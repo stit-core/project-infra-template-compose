@@ -29,6 +29,12 @@
   args:
     creates: /swapfile
 
+- name: Ensure journald.conf.d exists
+  ansible.builtin.file:
+    path: /etc/systemd/journald.conf.d
+    state: directory
+    mode: "0755"
+
 - name: Limit journald disk usage
   ansible.builtin.copy:
     dest: /etc/systemd/journald.conf.d/limits.conf
