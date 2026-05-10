@@ -29,9 +29,14 @@ services:
       - proxy            # outbound к vault.stit.tech
       - backend-net      # consumer'ы читают rendered-файлы через bind-mount
     healthcheck:
-      # Healthy = существует .ready marker. Consumer'ы (backend, postgres)
-      # ждут service_healthy, чтобы не стартовать до материализации секретов.
-      test: ["CMD", "test", "-f", "/secrets/.ready"]
+      # Healthy = ВСЕ rendered-секреты непустые. Просто `.ready` marker
+      # не годится: consul-template (внутри vault-agent) рендерит
+      # static-template (`.ready` с contents = "ready") раньше, чем
+      # template'ы, требующие запроса в Vault — postgres / backend
+      # стартовали с пустым env_file и падали.
+      # Если добавляешь новый render target в agent.hcl.tpl — добавь его
+      # сюда же.
+      test: ["CMD-SHELL", "test -s /secrets/backend.env && test -s /secrets/postgres.env"]
       interval: 5s
       timeout: 2s
       retries: 24        # ~2 мин на первый auth + render
