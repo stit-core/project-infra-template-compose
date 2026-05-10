@@ -1,0 +1,111 @@
+# Architecture
+
+Single-VPS docker-compose стек одного проекта. Все сервисы — контейнеры на одной машине, сетевая изоляция через docker networks.
+
+## Слои
+
+```
+                         Internet
+                            │
+                       ┌────┴────┐
+                       │ Traefik │ ──── HTTP-01 LE → Let's Encrypt
+                       │  +CrowdSec │
+                       └────┬────┘
+                            │ proxy network
+        ┌───────────────────┼───────────────┐
+        │                   │               │
+  ┌─────┴─────┐      ┌──────┴──────┐  ┌─────┴──────┐
+  │  Backend  │      │  otel-agent │  │   Vault-   │
+  │ (api.D)   │      │    (4318)   │  │   Agent    │
+  └─────┬─────┘      └──────┬──────┘  └─────┬──────┘
+        │                   │               │
+        │ backend-net       │ outbound      │ outbound
+        ↓                   ↓               ↓
+  ┌─────────┐       otel.stit.tech    vault.stit.tech
+  │Postgres │       (corp ingest)     (corp Vault)
+  └─────────┘
+```
+
+Дополнительно:
+- **Backup** (restic): сидит сбоку, по cron делает `pg_dumpall` + restic backup volume.
+- **Gitea-runner**: pull-based CI, исполняет workflows из `<org>/backend` и `<org>/infra`.
+
+## Сети
+
+| Network | Тип | Кто в ней |
+|---|---|---|
+| `proxy` | bridge, external | Traefik (edge), backend (для входящего HTTPS), vault-agent + otel-agent (исходящий к корпу), backup + runner (исходящий к S3 / Gitea) |
+| `backend-net` | bridge, **internal** | postgres, backend, otel-agent (получает OTLP от backend), vault-agent (рендерит файлы в shared volume) |
+
+Постгрес НЕ в `proxy` — он недоступен извне. Backend стучится в постгрес по hostname `postgres` через `backend-net`.
+
+## Данные и persistence
+
+| Volume | Что | Backup |
+|---|---|---|
+| `postgres-data` | PG datadir | да — pg_dumpall + raw volume |
+| `traefik-acme` | LE cert storage | нет (восстанавливается через ACME) |
+| `crowdsec-data` / `-config` | bouncer state, ban-lists | опционально (mostly self-rebuilds) |
+| `vault-agent-secrets` | rendered env-files | нет (рендерится из Vault) |
+| `vault-agent-bootstrap` | role-id/secret-id files | нет (из .env) |
+| `runner-data` | gitea-runner registration creds | нет (re-register если потерять) |
+| `backup-cache` | restic local cache | нет |
+| `.runtime/secrets/` (bind-mount) | env-files для `env_file:` consumer'ов | нет |
+
+`.runtime/secrets/` — bind-mount, а не named volume, потому что compose должен резолвить `env_file:` пути на хосте при создании контейнера.
+
+## Контракт с корпом
+
+| Корп-сервис | Что | Адрес |
+|---|---|---|
+| Vault | Secrets backend, AppRole-логин для проекта | `https://vault.stit.tech` |
+| OTel ingest | Telemetry (logs/metrics/traces) с tenant routing | `https://otel.stit.tech` |
+| Gitea | Source + container registry | `https://git.stit.tech` |
+| Minio | Restic backup destination (default) | `https://s3.stit.tech` |
+
+Vault AppRole + observability tenant выдаёт `stit/infra/scripts/onboard-project.sh <project>`. См. `stit/infra/docs/project-secrets.md`.
+
+## Поток секретов
+
+1. Оператор копирует AppRole `role-id/secret-id` в проектный `.env` (после `onboard-project.sh`).
+2. На `make deploy`: vault-agent стартует первым.
+   - entrypoint пишет `role-id`/`secret-id` в `.runtime/secrets-bootstrap/`.
+   - `auto_auth` логинится по AppRole, получает Vault token (TTL 10m, max 30m).
+   - templates читают `kv/projects/<p>/{db,oidc,jwt}` + `kv/observability/tenants/<p>`, рендерят `backend.env` и `postgres.env` в `.runtime/secrets/`.
+   - последний template создаёт `.ready` marker → healthcheck зелёный.
+3. Postgres + backend + otel-agent ждут `vault-agent: condition: service_healthy`, потом стартуют и читают `env_file: .runtime/secrets/<svc>.env`.
+4. На rotation секрета (например `vault kv patch kv/projects/<p>/db password=NEW`):
+   - vault-agent видит изменение, перерендеривает `.env`-файлы.
+   - В V1 — `make deploy` рестартит зависимые контейнеры (через `restart-on-config-change` логику).
+   - В V2 (TBD) — `command` в template-блоке делает `docker restart` автоматически.
+
+## Pull-based deploy
+
+```
+<org>/backend             <org>/infra (этот шаблон, скопированный)
+   │                          │
+   │ tag v*                   │ push main
+   ↓                          ↓
+git.stit.tech CI         gitea-runner (на VPS, label <project>-prod/<staging>)
+   │                          │
+   │ build + push image       │ ssh не нужен — runner ЛОКАЛЬНО:
+   ↓                          │   git pull && make deploy
+git.stit.tech registry        │
+                              ↓
+                          docker compose up --pull always
+                              ↓
+                          backend container с новым image:<tag>
+```
+
+Деплой инициируется push'ем в backend repo: tag → corp CI билдит → проектный runner подхватывает (label `<project>-prod`) и делает `make deploy`. Никаких SSH ключей в CI-secrets, никакого push'а на VPS извне.
+
+## Что НЕ в шаблоне (overlay-services)
+
+Если проекту нужно — добавляешь fragment в `compose/`:
+
+- **NATS** (event bus) — `compose/nats.yml` + добавь в backend-net.
+- **Redis** (cache) — `compose/redis.yml` + backend-net.
+- **Frontend** (static SPA или SSR) — `compose/frontend.yml` с traefik labels на корневой `${DOMAIN}`.
+- **Worker** (отдельный binary) — `compose/worker.yml`, обычно тот же image что backend, но `command: /app/worker`.
+
+Принцип: один файл = один сервис. Makefile собирает `-f` аргументы автоматически.

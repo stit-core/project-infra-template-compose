@@ -1,0 +1,35 @@
+# Pull-based deploy. Triggered by:
+#   push.branches=main  → staging environment (runner label <project>-staging)
+#   push.tags=v*        → prod environment    (runner label <project>-prod)
+#
+# Lives at .gitea/workflows/deploy.yml after copying — keeping source in
+# ci/gitea/workflows/ here keeps it visible without colliding with this
+# repo's own .gitea/ (the template repo doesn't auto-deploy itself).
+name: deploy
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+
+jobs:
+  staging:
+    if: github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, "${{ vars.PROJECT_NAME }}-staging"]
+    steps:
+      - name: Pull + deploy
+        run: |
+          cd /opt/${{ vars.PROJECT_NAME }}-infra
+          git pull --ff-only origin main
+          make deploy
+
+  prod:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: [self-hosted, "${{ vars.PROJECT_NAME }}-prod"]
+    steps:
+      - name: Pull + deploy at tag
+        run: |
+          cd /opt/${{ vars.PROJECT_NAME }}-infra
+          git fetch --tags
+          git checkout ${{ github.ref_name }}
+          make deploy
