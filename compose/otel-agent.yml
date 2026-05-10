@@ -1,6 +1,6 @@
 services:
   otel-agent:
-    image: otel/opentelemetry-collector-contrib:0.116.1
+    image: otel/opentelemetry-collector-contrib:0.151.0
     container_name: otel-agent
     restart: unless-stopped
     command: ["--config=/etc/otel/config.yaml"]
