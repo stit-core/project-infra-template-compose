@@ -48,6 +48,37 @@ depends_on:
 
 Vault-agent healthy = `.runtime/secrets/.ready` существует = шаблоны отрендерены. Без этого consumer стартует с пустым `env_file` и падает.
 
+## `internal: true` сеть и `ports:` несовместимы
+
+`backend-net` помечена `internal: true` — docker не делает входящий NAT на host-mapped порты для контейнеров, у которых **только** internal-сеть. То есть:
+
+```yaml
+networks:
+  - backend-net
+ports:
+  - "8080:8080"        # ❌ декларация есть, реально port forwarding не работает
+```
+
+`docker port <svc>` пуст, `ss -tlnp` не показывает 8080, `curl 127.0.0.1:8080` → connection refused.
+
+**Правило:** если у сервиса есть `ports:`, обязательно добавь не-internal сеть (`proxy`) рядом с `backend-net`:
+
+```yaml
+networks:
+  - proxy            # для published-port forwarding
+  - backend-net      # internal-traffic к postgres/minio/etc
+```
+
+Backend в шаблоне идёт через traefik (labels), не через `ports:` — там это не блокер. Когда DNS не поднят и сервис временно торчит портом — обязательно proxy.
+
+## env_file читается при container CREATE, не start
+
+Docker фиксирует содержимое `env_file:` в container config в момент **создания** контейнера, не запуска. Это две практические импликации:
+
+1. **На свежем bootstrap'е** vault-agent ещё не отрендерил `.runtime/secrets/*.env`, а compose уже валидирует **существование** этих путей до старта любого сервиса. Решение — `scripts/deploy.sh` делает `touch` пустых файлов перед `compose up`.
+
+2. **После изменения vault-template** (добавил поле, переименовал переменную) недостаточно сделать `docker restart <consumer>` — контейнер уже создан со старым ENV. Нужен `compose up -d --force-recreate <consumer>`. `scripts/deploy.sh` делает это автоматически когда видит изменения в `configs/vault-agent/templates/*.tpl` или `agent.hcl.tpl` между prev/new sha.
+
 ## Traefik labels
 
 Публичный сервис — labels на самом сервисе:

@@ -60,7 +60,12 @@ PG_DSN=postgres://{{ .Data.data.user }}:{{ .Data.data.password }}@postgres:5432/
 1. Создать `.tpl` в `configs/vault-agent/templates/`.
 2. Добавить `template { source = ...; destination = "/secrets/<svc>.env"; perms = 0400 }` блок в `agent.hcl.tpl`.
 
-После — рестарт vault-agent: `make restart SVC=vault-agent`. Consumer (backend и т.д.) поднимется когда `.ready` marker появится (depends_on: service_healthy).
+После — рестарт vault-agent + **force-recreate** consumer'ов. Просто `restart` НЕ работает: docker фиксирует `env_file` при container CREATE, не start, поэтому повторное чтение требует пересоздать контейнер. `scripts/deploy.sh` делает это автоматически при изменении `.tpl` между sha (см. блок про vault-template change). Вручную:
+
+```bash
+docker compose <args> restart vault-agent
+docker compose <args> up -d --no-deps --force-recreate <consumer>
+```
 
 ### Ротация
 
@@ -69,9 +74,13 @@ PG_DSN=postgres://{{ .Data.data.user }}:{{ .Data.data.password }}@postgres:5432/
 ```
 # на корп-VPS (stit/infra)
 vault kv patch kv/projects/<p>/db password=<new>
-# на проектной — vault-agent заметит изменение, перерендерит .env
-# но consumer уже прочитал env_file при старте — нужен рестарт
-make restart SVC=backend
+```
+
+Vault-agent на проектном VPS заметит изменение и перерендерит `.runtime/secrets/<svc>.env`. **Но consumer уже прочитал env_file при создании контейнера** — нужен force-recreate, не restart:
+
+```bash
+make restart SVC=backend     # ❌ контейнер не пересоздан, env_file не перечитан
+docker compose <args> up -d --no-deps --force-recreate backend  # ✅
 ```
 
 Не редактируй `.runtime/secrets/*.env` руками — vault-agent перетрёт.
