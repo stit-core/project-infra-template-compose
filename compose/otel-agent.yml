@@ -21,8 +21,14 @@ services:
     depends_on:
       vault-agent:
         condition: service_healthy
+    # Образ otel/opentelemetry-collector-contrib distroless — внутри
+    # только бинарь /otelcol-contrib, нет shell / wget / curl. HTTP-probe
+    # health_check extension изнутри контейнера невозможен. Используем
+    # `validate` как smoke: проверяет что бинарь работает и читает
+    # конфиг. Полноценный probe (что HTTP-сервер реально принимает данные)
+    # требует sidecar — отложено.
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:13133/"]
+      test: ["CMD", "/otelcol-contrib", "validate", "--config=/etc/otel/config.yaml"]
       interval: 30s
       timeout: 5s
       retries: 3
