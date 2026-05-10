@@ -12,7 +12,8 @@
 | DB | Postgres 17 | `compose/postgres.yml` |
 | App | Backend (image `git.stit.tech/<org>/backend`) | `compose/backend.yml` |
 | Secrets | vault-agent sidecar | `compose/vault-agent.yml` |
-| Telemetry | otel-agent → `otel.stit.tech` | `compose/otel-agent.yml` |
+| Telemetry | otel-agent → `otel.stit.tech` (OTLP от backend + Prom-scrape host-метрик) | `compose/otel-agent.yml` |
+| Host metrics | cadvisor + node-exporter (скрейпятся локальным otel-agent) | `compose/cadvisor.yml`, `compose/node-exporter.yml` |
 | Backup | restic-cron → corp Minio | `compose/backup.yml` |
 | CI | gitea-runner | `compose/runner.yml` |
 

@@ -1,0 +1,25 @@
+services:
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    container_name: node-exporter
+    restart: unless-stopped
+    mem_limit: 64m
+    command:
+      - --path.procfs=/host/proc
+      - --path.sysfs=/host/sys
+      - --path.rootfs=/host/root
+      - --collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc|rootfs/var/lib/docker/.+|var/lib/docker/.+)($$|/)
+      - --collector.netclass.ignored-devices=^(veth.*|docker.*|br-.*|lo)$$
+    pid: host
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/host/root:ro,rslave
+    networks:
+      - backend-net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9100/metrics"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
