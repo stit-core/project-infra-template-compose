@@ -1,0 +1,41 @@
+services:
+  backend:
+    image: git.stit.tech/${PROJECT_NAME}/backend:${BACKEND_TAG}
+    container_name: backend
+    restart: unless-stopped
+    # Non-secret runtime env from .env. Secrets (PG_DSN, OIDC, JWT,
+    # OTEL_TOKEN) come from vault-agent's rendered backend.env.
+    environment:
+      APP_ENV: prod
+      OTEL_SERVICE_NAME: backend
+      OTEL_TENANT: ${OTEL_TENANT}
+      # Backend exports to local otel-agent, which forwards to corp.
+      OTEL_EXPORTER_OTLP_ENDPOINT: otel-agent:4318
+      OTEL_EXPORTER_OTLP_INSECURE: "true"
+    env_file:
+      - .runtime/secrets/backend.env
+    depends_on:
+      vault-agent:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      otel-agent:
+        condition: service_healthy
+    networks:
+      - proxy
+      - backend-net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: proxy
+      traefik.http.routers.backend.rule: Host(`api.${DOMAIN}`)
+      traefik.http.routers.backend.entrypoints: websecure
+      traefik.http.routers.backend.tls: "true"
+      traefik.http.routers.backend.tls.certresolver: letsencrypt
+      traefik.http.routers.backend.middlewares: crowdsec@file,secure-headers@file,rate-limit@file
+      traefik.http.services.backend.loadbalancer.server.port: "8080"

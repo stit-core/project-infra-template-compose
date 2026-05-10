@@ -1,0 +1,39 @@
+services:
+  vault-agent:
+    image: hashicorp/vault:1.18.3
+    container_name: vault-agent
+    restart: unless-stopped
+    # Trampoline: write role-id / secret-id to the bootstrap volume that
+    # vault-agent's auto_auth reads, then exec the agent. Doing it in the
+    # entrypoint keeps the .env values out of `docker inspect` output.
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - |
+        umask 077
+        printf '%s' "$$VAULT_ROLE_ID"   > /secrets-bootstrap/role-id
+        printf '%s' "$$VAULT_SECRET_ID" > /secrets-bootstrap/secret-id
+        chmod 0400 /secrets-bootstrap/role-id /secrets-bootstrap/secret-id
+        exec vault agent -config=/etc/vault-agent/agent.hcl
+    environment:
+      VAULT_ROLE_ID:   ${VAULT_ROLE_ID}
+      VAULT_SECRET_ID: ${VAULT_SECRET_ID}
+      VAULT_ADDR:      ${VAULT_ADDR}
+      PROJECT_NAME:    ${PROJECT_NAME}
+    volumes:
+      - ./configs/vault-agent/agent.hcl:/etc/vault-agent/agent.hcl:ro
+      - ./configs/vault-agent/templates:/etc/vault-agent/templates:ro
+      - ./.runtime/secrets:/secrets
+      - ./.runtime/secrets-bootstrap:/secrets-bootstrap
+    networks:
+      - proxy            # outbound to vault.stit.tech via internet
+      - backend-net      # consumers read rendered files via shared bind-mount
+    healthcheck:
+      # Healthy = .ready marker exists. Downstream services use
+      # depends_on: condition: service_healthy on vault-agent so they
+      # don't start before secrets are materialized.
+      test: ["CMD", "test", "-f", "/secrets/.ready"]
+      interval: 5s
+      timeout: 2s
+      retries: 24        # ~2 min for first auth + render
+      start_period: 5s

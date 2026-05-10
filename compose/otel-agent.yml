@@ -1,0 +1,30 @@
+services:
+  otel-agent:
+    image: otel/opentelemetry-collector-contrib:0.116.1
+    container_name: otel-agent
+    restart: unless-stopped
+    command: ["--config=/etc/otel/config.yaml"]
+    # Bearer token comes from the vault-agent rendered backend.env (it
+    # contains OTEL_TOKEN). otel-agent only needs OTEL_TOKEN; the rest
+    # of backend.env is harmless extra env from its perspective.
+    env_file:
+      - .runtime/secrets/backend.env
+    environment:
+      OTEL_TENANT: ${OTEL_TENANT}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT}
+      OTEL_EXPORTER_OTLP_INSECURE: ${OTEL_EXPORTER_OTLP_INSECURE}
+    volumes:
+      - ./configs/otel-agent/config.yaml:/etc/otel/config.yaml:ro
+      - otel-agent-data:/var/lib/otel
+    networks:
+      - proxy            # outbound to otel.stit.tech
+      - backend-net      # accepts OTLP from backend
+    depends_on:
+      vault-agent:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:13133/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

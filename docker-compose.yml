@@ -1,0 +1,22 @@
+# Edge networks + named volumes. Per-service compose fragments live in
+# compose/*.yml and are stitched in via Makefile's COMPOSE_ARGS.
+
+networks:
+  proxy:
+    name: proxy
+    driver: bridge
+  backend-net:
+    name: backend-net
+    driver: bridge
+    internal: true
+
+volumes:
+  traefik-acme:
+  crowdsec-data:
+  crowdsec-config:
+  postgres-data:
+  vault-agent-secrets:
+  vault-agent-bootstrap:
+  otel-agent-data:
+  backup-cache:
+  runner-data:

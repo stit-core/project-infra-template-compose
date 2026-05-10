@@ -1,0 +1,23 @@
+services:
+  backup:
+    image: restic/restic:0.17.3
+    container_name: backup
+    restart: "no"
+    # Long-running container with cron-driven invocations. The image's
+    # entrypoint accepts subcommands; we override to a sleep loop and
+    # have the host cron exec `docker exec backup /usr/local/bin/run-backup.sh`.
+    # Alternative: separate restic-runner image with crond inside. Picked
+    # this for simplicity — host cron is already where backup.sh hooks live.
+    entrypoint: ["sh", "-c", "tail -f /dev/null"]
+    environment:
+      RESTIC_REPOSITORY: ${RESTIC_REPOSITORY}
+      RESTIC_PASSWORD: ${RESTIC_PASSWORD}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+    volumes:
+      - postgres-data:/data/postgres:ro
+      - ./scripts/backup.sh:/usr/local/bin/run-backup.sh:ro
+      - backup-cache:/cache
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - proxy            # outbound to S3 endpoint

@@ -1,0 +1,17 @@
+services:
+  gitea-runner:
+    image: gitea/act_runner:0.2.11
+    container_name: gitea-runner
+    restart: unless-stopped
+    environment:
+      GITEA_INSTANCE_URL: https://git.stit.tech
+      # GITEA_RUNNER_REGISTRATION_TOKEN consumed by entrypoint on first
+      # boot only; after registration the token is cleared from .env.
+      GITEA_RUNNER_REGISTRATION_TOKEN: ${GITEA_RUNNER_REG_TOKEN}
+      GITEA_RUNNER_NAME: ${PROJECT_NAME}-runner
+      GITEA_RUNNER_LABELS: "${PROJECT_NAME}-prod,${PROJECT_NAME}-staging,docker"
+    volumes:
+      - runner-data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - proxy
