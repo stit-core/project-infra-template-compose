@@ -67,7 +67,11 @@
       "Write(.env.production)",
       "Write(**/*.pem)",
       "Write(**/*.key)",
-      "Write(.runtime/**)"
+      "Write(.runtime/**)",
+      "Write(//*/.claude/projects/*/memory/**)",
+      "Edit(//*/.claude/projects/*/memory/**)",
+      "MultiEdit(//*/.claude/projects/*/memory/**)",
+      "NotebookEdit(//*/.claude/projects/*/memory/**)"
     ]
   },
   "hooks": {
@@ -87,6 +91,10 @@
           {
             "type": "command",
             "command": "scripts/claude-hooks/pre-edit-image-bump.sh"
+          },
+          {
+            "type": "command",
+            "command": "scripts/claude-hooks/pre-write-no-memory.sh"
           }
         ]
       }

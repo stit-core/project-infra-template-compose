@@ -88,6 +88,7 @@ VAULT_TOKEN=<root> bash scripts/onboard-project.sh <project>
 - Commit `.env*`, `.runtime/`, `*.pem`, `*.key`.
 - Image-теги вида `:latest`.
 - Хранить секреты в `.env` или `configs/`. Всё через vault-agent.
+- **Писать в auto-memory** (`~/.claude/projects/**/memory/**`) — отключено. Pre-write хук блокирует. См. §8.
 
 ## 7. Что менять при копировании в `<org>/infra`
 
@@ -100,3 +101,22 @@ VAULT_TOKEN=<root> bash scripts/onboard-project.sh <project>
 5. `configs/traefik/dynamic/` — клиент-специфичные routers/middlewares (опционально).
 
 См. `docs/onboarding.md` для полного чек-листа.
+
+## 8. Auto-memory
+
+В этом проекте автопамять Claude **отключена**. Всё, что должно пережить сессию, фиксируется в репо под git — это видно команде, ревьюится, воспроизводимо.
+
+Куда что писать:
+
+| Что | Куда |
+|---|---|
+| Постоянные правила/предпочтения для агента | `AGENTS.md` или `.claude/rules/<topic>.md` |
+| Архитектурные решения | `docs/adrs/NNNN-<slug>.md` |
+| Активные задачи / план работ | `.claude/plans/<slug>.md` |
+| Reference на внешние системы | `docs/architecture.md`, `docs/onboarding.md`, `docs/runbook.md` |
+| Креды и где они используются | вне репо (Vaultwarden, оператор-only заметка) |
+
+Технически:
+- `permissions.deny` в `.claude/settings.json` блокирует Write/Edit/MultiEdit/NotebookEdit к memory-директории Claude Code (`~/.claude/projects/**/memory/**`).
+- `scripts/claude-hooks/pre-write-no-memory.sh` (PreToolUse) — страховка с понятным сообщением.
+- Если правила «забываются» между сессиями — значит они недо-зафиксированы в репо. Перенеси в `AGENTS.md` / `.claude/rules/`.
