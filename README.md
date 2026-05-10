@@ -13,6 +13,21 @@ IaC шаблон проектной инфры для stit.tech: docker-compose 
 
 См. `docs/architecture.md` для деталей.
 
+## Использовать как шаблон
+
+В Gitea этот репо помечен `template: true`. Старт нового проекта:
+
+1. Открыть https://git.stit.tech/stit/project-infra-template-compose → **Use this template** → создать `<client-org>/infra`.
+2. Дальше идти по Day-0 quickstart ниже — шаг 2 уже выполнен (репо создан, история чистая).
+
+Альтернатива через Gitea API:
+```bash
+curl -X POST -H "Authorization: token $GITEA_TOKEN" -H "Content-Type: application/json" \
+  -d '{"owner":"<client-org>","name":"infra","private":true}' \
+  https://git.stit.tech/api/v1/repos/generate \
+  --url-query 'template_owner=stit' --url-query 'template_repo=project-infra-template-compose'
+```
+
 ## Day-0 quickstart
 
 1. На корп-стороне (`stit/infra`):
@@ -21,10 +36,9 @@ IaC шаблон проектной инфры для stit.tech: docker-compose 
    ```
    Получаешь блок `.env`-переменных + AppRole.
 
-2. Создать клиентский репо `<org>/infra` из этого шаблона (clone + change remote, или git template):
+2. Создать клиентский репо `<org>/infra` из этого шаблона — через UI **Use this template** или API (см. секцию выше). Затем склонировать локально:
    ```bash
-   git clone https://git.stit.tech/stit/project-infra-template-compose.git acme-infra
-   cd acme-infra && git remote set-url origin https://git.stit.tech/<org>/infra.git
+   git clone git@git.stit.tech:<org>/infra.git && cd infra
    ```
 
 3. Заполнить `.env` (на проектном VPS, в `/opt/<project>-infra/`) блоком из step 1 + клиентским доменом, BACKEND_TAG, restic-кредами.
