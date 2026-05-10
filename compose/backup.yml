@@ -1,6 +1,6 @@
 services:
   backup:
-    image: restic/restic:0.17.3
+    image: restic/restic:0.18.1
     container_name: backup
     restart: "no"
     # Долгоживущий контейнер, дёргается через host-cron:
