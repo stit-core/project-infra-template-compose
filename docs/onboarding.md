@@ -147,7 +147,7 @@ docker exec backup restic snapshots                    # пусто на ста�
 
 - `https://api.<DOMAIN>/...` отдаёт backend.
 - `docker logs backend` показывает trace IDs от OTel.
-- В корп Grafana (`https://grafana.stit.tech`) под tenant `<project>` видны логи + traces + metrics.
+- В корп Grafana (`https://grafana.stit.tech`) при выборе variable `$tenant=<project>` в дашбордах **Cadvisor**, **Node Exporter Full** и в Explore (Loki/Tempo) видны host-метрики, контейнерные метрики, логи и трейсы проектной VPS.
 - В корп Vault видны лизы (`vault list sys/leases/lookup/auth/approle/login`).
 - На завтра в restic появляется snapshot за прошлую ночь.
 

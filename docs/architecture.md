@@ -16,26 +16,30 @@ Single-VPS docker-compose стек одного проекта. Все серв�
         │                   │               │
   ┌─────┴─────┐      ┌──────┴──────┐  ┌─────┴──────┐
   │  Backend  │      │  otel-agent │  │   Vault-   │
-  │ (api.D)   │      │    (4318)   │  │   Agent    │
+  │ (api.D)   │      │ OTLP+scrape │  │   Agent    │
   └─────┬─────┘      └──────┬──────┘  └─────┬──────┘
-        │                   │               │
-        │ backend-net       │ outbound      │ outbound
-        ↓                   ↓               ↓
-  ┌─────────┐       otel.stit.tech    vault.stit.tech
-  │Postgres │       (corp ingest)     (corp Vault)
-  └─────────┘
+        │                   │ ↑             │
+        │ backend-net       │ │ scrape      │ outbound
+        ↓                   ↓ │             ↓
+  ┌─────────┐       ┌────────┴────────┐ vault.stit.tech
+  │Postgres │       │ cadvisor +      │ (corp Vault)
+  └─────────┘       │ node-exporter   │
+                    └─────────────────┘
+                            ↓
+                     otel.stit.tech (corp ingest)
 ```
 
 Дополнительно:
 - **Backup** (restic): сидит сбоку, по cron делает `pg_dumpall` + restic backup volume.
 - **Gitea-runner**: pull-based CI, исполняет workflows из `<org>/backend` и `<org>/infra`.
+- **cadvisor + node-exporter**: host-/container-метрики, скрейпятся локальным otel-agent'ом и шлются в корп под тем же tenant'ом, что и app-телеметрия (`service.namespace=$OTEL_TENANT`). Видны в корп-Grafana дашбордах cadvisor + Node Exporter Full при выборе `$tenant=<project>`.
 
 ## Сети
 
 | Network | Тип | Кто в ней |
 |---|---|---|
 | `proxy` | bridge, external | Traefik (edge), backend (для входящего HTTPS), vault-agent + otel-agent (исходящий к корпу), backup + runner (исходящий к S3 / Gitea) |
-| `backend-net` | bridge, **internal** | postgres, backend, otel-agent (получает OTLP от backend), vault-agent (рендерит файлы в shared volume) |
+| `backend-net` | bridge, **internal** | postgres, backend, otel-agent (получает OTLP от backend, скрейпит cadvisor + node-exporter), cadvisor, node-exporter, vault-agent (рендерит файлы в shared volume) |
 
 Постгрес НЕ в `proxy` — он недоступен извне. Backend стучится в постгрес по hostname `postgres` через `backend-net`.
 
