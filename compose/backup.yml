@@ -3,11 +3,10 @@ services:
     image: restic/restic:0.17.3
     container_name: backup
     restart: "no"
-    # Long-running container with cron-driven invocations. The image's
-    # entrypoint accepts subcommands; we override to a sleep loop and
-    # have the host cron exec `docker exec backup /usr/local/bin/run-backup.sh`.
-    # Alternative: separate restic-runner image with crond inside. Picked
-    # this for simplicity — host cron is already where backup.sh hooks live.
+    # Долгоживущий контейнер, дёргается через host-cron:
+    # `docker exec backup /usr/local/bin/run-backup.sh`. Альтернатива —
+    # отдельный image c crond внутри; не делаем ради простоты, host-cron
+    # и так уже точка управления backup.sh.
     entrypoint: ["sh", "-c", "tail -f /dev/null"]
     environment:
       RESTIC_REPOSITORY: ${RESTIC_REPOSITORY}
@@ -20,4 +19,4 @@ services:
       - backup-cache:/cache
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
-      - proxy            # outbound to S3 endpoint
+      - proxy            # outbound к S3-endpoint

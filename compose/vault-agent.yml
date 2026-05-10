@@ -3,9 +3,9 @@ services:
     image: hashicorp/vault:1.18.3
     container_name: vault-agent
     restart: unless-stopped
-    # Trampoline: write role-id / secret-id to the bootstrap volume that
-    # vault-agent's auto_auth reads, then exec the agent. Doing it in the
-    # entrypoint keeps the .env values out of `docker inspect` output.
+    # Trampoline: пишем role-id / secret-id в bootstrap-volume, откуда
+    # auto_auth их читает, и exec'аем agent. Через entrypoint (а не
+    # напрямую в config) — чтобы значения не светились в `docker inspect`.
     entrypoint:
       - /bin/sh
       - -ec
@@ -26,14 +26,13 @@ services:
       - ./.runtime/secrets:/secrets
       - ./.runtime/secrets-bootstrap:/secrets-bootstrap
     networks:
-      - proxy            # outbound to vault.stit.tech via internet
-      - backend-net      # consumers read rendered files via shared bind-mount
+      - proxy            # outbound к vault.stit.tech
+      - backend-net      # consumer'ы читают rendered-файлы через bind-mount
     healthcheck:
-      # Healthy = .ready marker exists. Downstream services use
-      # depends_on: condition: service_healthy on vault-agent so they
-      # don't start before secrets are materialized.
+      # Healthy = существует .ready marker. Consumer'ы (backend, postgres)
+      # ждут service_healthy, чтобы не стартовать до материализации секретов.
       test: ["CMD", "test", "-f", "/secrets/.ready"]
       interval: 5s
       timeout: 2s
-      retries: 24        # ~2 min for first auth + render
+      retries: 24        # ~2 мин на первый auth + render
       start_period: 5s

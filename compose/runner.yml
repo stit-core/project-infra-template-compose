@@ -5,8 +5,8 @@ services:
     restart: unless-stopped
     environment:
       GITEA_INSTANCE_URL: https://git.stit.tech
-      # GITEA_RUNNER_REGISTRATION_TOKEN consumed by entrypoint on first
-      # boot only; after registration the token is cleared from .env.
+      # Token используется только на первом старте. После регистрации
+      # значение можно убрать из .env.
       GITEA_RUNNER_REGISTRATION_TOKEN: ${GITEA_RUNNER_REG_TOKEN}
       GITEA_RUNNER_NAME: ${PROJECT_NAME}-runner
       GITEA_RUNNER_LABELS: "${PROJECT_NAME}-prod,${PROJECT_NAME}-staging,docker"

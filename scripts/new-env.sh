@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Interactive bootstrap of .env on a fresh project VPS.
-# Prompts for project facts, paste-friendly block from corp onboard.
+# Интерактивный bootstrap .env на свежем проектном VPS. Промптит project-факты,
+# принимает paste-блок от корп-onboard-project.sh.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 if [ -f .env ]; then
-  echo "ERR: .env already exists. Edit it manually or remove first." >&2
+  echo "ERR: .env уже существует. Правь вручную или удали." >&2
   exit 1
 fi
 
@@ -23,10 +23,10 @@ prompt() {
 echo "=== Project identity ==="
 prompt PROJECT_NAME "PROJECT_NAME (lowercase, e.g. acme)"
 prompt DOMAIN "DOMAIN (e.g. acme.com)"
-prompt ACME_EMAIL "ACME_EMAIL (LE notifications)" "ops@$DOMAIN"
+prompt ACME_EMAIL "ACME_EMAIL (LE-уведомления)" "ops@$DOMAIN"
 
 echo
-echo "=== Vault AppRole (paste from corp onboard-project.sh output) ==="
+echo "=== Vault AppRole (paste из вывода corp onboard-project.sh) ==="
 prompt VAULT_ROLE_ID "VAULT_ROLE_ID"
 prompt VAULT_SECRET_ID "VAULT_SECRET_ID"
 prompt VAULT_ADDR "VAULT_ADDR" "https://vault.stit.tech"
@@ -50,7 +50,7 @@ prompt AWS_SECRET_ACCESS_KEY "AWS_SECRET_ACCESS_KEY"
 
 echo
 echo "=== Gitea runner registration ==="
-prompt GITEA_RUNNER_REG_TOKEN "GITEA_RUNNER_REG_TOKEN (one-shot from Gitea admin UI)" ""
+prompt GITEA_RUNNER_REG_TOKEN "GITEA_RUNNER_REG_TOKEN (one-shot из Gitea admin UI)" ""
 
 CROWDSEC_BOUNCER_API_KEY=""
 
@@ -82,15 +82,15 @@ chmod 0600 .env
 
 cat <<EOF
 
-OK: .env written (chmod 0600).
+OK: .env записан (chmod 0600).
 
-Next:
-  1. First deploy:                bash scripts/deploy.sh
+Дальше:
+  1. Первый деплой:               bash scripts/deploy.sh
   2. CrowdSec bouncer key:        docker exec crowdsec cscli bouncers add traefik
-                                  (paste API key into CROWDSEC_BOUNCER_API_KEY in .env, redeploy)
-  3. Register gitea-runner:       bash scripts/register-runner.sh
-                                  (or set GITEA_RUNNER_REG_TOKEN before first deploy and let runner self-register)
+                                  (paste API-key в CROWDSEC_BOUNCER_API_KEY в .env, редеплой)
+  3. Зарегистрировать runner:     bash scripts/register-runner.sh
+                                  (или установить GITEA_RUNNER_REG_TOKEN до первого деплоя — runner сам зарегистрируется)
 
-If OIDC / 3rd-party API keys are needed, seed them on corp side via
+Если нужны OIDC / 3rd-party API keys — seed на корп-стороне:
   VAULT_TOKEN=<root> bash scripts/seed-project-secrets.sh $PROJECT_NAME <env-file>
 EOF

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Pre-deploy gate: compose syntax + .env.example coverage + tpl render.
+# Pre-deploy gate: compose syntax + .env.example coverage + .tpl render.
 set -eo pipefail
 cd "$(dirname "$0")/../.."
 
@@ -7,7 +7,7 @@ fail=0
 
 echo "== compose syntax =="
 if ! command -v docker >/dev/null; then
-  echo "  docker not installed locally — skipped"
+  echo "  docker не установлен локально — пропускаем"
 else
   args=(-f docker-compose.yml)
   for f in compose/*.yml; do [ -f "$f" ] && args+=(-f "$f"); done
@@ -20,14 +20,14 @@ else
       fail=1
     fi
   else
-    echo "  .env missing — skipping (need real .env for substitutions)"
+    echo "  .env отсутствует — пропускаем (для подстановок нужен реальный .env)"
   fi
 fi
 
 echo
 echo "== yamllint configs/ =="
 if ! command -v yamllint >/dev/null; then
-  echo "  yamllint not installed — skipped (install: pip install yamllint)"
+  echo "  yamllint не установлен — пропускаем (установка: pip install yamllint)"
 else
   if yamllint -d "{extends: relaxed, rules: {line-length: disable}}" configs/ compose/ docker-compose.yml 2>&1 | sed 's/^/  /'; then
     echo "  OK"
@@ -41,7 +41,7 @@ echo "== .tpl rendering =="
 shopt -s globstar nullglob
 tpls=(configs/**/*.tpl)
 if [ ${#tpls[@]} -eq 0 ]; then
-  echo "  no .tpl files"
+  echo "  .tpl-файлов нет"
 else
   set -a
   [ -f .env ] && . ./.env
@@ -58,9 +58,9 @@ fi
 
 echo
 echo "== .env.example coverage =="
-# Find ${VAR} references in compose + configs, check presence in .env.example.
+# Ищем ${VAR} в compose + configs, проверяем наличие в .env.example.
 if [ ! -f .env.example ]; then
-  echo "  .env.example missing"
+  echo "  .env.example отсутствует"
   fail=1
 else
   used=$(grep -rhoE '\$\{[A-Z_][A-Z0-9_]*' compose/ configs/ docker-compose.yml 2>/dev/null \

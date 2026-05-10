@@ -1,5 +1,5 @@
-# Edge networks + named volumes. Per-service compose fragments live in
-# compose/*.yml and are stitched in via Makefile's COMPOSE_ARGS.
+# Сети + named volumes. Сервисы — в compose/*.yml, склеиваются через
+# COMPOSE_ARGS в Makefile.
 
 networks:
   proxy:

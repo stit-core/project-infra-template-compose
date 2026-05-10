@@ -1,14 +1,14 @@
 ---
-# Take a fresh Debian/Ubuntu VPS to a state where `make deploy` works.
-# Idempotent — re-run safely after package updates / config drift.
+# Доводит свежий Debian/Ubuntu VPS до состояния, когда `make deploy` работает.
+# Идемпотентно — re-run safe после package-апдейтов / config-drift.
 #
-# Usage:
+# Запуск:
 #   ansible-playbook -i inventory.ini bootstrap.yml
 #
-# Required inventory vars (per host):
-#   ansible_host        — IP or DNS name of VPS
-#   project_name        — must match PROJECT_NAME in project's .env
-#   project_repo_url    — git URL of <client-org>/infra repo
+# Required inventory-vars (per host):
+#   ansible_host        — IP или DNS VPS
+#   project_name        — должен совпадать с PROJECT_NAME в .env проекта
+#   project_repo_url    — git URL репо <client-org>/infra
 - name: Bootstrap project VPS
   hosts: project_vps
   become: true

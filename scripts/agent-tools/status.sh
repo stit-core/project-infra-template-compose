@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Repo state summary for /smartdev. No SSH; for full server-side checks
-# pass --full (TBD when ssh.sh wrapper is added).
+# Сводка состояния репо для /smartdev. Без SSH; серверные проверки —
+# через scripts/agent-tools/ssh.sh status.
 set -eo pipefail
 cd "$(dirname "$0")/../.."
 

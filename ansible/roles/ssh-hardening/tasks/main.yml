@@ -1,7 +1,7 @@
 ---
-# Move sshd to port 2222, disable password auth, install fail2ban.
-# Operator's pubkey already in /root/.ssh/authorized_keys (assumed
-# from VPS provisioning; otherwise this task locks you out).
+# sshd на 2222, disable password auth, fail2ban.
+# Pubkey оператора предполагается уже в /root/.ssh/authorized_keys
+# (из VPS-provisioning); иначе роль залочит доступ.
 - name: Verify root authorized_keys non-empty (refuse to harden a passworded box)
   ansible.builtin.stat:
     path: /root/.ssh/authorized_keys

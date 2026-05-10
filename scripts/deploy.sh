@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Idempotent deploy: pull, render configs, compose up. Restart services
-# whose bind-mounted configs changed (compose `up -d` doesn't notice
-# edits inside bind-mounted files, only YAML changes).
+# Идемпотентный deploy: pull → render → compose up. Дополнительно
+# рестартит сервисы, у которых поменялись bind-mounted конфиги
+# (compose `up -d` смотрит только на YAML, не на содержимое bind-mount).
 #
-# Run on the project's VPS from /opt/<project>-infra/.
+# Запускать на проектном VPS из /opt/<project>-infra/.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -16,7 +16,7 @@ new_sha=$(git rev-parse HEAD 2>/dev/null || echo "none")
 
 bash scripts/render-configs.sh
 
-# Ensure runtime dirs exist before vault-agent tries to bind-mount them.
+# Создаём runtime-директории до того, как vault-agent попытается их bind-mount'ить.
 mkdir -p .runtime/secrets .runtime/secrets-bootstrap
 chmod 0700 .runtime/secrets .runtime/secrets-bootstrap
 
@@ -27,7 +27,7 @@ done
 
 docker compose "${args[@]}" up -d --remove-orphans --wait --wait-timeout 180
 
-# Restart services with changed bind-mounted configs.
+# Рестарт сервисов с изменёнными bind-mounted конфигами.
 if [ "$prev_sha" != "$new_sha" ] && [ "$prev_sha" != "none" ]; then
   declare -A configmap=(
     [traefik]="traefik"

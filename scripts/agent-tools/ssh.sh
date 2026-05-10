@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
-# SSH wrapper for project VPS operations. Reads SSH_HOST/SSH_PORT from
-# .env (or environment) so you can run from your dev machine without
-# memorizing connection strings.
+# SSH-обёртка операций на проектном VPS. Читает SSH_HOST/SSH_PORT из
+# .env (или окружения), чтобы не помнить connection-строки.
 #
 # Subcommands:
-#   status       — quick remote `make ps` + `make status` summary
-#   deploy       — ssh + git pull + make deploy (on server)
+#   status       — remote `make ps` + status.sh
+#   deploy       — ssh + git pull + make deploy
 #   restart SVC  — ssh + make restart SVC=<name>
-#   logs SVC     — ssh + tail logs of one service
-#   exec CMD ... — ssh + run arbitrary command inside /opt/<project>-infra/
+#   logs SVC     — ssh + tail логов одного сервиса
+#   exec CMD ... — ssh + произвольная команда в /opt/<project>-infra/
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 

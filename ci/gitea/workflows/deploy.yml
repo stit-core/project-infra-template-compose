@@ -1,10 +1,9 @@
-# Pull-based deploy. Triggered by:
-#   push.branches=main  → staging environment (runner label <project>-staging)
-#   push.tags=v*        → prod environment    (runner label <project>-prod)
+# Pull-based deploy. Триггеры:
+#   push.branches=main  → staging (runner label <project>-staging)
+#   push.tags=v*        → prod    (runner label <project>-prod)
 #
-# Lives at .gitea/workflows/deploy.yml after copying — keeping source in
-# ci/gitea/workflows/ here keeps it visible without colliding with this
-# repo's own .gitea/ (the template repo doesn't auto-deploy itself).
+# В клиентском репо файл копируется в .gitea/workflows/deploy.yml. Здесь
+# держим в ci/gitea/workflows/ — чтобы шаблонный репо сам себя не деплоил.
 name: deploy
 
 on:

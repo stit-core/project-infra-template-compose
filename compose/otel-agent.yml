@@ -4,9 +4,8 @@ services:
     container_name: otel-agent
     restart: unless-stopped
     command: ["--config=/etc/otel/config.yaml"]
-    # Bearer token comes from the vault-agent rendered backend.env (it
-    # contains OTEL_TOKEN). otel-agent only needs OTEL_TOKEN; the rest
-    # of backend.env is harmless extra env from its perspective.
+    # Bearer-token берётся из backend.env (там OTEL_TOKEN). Лишние
+    # переменные из backend.env для otel-agent безвредны.
     env_file:
       - .runtime/secrets/backend.env
     environment:
@@ -17,8 +16,8 @@ services:
       - ./configs/otel-agent/config.yaml:/etc/otel/config.yaml:ro
       - otel-agent-data:/var/lib/otel
     networks:
-      - proxy            # outbound to otel.stit.tech
-      - backend-net      # accepts OTLP from backend
+      - proxy            # outbound к otel.stit.tech
+      - backend-net      # принимает OTLP от backend
     depends_on:
       vault-agent:
         condition: service_healthy

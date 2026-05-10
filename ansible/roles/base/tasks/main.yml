@@ -15,7 +15,7 @@
       - htop
       - jq
       - gettext-base       # envsubst
-      - chrony             # ntp
+      - chrony             # NTP
       - unattended-upgrades
     state: present
 

@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
-# Render .tpl configs to their non-.tpl counterparts via envsubst.
-# Run on the server before `docker compose up`. Run locally (with .env
-# populated) for validate.sh dry-runs.
+# envsubst для .tpl → файл без .tpl. На сервере запускается перед
+# `docker compose up`. Локально (с заполненным .env) — для validate.sh dry-run.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 if [ ! -f .env ]; then
-  echo "ERR: .env not found" >&2
+  echo "ERR: .env не найден" >&2
   exit 1
 fi
 

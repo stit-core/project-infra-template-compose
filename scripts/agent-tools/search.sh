@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# rg/grep over compose + configs + scripts + docs. Scopes the search so
-# we don't drag in .runtime/, rendered configs, or other noise.
+# rg/grep по compose + configs + scripts + docs. Исключает .runtime/,
+# rendered-конфиги и прочий шум.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 

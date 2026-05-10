@@ -1,7 +1,7 @@
 ---
-# Set up project_root, deploy SSH key for git pulls, clone the project
-# infra repo. Operator runs `bash scripts/new-env.sh` afterwards to
-# populate .env, then `make deploy` for the first stack-up.
+# Настройка project_root, генерация deploy-key, клонирование репо.
+# После — оператор делает `bash scripts/new-env.sh` (заполняет .env)
+# и `make deploy` (первый подъём стека).
 - name: Ensure project root exists
   ansible.builtin.file:
     path: "{{ project_root }}"
@@ -46,14 +46,14 @@
     dest: "{{ project_root }}"
     update: true
     accept_hostkey: true
-  ignore_errors: true   # First run: deploy key not yet added in Gitea — operator does it manually after seeing pubkey, then re-runs.
+  ignore_errors: true   # Первый прогон: deploy-key ещё не зарегистрирован в Gitea — оператор делает это руками после вывода pubkey, потом re-run.
   register: clone
 
 - name: Print next-step hint if clone failed
   ansible.builtin.debug:
     msg: |
-      Clone failed — likely deploy key not yet registered in Gitea.
-      1. Copy the pubkey above into the project infra repo's deploy keys.
+      Clone упал — скорее всего deploy-key не зарегистрирован в Gitea.
+      1. Скопируй pubkey выше в deploy keys репо.
       2. Re-run: ansible-playbook -i inventory.ini bootstrap.yml --tags onboard
   when: clone.failed | default(false)
 

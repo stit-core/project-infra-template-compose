@@ -3,8 +3,8 @@ services:
     image: postgres:17.2-alpine
     container_name: postgres
     restart: unless-stopped
-    # POSTGRES_USER/PASSWORD/DB come from vault-agent rendered file.
-    # postgres image accepts them via env_file the same way as direct env.
+    # POSTGRES_USER/PASSWORD/DB рендерятся vault-agent'ом; postgres image
+    # принимает их через env_file так же, как прямой environment.
     env_file:
       - .runtime/secrets/postgres.env
     volumes:
@@ -15,8 +15,7 @@ services:
     networks:
       - backend-net
     healthcheck:
-      # POSTGRES_USER/DB come from env_file (rendered by vault-agent).
-      # $$ escapes compose interpolation; the container shell expands.
+      # $$ — escape compose-интерполяции, переменные раскрывает shell в контейнере.
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 10s
       timeout: 5s
