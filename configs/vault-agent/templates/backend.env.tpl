@@ -8,7 +8,7 @@ OIDC_CLIENT_SECRET={{ .Data.data.client_secret }}
 {{ end }}
 
 {{ with secret (printf "kv/data/projects/%s/jwt" (env "PROJECT_NAME")) }}
-JWT_SIGNING_KEY={{ .Data.data.signing_key }}
+JWT_SECRET={{ .Data.data.signing_key }}
 {{ end }}
 
 {{ with secret (printf "kv/data/observability/tenants/%s" (env "PROJECT_NAME")) }}

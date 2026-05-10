@@ -48,7 +48,23 @@ curl -X POST -H "Authorization: token $GITEA_TOKEN" -H "Content-Type: applicatio
    ansible-playbook -i ansible/inventory.ini ansible/bootstrap.yml
    ```
 
-5. Первый деплой:
+5. На VPS залогиниться в registry (для pull image'ей):
+   ```bash
+   ssh root@<vps>
+   docker login git.stit.tech -u <user> -p <PAT>      # PAT из gitea: Settings → Applications
+   ```
+
+6. (Опц., но **сильно рекомендовано** при ручной сборке с dev-машины)
+   Whitelist'нуть IP dev-машины в корпном CrowdSec, иначе `docker push`
+   быстро триггерит `crowdsecurity/http-probing` бан:
+   ```bash
+   # на корп-VPS
+   bash /opt/stit-infra/scripts/onboard-project.sh <project> --source-ip <dev-ip>
+   ```
+   (Если проект уже onboard'ен — отредактируй `configs/crowdsec/whitelists.yaml`
+   и `docker compose ... restart crowdsec` руками.)
+
+7. Первый деплой:
    ```bash
    ssh root@<vps> 'cd /opt/<project>-infra && make deploy'
    ```

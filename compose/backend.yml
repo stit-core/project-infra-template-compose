@@ -25,7 +25,8 @@ services:
       - proxy
       - backend-net
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      # golibinfra/httpkit регистрирует /health (liveness) и /ready (с DB-probe).
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
       interval: 30s
       timeout: 5s
       retries: 3
