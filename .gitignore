@@ -1,0 +1,19 @@
+.env
+.env.*
+!.env.example
+
+# vault-agent rendered secrets + bootstrap files
+.runtime/
+
+# rendered .tpl outputs (kept in repo only as .tpl)
+configs/**/*.yml
+!configs/**/*.tpl
+configs/traefik/dynamic/middlewares.yml
+
+# ansible
+ansible/*.retry
+ansible/inventory.ini
+
+# local
+*.local
+.DS_Store

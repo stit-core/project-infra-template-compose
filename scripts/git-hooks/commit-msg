@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Conventional Commits validator для project-infra-template-compose.
+# Допустимые типы: feat, fix, refactor, docs, test, chore, meta, perf.
+# Subject ≤72 символа, scope опционален.
+
+set -e
+
+COMMIT_MSG_FILE="$1"
+PATTERN='^(feat|fix|refactor|docs|test|chore|meta|perf)(\([a-z0-9_/-]+\))?(!)?: .{1,72}'
+HEAD_LINE="$(head -n 1 "$COMMIT_MSG_FILE" | sed 's/[[:space:]]*$//')"
+
+case "$HEAD_LINE" in
+    "Merge "*|"Revert "*) exit 0 ;;
+esac
+
+if ! [[ "$HEAD_LINE" =~ $PATTERN ]]; then
+    cat <<EOF
+ERROR: первая строка коммита должна быть Conventional Commit.
+
+Формат: <type>(<scope>)?: <subject>  (subject ≤72)
+Типы:   feat, fix, refactor, docs, test, chore, meta, perf
+Примеры:
+  feat(traefik): add wildcard cert support
+  fix(backend): correct healthcheck path
+  chore(postgres): bump 17.2 → 17.3
+
+Текущая первая строка: $HEAD_LINE
+EOF
+    exit 1
+fi
