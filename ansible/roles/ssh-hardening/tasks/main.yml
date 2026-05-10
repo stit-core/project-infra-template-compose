@@ -1,0 +1,49 @@
+---
+# Move sshd to port 2222, disable password auth, install fail2ban.
+# Operator's pubkey already in /root/.ssh/authorized_keys (assumed
+# from VPS provisioning; otherwise this task locks you out).
+- name: Verify root authorized_keys non-empty (refuse to harden a passworded box)
+  ansible.builtin.stat:
+    path: /root/.ssh/authorized_keys
+  register: ak
+
+- name: Fail if authorized_keys empty
+  ansible.builtin.assert:
+    that: ak.stat.exists and ak.stat.size | int > 0
+    fail_msg: "/root/.ssh/authorized_keys empty — refusing to disable password auth."
+
+- name: Configure sshd
+  ansible.builtin.copy:
+    dest: /etc/ssh/sshd_config.d/10-stit-hardening.conf
+    content: |
+      Port 2222
+      PermitRootLogin prohibit-password
+      PasswordAuthentication no
+      ChallengeResponseAuthentication no
+      KbdInteractiveAuthentication no
+      X11Forwarding no
+      MaxAuthTries 3
+    mode: "0644"
+  notify: restart sshd
+
+- name: Install fail2ban
+  ansible.builtin.apt:
+    name: fail2ban
+    state: present
+
+- name: fail2ban jail.local
+  ansible.builtin.copy:
+    dest: /etc/fail2ban/jail.local
+    content: |
+      [DEFAULT]
+      bantime = 1h
+      findtime = 10m
+      maxretry = 5
+
+      [sshd]
+      enabled = true
+      port = 2222
+      logpath = %(sshd_log)s
+      backend = systemd
+    mode: "0644"
+  notify: restart fail2ban

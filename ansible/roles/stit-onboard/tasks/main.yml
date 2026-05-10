@@ -1,0 +1,65 @@
+---
+# Set up project_root, deploy SSH key for git pulls, clone the project
+# infra repo. Operator runs `bash scripts/new-env.sh` afterwards to
+# populate .env, then `make deploy` for the first stack-up.
+- name: Ensure project root exists
+  ansible.builtin.file:
+    path: "{{ project_root }}"
+    state: directory
+    mode: "0750"
+
+- name: Generate deploy SSH key (if missing)
+  ansible.builtin.openssh_keypair:
+    path: /root/.ssh/{{ project_name }}-deploy
+    type: ed25519
+    comment: "{{ project_name }}-deploy@{{ inventory_hostname }}"
+    mode: "0600"
+  register: deploy_key
+
+- name: Show deploy pubkey (add as deploy key in Gitea)
+  ansible.builtin.command: cat /root/.ssh/{{ project_name }}-deploy.pub
+  register: pubkey
+  changed_when: false
+
+- name: Print deploy pubkey
+  ansible.builtin.debug:
+    msg: |
+      ─── Add this as a deploy key in Gitea (org/infra → Settings → Deploy Keys) ───
+      {{ pubkey.stdout }}
+      ──────────────────────────────────────────────────────────────────────────────
+
+- name: SSH config for git.stit.tech
+  ansible.builtin.blockinfile:
+    path: /root/.ssh/config
+    create: true
+    mode: "0600"
+    marker: "# {mark} {{ project_name }} deploy key"
+    block: |
+      Host git.stit.tech
+        IdentityFile /root/.ssh/{{ project_name }}-deploy
+        IdentitiesOnly yes
+        StrictHostKeyChecking accept-new
+
+- name: Clone project infra repo
+  ansible.builtin.git:
+    repo: "{{ project_repo_url }}"
+    dest: "{{ project_root }}"
+    update: true
+    accept_hostkey: true
+  ignore_errors: true   # First run: deploy key not yet added in Gitea — operator does it manually after seeing pubkey, then re-runs.
+  register: clone
+
+- name: Print next-step hint if clone failed
+  ansible.builtin.debug:
+    msg: |
+      Clone failed — likely deploy key not yet registered in Gitea.
+      1. Copy the pubkey above into the project infra repo's deploy keys.
+      2. Re-run: ansible-playbook -i inventory.ini bootstrap.yml --tags onboard
+  when: clone.failed | default(false)
+
+- name: Install git hooks (if cloned)
+  ansible.builtin.command: bash scripts/hooks-install.sh
+  args:
+    chdir: "{{ project_root }}"
+  when: not (clone.failed | default(false))
+  changed_when: false

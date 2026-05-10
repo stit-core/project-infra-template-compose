@@ -1,0 +1,53 @@
+---
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Install baseline packages
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - curl
+      - gnupg
+      - git
+      - rsync
+      - htop
+      - jq
+      - gettext-base       # envsubst
+      - chrony             # ntp
+      - unattended-upgrades
+    state: present
+
+- name: Configure swap (2G if missing)
+  ansible.builtin.shell: |
+    if ! swapon --show | grep -q '/swapfile'; then
+      fallocate -l 2G /swapfile && chmod 600 /swapfile
+      mkswap /swapfile && swapon /swapfile
+      grep -q '/swapfile' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
+    fi
+  args:
+    creates: /swapfile
+
+- name: Limit journald disk usage
+  ansible.builtin.copy:
+    dest: /etc/systemd/journald.conf.d/limits.conf
+    content: |
+      [Journal]
+      SystemMaxUse=500M
+      SystemKeepFree=1G
+      MaxRetentionSec=1month
+    mode: "0644"
+  notify: restart journald
+
+- name: Sysctl tuning
+  ansible.posix.sysctl:
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+    state: present
+    sysctl_set: true
+    reload: true
+  loop:
+    - { name: vm.swappiness, value: "10" }
+    - { name: net.core.somaxconn, value: "1024" }
+    - { name: fs.file-max, value: "200000" }

@@ -1,0 +1,34 @@
+---
+# Take a fresh Debian/Ubuntu VPS to a state where `make deploy` works.
+# Idempotent — re-run safely after package updates / config drift.
+#
+# Usage:
+#   ansible-playbook -i inventory.ini bootstrap.yml
+#
+# Required inventory vars (per host):
+#   ansible_host        — IP or DNS name of VPS
+#   project_name        — must match PROJECT_NAME in project's .env
+#   project_repo_url    — git URL of <client-org>/infra repo
+- name: Bootstrap project VPS
+  hosts: project_vps
+  become: true
+  vars:
+    project_root: "/opt/{{ project_name }}-infra"
+
+  pre_tasks:
+    - name: Verify required vars
+      ansible.builtin.assert:
+        that:
+          - project_name is defined
+          - project_repo_url is defined
+        fail_msg: "Set project_name + project_repo_url in inventory."
+
+  roles:
+    - role: base
+      tags: [base]
+    - role: ssh-hardening
+      tags: [ssh]
+    - role: docker
+      tags: [docker]
+    - role: stit-onboard
+      tags: [onboard]
