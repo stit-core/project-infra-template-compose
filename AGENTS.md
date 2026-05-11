@@ -15,9 +15,9 @@
 | Telemetry | otel-agent → `otel.stit.tech` (OTLP от backend + Prom-scrape host-метрик) | `compose/otel-agent.yml` |
 | Host metrics | cadvisor + node-exporter (скрейпятся локальным otel-agent) | `compose/cadvisor.yml`, `compose/node-exporter.yml` |
 | Storage | Minio (S3 API + Console) на `s3.${DOMAIN}` / `minio.${DOMAIN}` | `compose/minio.yml` |
-| Backup | self-contained контейнер (alpine + restic + pg_dumpall + crond), пишет в `$RESTIC_REPOSITORY` (дефолт — `s3:http://minio:9000/backups`) | `compose/backup.yml`, `containers/backup/` |
+| Backup | self-contained контейнер (alpine + restic + pg_dumpall + crond), пишет в `$RESTIC_REPOSITORY` из `kv/projects/<p>/<env>/backup.repository` (рендерится vault-agent'ом в `.runtime/secrets/backup.env`) | `compose/backup.yml`, `containers/backup/` |
 
-`backend` — opt-in через `COMPOSE_PROFILES=backend` (image должен быть опубликован). Всё остальное стартует по дефолту.
+Always-on (traefik / vault-agent / crowdsec / otel-agent / node-exporter / cadvisor / landing) поднимается на минимальном seed'е (`meta` + `otel` от корпа при онбординге). `postgres` / `storage` (minio + backup) / `backend` — opt-in через `COMPOSE_PROFILES`, активируются после seed'а соответствующих KV-объектов. См. `.claude/rules/multi-env.md`.
 
 Сети: `proxy` (наружу), `backend-net` (internal). Подробно — `docs/architecture.md`.
 
@@ -37,22 +37,22 @@ make hooks-install    # поставить commit-msg hook
 
 ## 3. Корп-контракт
 
-Этот шаблон требует, чтобы проект был онбоарден на корп-стороне:
+Этот шаблон требует, чтобы проект был онбоарден на корп-стороне для каждой среды (`dev`, `prod`, ...). Один VPS = одна среда.
 
 ```bash
 # stit/infra (корп-VPS), оператор с root-токеном Vault.
-VAULT_TOKEN=<root> bash scripts/onboard-project.sh <project>
+VAULT_TOKEN=<root> bash scripts/onboard-project.sh --name <p> --envs dev,prod
 ```
 
-Это создаёт:
-- `kv/observability/tenants/<p>` (OTEL_TOKEN + accountID)
-- `kv/projects/<p>/{db,oidc,jwt}` со stub-значениями (db с random password)
-- AppRole `project-<p>` с scoped policy
-- Возвращает блок для проектного `.env`: PROJECT_NAME, VAULT_ROLE_ID/SECRET_ID, OTEL_*
+Per env создаёт:
+- AppRole `projects/<p>/<env>` с policy read-only на `kv/data/projects/<p>/<env>/*`.
+- `kv/projects/<p>/<env>/otel` (OTEL token).
+- `kv/projects/<p>/<env>/meta` (`backend_tag`, `acme_email`, `acme_caserver` — дефолты, ротируются `vault kv patch`).
+- Возвращает per-env блок: `PROJECT_NAME`, `ENV`, `VAULT_ROLE_ID`, `VAULT_SECRET_ID` для проектного `.env`.
 
-Дополнительные секреты (реальный OIDC client_secret, 3rd-party API keys) — через `seed-project-secrets.sh` на корп-стороне.
+Дополнительные KV-объекты (`db`, `oidc`, `jwt`, `minio`, `backup`, project-specific) — оператор запрашивает по мере подключения сервисов через skill `/request-secret`: получает stdout-блок `vault kv put kv/projects/<p>/<env>/<name>` и отдаёт корп-админу out-of-band.
 
-См. `stit/infra/docs/project-secrets.md` для подробностей KV-схемы и rotation flow.
+AppRole policy строго `kv/data/projects/<p>/<env>/*`. Невозможность залогиниться с чужим ENV = валидация. Подробности — `.claude/rules/multi-env.md`.
 
 ## 4. Стиль
 
@@ -98,7 +98,7 @@ VAULT_TOKEN=<root> bash scripts/onboard-project.sh <project>
 
 Минимальный set:
 
-1. `.env` — `bash scripts/new-env.sh` (env-driven: PROJECT_NAME, DOMAIN, VAULT_ROLE_ID, VAULT_SECRET_ID; остальное зашито в дефолты).
+1. `.env` — `bash scripts/new-env.sh` (env-driven: PROJECT_NAME, ENV, DOMAIN, VAULT_ROLE_ID, VAULT_SECRET_ID; остальное зашито в дефолты или приходит из Vault).
 2. `docker-compose.yml` — проверить network names (если нужен conflict-free на shared VPS).
 3. `compose/backend.yml` (и опционально frontend/worker) — `image:` под клиентский org, healthcheck path под backend API.
 4. `configs/vault-agent/templates/backend.env.tpl` — добавить project-specific env-переменные если backend читает что-то сверх стандартного контракта.

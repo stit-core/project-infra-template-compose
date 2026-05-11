@@ -84,18 +84,18 @@ services:
 Если сервис читает секреты:
 
 1. Создать `configs/vault-agent/templates/<svc>.env.tpl`. Синтаксис — consul-template,
-   а не shell envsubst: `(env "PROJECT_NAME")`, не `${PROJECT_NAME}`. KV v2 API
+   а не shell envsubst: `(env "PROJECT_NAME")` / `(env "ENV")`, не `${...}`. KV v2 API
    требует префикс `kv/data/...` в path (в `vault kv put`-CLI префикс не нужен —
    см. `.claude/rules/secrets-and-env.md`).
 
    ```
-   {{ with secret (printf "kv/data/projects/%s/<svc>" (env "PROJECT_NAME")) -}}
+   {{ with secret (printf "kv/data/projects/%s/%s/<svc>" (env "PROJECT_NAME") (env "ENV")) -}}
    KEY1={{ .Data.data.key1 }}
    KEY2={{ .Data.data.key2 }}
    {{- end }}
    ```
 
-2. Добавить блок в `configs/vault-agent/agent.hcl.tpl`:
+2. Добавить блок в `configs/vault-agent/agent.hcl.parts/<profile>.hcl` (либо `head.hcl` если сервис always-on; render-configs.sh склеит финальный `agent.hcl` под активный `COMPOSE_PROFILES`):
 
    ```hcl
    template {
@@ -105,10 +105,11 @@ services:
    }
    ```
 
-3. На корп-стороне (`stit/infra`) — оператор должен seed-нуть Vault KV: `kv/projects/<project>/<svc>` с нужными ключами. Это вне scope'а проектного репо — указать оператору в коммит-сообщении / PR-описании.
+3. Запросить seed KV-объекта через skill `/request-secret` — оно сформирует stdout-блок `vault kv put kv/projects/<p>/<env>/<svc> field=...` для корп-админа. Без seed'а vault-agent залипнет в retry-loop'е на этом template (preflight также warning'нёт).
 
-4. В compose:
+4. В compose добавь `profiles:` (если сервис opt-in), `env_file`, `depends_on`:
    ```yaml
+   profiles: [<profile>]
    env_file:
      - .runtime/secrets/<svc>.env
    depends_on:
@@ -144,7 +145,7 @@ services:
 - [ ] Healthcheck указан
 - [ ] `networks:` явный список
 - [ ] Если public — `proxy` сеть + traefik labels с минимум `crowdsec@file`
-- [ ] Если читает секреты — `env_file` на `.runtime/secrets/<svc>.env` + `depends_on: vault-agent: service_healthy` + `<svc>.env.tpl` + блок в `agent.hcl.tpl`
+- [ ] Если читает секреты — `env_file` на `.runtime/secrets/<svc>.env` + `depends_on: vault-agent: service_healthy` + `<svc>.env.tpl` + блок в `agent.hcl.parts/<profile>.hcl` + seed KV-объекта через `/request-secret`
 - [ ] Все `${VAR}` (bootstrap) есть в `.env.example`
 - [ ] Если новый Postgres — добавлен ещё один `pg_dumpall` блок в `containers/backup/backup-now` (с другим `-h` host'ом и `--stdin-filename`)
 - [ ] `validate.sh` зелёный

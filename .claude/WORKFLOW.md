@@ -49,18 +49,18 @@ DEPLOY  ─── `make ship MSG="..."` локально: commit + push + (на 
 Триггер: «подними клиентский VPS», «новый сервер».
 
 1. Skill `bootstrap-vps` ведёт чек-листом.
-2. На корп-стороне (`stit/infra`) оператор уже выполнил `bash scripts/onboard-project.sh <project>` — получил блок с `VAULT_ROLE_ID`, `VAULT_SECRET_ID`, `OTEL_*`.
+2. На корп-стороне (`stit/infra`) оператор уже выполнил `bash scripts/onboard-project.sh --name <p> --envs dev,prod` — получил per-env блок с `PROJECT_NAME`, `ENV`, `VAULT_ROLE_ID`, `VAULT_SECRET_ID`. Один VPS = одна среда.
 3. Локально: `ansible-playbook -i inventory.ini bootstrap.yml` → подготовка хоста.
 4. После того как playbook отдал deploy-key — оператор регистрирует его в Gitea (Settings → Deploy keys).
 5. `ansible-playbook ... --tags onboard` — клонирование репо.
-6. На VPS: `PROJECT_NAME=… DOMAIN=… VAULT_ROLE_ID=… VAULT_SECRET_ID=… bash scripts/new-env.sh` (или интерактивный запуск без env-vars). Корп-инфра (VAULT_ADDR/OTEL) зашита в скрипт.
+6. На VPS: `PROJECT_NAME=… ENV=… DOMAIN=… VAULT_ROLE_ID=… VAULT_SECRET_ID=… bash scripts/new-env.sh` (или интерактивный запуск без env-vars). Корп-инфра (VAULT_ADDR/OTEL) зашита в скрипт.
 7. С laptop'а: `make ship` → SSH-deploy → vault-agent поднимается → рендерит `.runtime/secrets/*.env`. Backend в profile, стартует отдельно (`COMPOSE_PROFILES=backend make ship` когда image готов).
 
 ### Б. Новый сервис
 
 Триггер: «добавь Pyroscope / worker / cache».
 
-1. Skill `add-service` — чек-лист: `compose/<svc>.yml` (pinned image, healthcheck, networks), traefik labels с `crowdsec@file`, при необходимости `configs/vault-agent/templates/<svc>.env.tpl` + блок в `agent.hcl.tpl`.
+1. Skill `add-service` — чек-лист: `compose/<svc>.yml` (pinned image, healthcheck, networks), traefik labels с `crowdsec@file`, при необходимости `configs/vault-agent/templates/<svc>.env.tpl` + блок в `configs/vault-agent/agent.hcl.parts/<profile>.hcl` (или `head.hcl` если always-on).
 2. `${VAR}` в `.env.example`.
 3. `validate.sh` зелёный → `feat(<svc>): add <Service>` → push → deploy.
 
@@ -78,11 +78,11 @@ DEPLOY  ─── `make ship MSG="..."` локально: commit + push + (на 
 
 Триггер: «смени DB-пароль / OIDC client_secret».
 
-1. На корп-стороне: `vault kv patch kv/projects/<p>/db password=<new>`.
-2. На проектной: `make restart SVC=backend` (vault-agent сам перерендерит при template-change, но рестарт consumer-а гарантирует подхват `env_file`).
+1. На корп-стороне: `vault kv patch kv/projects/<p>/<env>/db password=<new>`.
+2. На проектной: `make ship` (без MSG, на чистом дереве). `scripts/deploy.sh` детектит изменения в `configs/vault-agent/templates/` или смену `COMPOSE_PROFILES` между prev/new sha и сам делает `docker compose up -d --no-deps --force-recreate <consumer>` — `env_file` фиксируется при container CREATE, простой `restart` старый ENV не пересоздаст.
 3. Проверить логи backend: коннект к БД ОК.
 
-Подробности и schema — `stit/infra/docs/project-secrets.md`.
+Подробности и schema — `.claude/rules/multi-env.md` + `.claude/rules/secrets-and-env.md`.
 
 ### Д. Disaster recovery
 

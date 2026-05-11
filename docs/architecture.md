@@ -30,7 +30,7 @@ Single-VPS docker-compose стек одного проекта. Все серв�
 ```
 
 Дополнительно:
-- **Backup** (restic, in-container crond): сидит сбоку, ежедневно делает `pg_dumpall | gzip | restic backup --stdin` (один файл-снапшот, не volume tree). `RESTIC_REPOSITORY` обязателен — local-default убран, чтобы случайно не указать на проектный minio (host failure уносит и postgres-data, и репо).
+- **Backup** (restic, in-container crond): сидит сбоку, ежедневно делает `pg_dumpall | gzip | restic backup --stdin` (один файл-снапшот, не volume tree). `RESTIC_REPOSITORY` приходит из Vault (`kv/projects/<p>/<env>/backup.repository`), не из `.env` — local-default убран, чтобы случайно не указать на проектный minio (host failure уносит и postgres-data, и репо).
 - **Minio**: S3-storage на `s3.${DOMAIN}` / console `minio.${DOMAIN}`; bucket `app-uploads` для backend, `backups` для restic; service-accounts создаёт `minio-init`.
 - **cadvisor + node-exporter**: host-/container-метрики, скрейпятся локальным otel-agent'ом и шлются в корп под тем же tenant'ом, что и app-телеметрия (`service.namespace=$OTEL_TENANT`). Видны в корп-Grafana дашбордах cadvisor + Node Exporter Full при выборе `$tenant=<project>`.
 
@@ -66,24 +66,26 @@ Single-VPS docker-compose стек одного проекта. Все серв�
 | OTel ingest | Telemetry (logs/metrics/traces) с tenant routing | `https://otel.stit.tech` |
 | Gitea | Source + container registry | `https://git.stit.tech` |
 
-Backup может писать в любой restic-совместимый endpoint (`RESTIC_REPOSITORY` в `.env`). Local-default убран — на single-VPS он не даёт DR, host failure уносит и репо. Рекомендация: external managed S3 / corp Minio / bare-IP S3 на другом хосте. App-uploads bucket (`minio-data`) — **не** покрыт backup'ом; если нужен — настрой `mc mirror` job в external storage отдельно.
+Backup может писать в любой restic-совместимый endpoint (`RESTIC_REPOSITORY` в Vault `kv/projects/<p>/<env>/backup.repository`). Local-default убран — на single-VPS он не даёт DR, host failure уносит и репо. Рекомендация: external managed S3 / corp Minio / bare-IP S3 на другом хосте. App-uploads bucket (`minio-data`) — **не** покрыт backup'ом; если нужен — настрой `mc mirror` job в external storage отдельно.
 
-Vault AppRole + observability tenant выдаёт `stit/infra/scripts/onboard-project.sh <project>`. См. `stit/infra/docs/project-secrets.md`.
+Per-env AppRole + KV-scope (`kv/data/projects/<p>/<env>/*`) выдаёт `stit/infra/scripts/onboard-project.sh --name <p> --envs dev,prod`. Один VPS = одна среда. Подробно — `.claude/rules/multi-env.md`.
 
 ## Поток секретов
 
-1. Оператор копирует AppRole `role-id/secret-id` в проектный `.env` (после `onboard-project.sh`).
+1. Оператор копирует per-env AppRole `role-id/secret-id` в проектный `.env` (вернул `onboard-project.sh --name <p> --envs ...`). Один VPS = один `ENV`, своя пара AppRole creds для `(project, env)`.
 2. На `make deploy`: vault-agent стартует первым.
    - entrypoint пишет `role-id`/`secret-id` в `.runtime/secrets-bootstrap/`.
    - `auto_auth` логинится по AppRole, получает Vault token (TTL 10m, max 30m).
-   - templates читают `kv/projects/<p>/{db,oidc,jwt}` + `kv/observability/tenants/<p>`, рендерят `backend.env` и `postgres.env` в `.runtime/secrets/`.
-   - Опциональные templates (`minio.env`, `backup.env`) — закомментированы в `agent.hcl.tpl` по умолчанию, раскомментируются после seed'а соответствующих Vault-путей.
-   - Healthcheck = backend.env + postgres.env непустые.
-3. Postgres + backend + otel-agent ждут `vault-agent: condition: service_healthy`, потом стартуют и читают `env_file: .runtime/secrets/<svc>.env`.
-4. На rotation секрета (например `vault kv patch kv/projects/<p>/db password=NEW`):
-   - vault-agent видит изменение, перерендеривает `.env`-файлы.
-   - В V1 — `make deploy` рестартит зависимые контейнеры (через `restart-on-config-change` логику).
-   - В V2 (TBD) — `command` в template-блоке делает `docker restart` автоматически.
+   - `scripts/render-configs.sh` собирает финальный `configs/vault-agent/agent.hcl` из `agent.hcl.parts/{head,<active-profile>,tail}.hcl` под активный `COMPOSE_PROFILES`.
+   - Always-on templates (рендерятся всегда): `meta.env.tpl` → `.runtime/env/compose.env` (`BACKEND_TAG` для `compose --env-file`), `traefik.yml.tpl` → `.runtime/configs/traefik.yml` (ACME email/caServer из Vault `meta`), `otel.env.tpl` → `.runtime/secrets/otel.env`.
+   - Per-profile templates: `postgres.env`, `backend.env`, `minio.env`, `backup.env` — рендерятся только если соответствующий profile активен (через `agent.hcl.parts/<profile>.hcl`).
+   - Все templates читают `kv/data/projects/<p>/<env>/{meta,otel,db,oidc,jwt,minio,backup}` (только то, что нужно под profile-набор).
+   - Healthcheck = `.runtime/configs/vault-health.sh` (генерится render-configs.sh под активный profile-набор) — проверяет non-empty все expected output-файлы.
+3. Consumer-сервисы (postgres / backend / otel-agent / minio / backup) ждут `vault-agent: condition: service_healthy`, потом стартуют и читают `env_file: .runtime/secrets/<svc>.env`.
+4. На rotation секрета (например `vault kv patch kv/projects/<p>/<env>/db password=NEW` на корп-стороне):
+   - vault-agent на проектном VPS видит изменение, перерендеривает `.runtime/secrets/<svc>.env`.
+   - Но `env_file` фиксируется при container CREATE — простой `restart` старый ENV не пересоздаст. Нужен `compose up -d --force-recreate <consumer>`.
+   - `scripts/deploy.sh` делает это автоматически когда видит изменения в `configs/vault-agent/templates/*.tpl` / `agent.hcl.parts/` или смену активного profile-набора между prev/new sha. На чистой ротации (без правок в репо) — `make ship` без MSG триггерит передеплой.
 
 ## Deploy-флоу
 
@@ -102,7 +104,7 @@ laptop оператора                          VPS
                                          (force-recreate consumers если vault-template менялся)
 ```
 
-Никаких runner'ов, push-trigger'ов, gitea-CI. Backend-images собирает разработчик локально (`docker buildx build … && docker push git.stit.tech/<client-org>/backend:<tag>`), затем `BACKEND_TAG=<tag>` в `.env` на VPS + `make ship` для подъёма новой версии.
+Никаких runner'ов, push-trigger'ов, gitea-CI. Backend-images собирает разработчик локально (`docker buildx build … && docker push git.stit.tech/<client-org>/backend:<tag>`), затем `vault kv patch kv/projects/<p>/<env>/meta backend_tag=<tag>` на корп-стороне + `make ship` (без MSG) для force-recreate. `BACKEND_TAG` в `.env` не лежит — приходит из Vault `meta` через `.runtime/env/compose.env`.
 
 ## Что НЕ в шаблоне (overlay-services)
 

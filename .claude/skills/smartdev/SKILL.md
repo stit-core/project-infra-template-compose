@@ -52,7 +52,7 @@ make ship MSG="feat(foo): bar"
 
 Допустимо при инциденте, но строго временно: `/opt/<p>-infra/` — рабочая копия git-репо. Следующий `make ship` / `make deploy` сделает `git pull --ff-only` и **затрёт правки**. Поэтому hot-fix = **обязательный backport в git в тот же день**.
 
-Если оператор упомянул что правил на хосте — флажь как `⚠ on-server drift, нужен backport`. Исключение — gitignored файлы (`.env`, `.onboard-creds`, `.runtime/`), они на VPS правятся легально.
+Если оператор упомянул что правил на хосте — флажь как `⚠ on-server drift, нужен backport`. Исключение — gitignored файлы (`.env`, `.runtime/`), они на VPS правятся легально.
 
 Debug-mode на самом VPS: `ssh root@<vps> 'cd /opt/<p>-infra && make deploy'` (видишь пошаговый stdout вместо `--wait`-таймаутов через SSH).
 
@@ -77,7 +77,7 @@ bash scripts/agent-tools/status.sh
 | Признаки | Действие |
 |---|---|
 | Меньше 5 атомарных шагов, без неочевидностей | Иди делать. План не нужен. |
-| Меняет vault-agent config / agent.hcl.tpl / templates/ | Security-sensitive — нужен план + явный OK. |
+| Меняет vault-agent config / agent.hcl.parts/ / templates/ | Security-sensitive — нужен план + явный OK. |
 | Меняет traefik static (`configs/traefik/traefik.yml`) | Нужен план — рестарт Traefik = downtime. |
 | Меняет `containers/backup/` или `compose/backup.yml` | Сначала спросить — может потерять restore-points. |
 | Затрагивает >2 сервиса или их networking | План рекомендован. Спроси: "план или сразу делать?" |

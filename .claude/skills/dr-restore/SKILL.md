@@ -31,7 +31,7 @@ Snapshot содержит **один файл** — `/pgdump-<UTC>.sql.gz`, не
 
 **Volumes (minio-data, app-uploads etc.) НЕ бэкапятся** по дефолту — только postgres. Если нужны volume-снапшоты, расширь `containers/backup/backup-now`.
 
-Restic-репо: значение `RESTIC_REPOSITORY` из `.env`. **Local default убран намеренно**: на single-VPS host failure уносит и postgres-data, и репо. Оператор обязан задать external endpoint (managed S3 / bare-IP S3 / corp Minio). `scripts/deploy.sh` fail'ит на пустом. RESTIC_PASSWORD + backup-SA access/secret — в Vault (`kv/data/projects/<p>/{backup,minio}`), vault-agent рендерит в `.runtime/secrets/backup.env`.
+Restic-репо: значение `RESTIC_REPOSITORY` приходит из Vault `kv/projects/<p>/<env>/backup.repository` (НЕ из `.env`) — vault-agent рендерит его в `.runtime/secrets/backup.env` рядом с `RESTIC_PASSWORD` и `AWS_*`. **Local default убран намеренно**: на single-VPS host failure уносит и postgres-data, и репо. Корп-сторона при seed'е `backup` KV-объекта обязана задать external endpoint (managed S3 / bare-IP S3 / corp Minio). Дисциплина — на стороне корп-админа при `vault kv put kv/projects/<p>/<env>/backup repository=...`.
 
 Retention в `containers/backup/backup-now`: 7 daily / 4 weekly / 3 monthly.
 
@@ -85,11 +85,11 @@ make restore-pg SNAPSHOT=latest                  # либо SNAPSHOT=<id>
 
 ### C. Полный host-restore (новый VPS)
 
-**Предусловие:** `RESTIC_REPOSITORY` указывает на **external** endpoint (managed S3 / corp Minio / bare-IP другого хоста). Если был local minio — снапшоты ушли вместе с хостом, restore невозможен.
+**Предусловие:** значение `kv/projects/<p>/<env>/backup.repository` указывает на **external** endpoint (managed S3 / corp Minio / bare-IP другого хоста). Если был local minio — снапшоты ушли вместе с хостом, restore невозможен.
 
 1. Provision нового VPS.
 2. Skill `bootstrap-vps` (ansible-playbook + регистрация deploy-key) — поднимет Docker, склонирует репо.
-3. На новом хосте: `bash scripts/new-env.sh` — те же AppRole creds (scope'ятся к `project-<p>`, не к хосту). RESTIC_REPOSITORY — тот же external endpoint.
+3. На новом хосте: `bash scripts/new-env.sh` — те же AppRole creds для `(project, env)` (scope'ятся к паре, не к хосту). `RESTIC_REPOSITORY` рендерится из Vault, повторно ничего не вводить.
 4. DNS cutover на новый IP.
 5. `make ship` — стек поднимается, vault-agent рендерит секреты.
 6. Сценарий A выше — для postgres.
@@ -111,13 +111,13 @@ make restore-pg SNAPSHOT=latest                  # либо SNAPSHOT=<id>
 
 - **Каждый destructive шаг — явный OK у пользователя.** Не один общий OK на всё.
 - **Не делай drop database без двойной проверки** что снапшот загружен и читается.
-- **Backup creds** живут в Vault (`kv/data/projects/<p>/{backup,minio}`), vault-agent рендерит в `.runtime/secrets/backup.env`. Если хост потерян целиком — пересоздаёшь .env с теми же AppRole, vault-agent рендерит секреты автоматически.
+- **Backup creds + repository endpoint** живут в Vault (`kv/data/projects/<p>/<env>/{backup,minio}`), vault-agent рендерит в `.runtime/secrets/backup.env`. Если хост потерян целиком — пересоздаёшь `.env` с теми же AppRole для `(project, env)`, vault-agent рендерит секреты автоматически.
 - **Restic check** перед критичным restore — `restic check --read-data` (медленно, но валидирует данные).
 
 ## Что делать если restic-репо тоже потерян
 
-Local-default `s3:http://minio:9000/backups` убран намеренно — на single-VPS он не даёт DR. Если в `.env` всё-таки local minio и хост умер — снапшоты потеряны вместе с базой. Recovery невозможен.
+Local-default `s3:http://minio:9000/backups` убран намеренно — на single-VPS он не даёт DR. Если в `kv/.../backup.repository` всё-таки local minio и хост умер — снапшоты потеряны вместе с базой. Recovery невозможен.
 
-Для prod — `RESTIC_REPOSITORY` должен указывать на external endpoint. `scripts/deploy.sh` fail'ит на пустом значении; от local minio защищает только дисциплина оператора.
+Для prod — `repository` в `kv/projects/<p>/<env>/backup` должен указывать на external endpoint. От local minio защищает только дисциплина корп-админа при seed'е этого KV-объекта.
 
 См. `docs/runbook.md` → «Полная замена VPS» при сохранившемся репо и «Quarterly DR drill» для регулярной проверки что backup восстанавливается.

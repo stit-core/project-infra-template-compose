@@ -14,7 +14,7 @@ docker logs vault-agent --tail=50
 - **AppRole creds невалидны** — `Code: 400. Errors: invalid role or secret ID`. Проверь в `.env` что `VAULT_ROLE_ID`/`VAULT_SECRET_ID` совпадают с тем что вернул `onboard-project.sh`. Если оператор крутил `secret-id` — нужно обновить в `.env` + перезапустить vault-agent.
 - **Vault корп-стороны sealed** — `* error performing token check: vault is sealed`. Ничего не починишь с проектной стороны. Эскалировать на корп: оператор делает `vault operator unseal <key>`.
 - **Network unreachable** — `dial tcp: lookup vault.stit.tech: no such host`. Проверь DNS на VPS, проверь outbound-доступ к корпу.
-- **Path не существует в KV** — `* permission denied` на `kv/data/projects/<p>/db`. Значит `onboard-project.sh` не отработал до конца или KV-stub'ы кто-то удалил. Перезапусти `seed-project-secrets.sh` или ручной `vault kv put`.
+- **Path не существует в KV** — `* permission denied` на `kv/data/projects/<p>/<env>/<name>`. Значит корп-сторона не засеяла этот KV-объект (онбординг создаёт только `meta` + `otel`; `db` / `oidc` / `jwt` / `minio` / `backup` запрашиваются по мере включения profile'ов). Запроси seed через skill `/request-secret` — он сформирует `vault kv put` блок для корп-админа.
 
 **Recovery:** после исправления — `make restart SVC=vault-agent`, дальше healthcheck подтянется и зависимые сервисы стартуют сами.
 
@@ -24,7 +24,7 @@ docker logs vault-agent --tail=50
 docker logs backend --tail=100
 ```
 
-- **PG_DSN ошибка:** проверь `.runtime/secrets/backend.env` (под root: `cat /opt/<p>-infra/.runtime/secrets/backend.env`). Если `password` там пустой — vault не отдал поле; `vault kv get kv/projects/<p>/db` покажет что в Vault.
+- **PG_DSN ошибка:** проверь `.runtime/secrets/backend.env` (под root: `cat /opt/<p>-infra/.runtime/secrets/backend.env`). Если `password` там пустой — vault не отдал поле; `vault kv get kv/projects/<p>/<env>/db` покажет что в Vault.
 - **OTLP timeout:** некритично, backend должен запускаться даже без otel-agent (Init не падает на network ошибках). Если падает — баг в backend, поднимай issue в `<org>/backend`.
 
 ## Traefik не выдаёт LE-cert
@@ -80,7 +80,7 @@ docker exec backup restic snapshots
 docker exec backup restic check
 ```
 
-- **`Fatal: unable to open repo`**: `RESTIC_PASSWORD` / minio creds ротированы. Меняются в Vault (`kv/data/projects/<p>/{backup,minio}`), vault-agent перерендерит `.runtime/secrets/backup.env`, после — `docker compose ... up -d --no-deps --force-recreate backup` (env_file подхватывается только при CREATE, не restart).
+- **`Fatal: unable to open repo`**: `RESTIC_PASSWORD` / minio creds / `repository` endpoint ротированы. Меняются в Vault (`kv/data/projects/<p>/<env>/{backup,minio}`), vault-agent перерендерит `.runtime/secrets/backup.env`, после — `docker compose ... up -d --no-deps --force-recreate backup` (env_file подхватывается только при CREATE, не restart) или `make ship` без MSG (deploy.sh сам детектит template-change).
 - **Cron не триггерит**: cron внутри контейнера, не на хосте. Проверь `docker exec backup pgrep crond` и `docker logs backup --tail 20`. Если crond упал — `docker compose ... restart backup`. Расписание — `containers/backup/crontab`, rebuild при изменении.
 - **Disk full на VPS**: `df -h`. Restic-cache в `/root/.cache/restic` внутри backup-контейнера может расти — `docker exec backup restic cache --cleanup`.
 
@@ -89,9 +89,13 @@ docker exec backup restic check
 Backend rollback (image tag):
 
 ```bash
-$EDITOR .env   # BACKEND_TAG=v0.1.0  (предыдущая стабильная)
-make deploy
+# На корп-стороне (vault.stit.tech):
+vault kv patch kv/projects/<p>/<env>/meta backend_tag=v0.1.0
+# На проектной (laptop / VPS):
+make ship   # без MSG, deploy.sh детектит template-change и force-recreate'нёт backend
 ```
+
+`BACKEND_TAG` приходит из Vault `meta`, не из `.env`. Vault-agent перерендеривает `.runtime/env/compose.env`, compose читает его через `--env-file` (см. Makefile).
 
 Infra rollback (compose/configs):
 
@@ -103,11 +107,11 @@ make ship
 
 ## Полная замена VPS
 
-**Предусловие:** `RESTIC_REPOSITORY` указывает на **внешний** S3 (не на проектный minio — он умер вместе с хостом). Если в `.env` старого VPS был local minio — снапшоты уже потеряны вместе с host'ом, restore невозможен.
+**Предусловие:** значение `repository` в `kv/projects/<p>/<env>/backup` указывает на **внешний** S3 (не на проектный minio — он умер вместе с хостом). Если в Vault стояло local minio — снапшоты уже потеряны вместе с host'ом, restore невозможен.
 
 1. Заказать новый VPS, обновить A-record `${DOMAIN}` и сабдомены на новый IP (TTL заранее снизить).
 2. `ansible-playbook -i inventory.ini bootstrap.yml` (с обновлённым `ansible_host`). Зарегистрировать deploy-key.
-3. На новом VPS: `bash scripts/new-env.sh` (используй те же AppRole creds — они привязаны к проекту, не к VPS). RESTIC_REPOSITORY — тот же external endpoint что был раньше.
+3. На новом VPS: `bash scripts/new-env.sh` (используй те же per-env AppRole creds — они привязаны к паре `(project, env)`, не к VPS). `RESTIC_REPOSITORY` рендерится из Vault, вводить не нужно.
 4. `make ship` (или на VPS `make deploy`) → стек поднимается, vault-agent логинится, postgres стартует пустой.
 5. Restore postgres из restic:
    ```bash
