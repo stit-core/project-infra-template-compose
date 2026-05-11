@@ -9,10 +9,35 @@ Provisioning нового VPS под клиентский проект. Цель
 
 ## Когда применять
 
-- "Подними новый VPS для <client>"
-- "Новый сервер, начнём с нуля"
-- "Перенос на новый хост" (после `dr-restore` для данных)
+- "Подними новый VPS для <client>" — **production-режим**
+- "Новый сервер, начнём с нуля" — **production-режим**
+- "Перенос на новый хост" (после `dr-restore` для данных) — production-режим
+- "Обкатка / тестовый прогон шаблона / пробую заново на тестовом VPS" — **rehearsal-режим** (см. ниже)
 - "/bootstrap-vps"
+
+### Production vs rehearsal — определи режим заранее
+
+| Режим | Триггеры | LE endpoint | Что меняется |
+|---|---|---|---|
+| **production** | "клиентский VPS", "новый проект", "поднимаем для <client>", single-shot bootstrap с заранее настроенным реальным доменом | LE prod (`acme-v02.api.letsencrypt.org`) | Дефолт — никаких флагов |
+| **rehearsal** | "обкатка", "обкатываю шаблон", "тестовый прогон", "пробую заново", "тестовый VPS", "буду повторять bootstrap", любое упоминание многократных итераций | LE staging (`acme-staging-v02.api.letsencrypt.org`) — untrusted, но rate-limits ~100× выше | При вызове `new-env.sh` передавать `ACME_CASERVER=https://acme-staging-v02.api.letsencrypt.org/directory` env-var'ом |
+
+**Почему важно:** LE prod лимиты тесные:
+- 5 failed validations / hostname / hour
+- 5 duplicate certs / SAN-set / week
+- 50 certs / registered domain / week
+
+При обкатке (DNS ещё не настроен → failed challenges, многократный teardown/redeploy → duplicate certs) лимит сжигается за день. Staging — те же API, лимиты ~30k/week, идеально для итераций.
+
+`scripts/new-env.sh` интерактивно про это **НЕ спрашивает** (caller сам решает). Это моя ответственность — переключать ACME_CASERVER исходя из триггеров выше. Если юзер не дал явный сигнал — спроси одним вопросом: "Это обкатка шаблона или production-bootstrap?".
+
+**Migration prod ↔ staging на одном VPS:** acme.json привязан к CA-серверу. Перед переключением:
+```bash
+docker compose <args> down traefik
+docker volume rm <p>_traefik-acme
+# поменять ACME_CASERVER в .env
+bash scripts/deploy.sh
+```
 
 ## Когда НЕ применять
 
@@ -103,6 +128,18 @@ ssh root@<IP>
 cd /opt/<project>-infra
 PROJECT_NAME=<p> DOMAIN=<d> VAULT_ROLE_ID=<id> VAULT_SECRET_ID=<id> bash scripts/new-env.sh
 ```
+
+**В rehearsal-режиме** добавь `ACME_CASERVER=https://acme-staging-v02.api.letsencrypt.org/directory` к env-vars'ам:
+
+```bash
+ssh root@<IP> bash -s <<'REMOTE'
+export ACME_CASERVER='https://acme-staging-v02.api.letsencrypt.org/directory'
+export PROJECT_NAME=<p> DOMAIN=<d> VAULT_ROLE_ID=<id> VAULT_SECRET_ID=<id>
+cd /opt/<p>-infra && bash scripts/new-env.sh
+REMOTE
+```
+
+В production — не передавать, дефолт = prod LE.
 
 Создаёт **два файла** (оба chmod 600, gitignored):
 - `.env` — bootstrap-vars (PROJECT_NAME, DOMAIN, VAULT_*, OTEL_*, BACKEND_TAG)
@@ -206,6 +243,8 @@ docker exec minio mc ls local/backups/
 - **Не запускай ssh-hardening без проверки** что в `/root/.ssh/authorized_keys` есть твой ключ. Роль `ssh-hardening` обязана это assert'нуть, но дополнительно проверь руками — `ansible -m shell -a 'cat /root/.ssh/authorized_keys' project_vps`.
 - **Не публикуй deploy-key из stdout/log'а** — это секрет. Передай оператору приватным каналом.
 - **DNS-cutover до первого deploy** — иначе LE rate-limit съедает попытки выпуска.
+- **Rehearsal → ВСЕГДА staging** — production LE сжигается за день многократных итераций. Если режим обкатка, но `ACME_CASERVER` не передан — это твоя ошибка, обнови процесс.
+- **Production → НИКОГДА staging** — клиент получит untrusted cert, браузер красным. Если режим production и видишь staging endpoint в `.env` — стоп, перепроверь с юзером.
 
 ## После
 
