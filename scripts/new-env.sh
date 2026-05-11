@@ -61,27 +61,12 @@ else
   OTEL_EXPORTER_OTLP_ENDPOINT="${OTEL_EXPORTER_OTLP_ENDPOINT:-$CORP_OTEL_ENDPOINT}"
   OTEL_EXPORTER_OTLP_INSECURE="${OTEL_EXPORTER_OTLP_INSECURE:-false}"
   ACME_EMAIL="${ACME_EMAIL:-ops@$DOMAIN}"
+  # LE: prod по дефолту. При обкатке/тестах передавать
+  # ACME_CASERVER=https://acme-staging-v02.api.letsencrypt.org/directory
+  # через env-var (lim'ы prod LE тесные: 5 failed/host/hour, 5 dup/SAN/week).
+  ACME_CASERVER="${ACME_CASERVER:-}"
   BACKEND_TAG="${BACKEND_TAG:-latest}"
   GITEA_RUNNER_REG_TOKEN="${GITEA_RUNNER_REG_TOKEN:-}"
-
-  # LE prod vs staging. Если ACME_CASERVER задан через env — используем
-  # как есть (non-interactive). Иначе в интерактиве спрашиваем — это
-  # обкатка / тест? prod лимиты тесные (5 failed validations/hostname/hour,
-  # 5 duplicate certs/SAN-set/week), легко упереться при многократных
-  # прогонах. Дефолт — prod (empty → prod endpoint в compose/traefik.yml).
-  if [ -z "${ACME_CASERVER:-}" ]; then
-    if [ -t 0 ]; then
-      echo
-      echo "=== Let's Encrypt environment ==="
-      read -r -p "Это обкатка шаблона / тестовый VPS? LE staging (untrusted certs, rate-limits ~100× выше) [y/N]: " staging
-      case "${staging,,}" in
-        y|yes) ACME_CASERVER="https://acme-staging-v02.api.letsencrypt.org/directory";;
-        *)     ACME_CASERVER="";;
-      esac
-    else
-      ACME_CASERVER=""
-    fi
-  fi
 
   cat > .env <<EOF
 # Сгенерировано scripts/new-env.sh. Правь руками после первого деплоя:
@@ -111,7 +96,7 @@ CROWDSEC_BOUNCER_API_KEY=
 GITEA_RUNNER_REG_TOKEN=$GITEA_RUNNER_REG_TOKEN
 EOF
   chmod 0600 .env
-  echo "OK: .env записан (chmod 0600).$([ -n "$ACME_CASERVER" ] && echo " LE staging endpoint выбран — сертификаты будут untrusted (для prod очисти ACME_CASERVER + удали volume traefik-acme).")"
+  echo "OK: .env записан (chmod 0600).$([ -n "$ACME_CASERVER" ] && echo " LE staging endpoint выбран — сертификаты будут untrusted.")"
 fi
 
 # ───────── .onboard-creds ─────────
