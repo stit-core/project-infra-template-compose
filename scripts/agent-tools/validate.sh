@@ -63,7 +63,9 @@ if [ ! -f .env.example ]; then
   echo "  .env.example отсутствует"
   fail=1
 else
-  used=$(grep -rhoE '\$\{[A-Z_][A-Z0-9_]*' compose/ configs/ docker-compose.yml 2>/dev/null \
+  # PCRE с negative lookbehind: ${VAR} ловим, $${VAR} (escape для shell внутри
+  # entrypoint heredoc, не compose-substitution) — пропускаем.
+  used=$(grep -rhoP '(?<!\$)\$\{[A-Z_][A-Z0-9_]*' compose/ configs/ docker-compose.yml 2>/dev/null \
           | sed 's/${//' | sort -u)
   missing=()
   while read -r var; do

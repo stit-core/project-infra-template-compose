@@ -1,0 +1,121 @@
+volumes:
+  minio-data:
+
+services:
+  minio:
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z-cpuv1
+    container_name: minio
+    restart: unless-stopped
+    # Opt-in: COMPOSE_PROFILES=minio. Перед включением:
+    # 1) корп-сторона seed'ит kv/data/projects/<project>/minio в Vault
+    #    (поля: root_user, root_password, app_access_key, app_secret_key,
+    #    buckets="app-uploads ..." опц.);
+    # 2) раскомментируй minio-template в configs/vault-agent/agent.hcl.tpl.
+    # Volume minio-data попадает в restic-backup автоматически (префикс
+    # <project>_ в scripts/backup.sh).
+    profiles: [minio]
+    command: server /data --console-address ":9001"
+    env_file:
+      - .runtime/secrets/minio.env
+    environment:
+      MINIO_BROWSER_REDIRECT_URL: https://minio.${DOMAIN}
+      MINIO_SERVER_URL: https://s3.${DOMAIN}
+      MINIO_PROMETHEUS_AUTH_TYPE: public
+    depends_on:
+      vault-agent:
+        condition: service_healthy
+    volumes:
+      - minio-data:/data
+    networks:
+      - proxy        # traefik s3.${DOMAIN} + minio.${DOMAIN}
+      - backend-net  # backend → minio:9000 внутрь
+    healthcheck:
+      test: ["CMD-SHELL", "mc ready local || curl -fsS http://127.0.0.1:9000/minio/health/live"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: proxy
+
+      # S3 API — s3.${DOMAIN} :9000, без auth-middleware (S3-клиенты используют SigV4).
+      traefik.http.routers.minio-s3.rule: Host(`s3.${DOMAIN}`)
+      traefik.http.routers.minio-s3.entrypoints: websecure
+      traefik.http.routers.minio-s3.tls: "true"
+      traefik.http.routers.minio-s3.tls.certresolver: letsencrypt
+      traefik.http.routers.minio-s3.service: minio-s3
+      traefik.http.routers.minio-s3.middlewares: crowdsec@file,rate-limit@file
+      traefik.http.services.minio-s3.loadbalancer.server.port: "9000"
+
+      # Console — minio.${DOMAIN} :9001. В шаблоне нет Authentik (проектная
+      # сторона без IDP), поэтому только crowdsec+rate-limit. Если нужен
+      # SSO — заворачивай через корп-Authentik отдельной интеграцией, либо
+      # ограничивай доступ IP-allowlist'ом / отключай маршрут.
+      traefik.http.routers.minio-console.rule: Host(`minio.${DOMAIN}`)
+      traefik.http.routers.minio-console.entrypoints: websecure
+      traefik.http.routers.minio-console.tls: "true"
+      traefik.http.routers.minio-console.tls.certresolver: letsencrypt
+      traefik.http.routers.minio-console.service: minio-console
+      traefik.http.routers.minio-console.middlewares: crowdsec@file,rate-limit@file
+      traefik.http.services.minio-console.loadbalancer.server.port: "9001"
+
+  minio-init:
+    image: minio/mc:RELEASE.2025-08-13T08-35-41Z-cpuv1
+    container_name: minio-init
+    restart: "no"
+    # Идемпотентный bootstrap: создаёт bucket'ы и service-account'ы по
+    # значениям из minio.env. Безопасно прогонять на каждом deploy.
+    profiles: [minio]
+    depends_on:
+      minio:
+        condition: service_healthy
+    env_file:
+      - .runtime/secrets/minio.env
+    networks:
+      - backend-net
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"
+
+        # Bucket-list берём из MINIO_BUCKETS (space-separated). Дефолт —
+        # один bucket app-uploads, под кейс file-uploads из backend'а.
+        for b in $${MINIO_BUCKETS:-app-uploads}; do
+          mc mb --ignore-existing "local/$$b"
+        done
+
+        # Default policy: full access на bucket app-uploads. Если добавляешь
+        # bucket'ы / service-accounts — расширяй блок policy + upsert_sa
+        # вызовы. См. stit/infra/compose/minio.yml как пример с несколькими
+        # tenant'ами (gitea/loki/tempo).
+        cat >/tmp/app-policy.json <<'EOF'
+        {
+          "Version": "2012-10-17",
+          "Statement": [{
+            "Effect": "Allow",
+            "Action": ["s3:*"],
+            "Resource": ["arn:aws:s3:::app-uploads", "arn:aws:s3:::app-uploads/*"]
+          }]
+        }
+        EOF
+
+        upsert_sa() {
+          name=$$1; ak=$$2; sk=$$3; policy=$$4
+          [ -z "$$ak" ] && { echo "skip $$name: access-key not set"; return 0; }
+          if mc admin user svcacct info local "$$ak" >/dev/null 2>&1; then
+            echo "service account $$name ($$ak) exists, updating policy"
+            mc admin user svcacct edit local "$$ak" --policy "$$policy"
+          else
+            echo "creating service account $$name ($$ak)"
+            mc admin user svcacct add local "$$MINIO_ROOT_USER" \
+              --access-key "$$ak" --secret-key "$$sk" --policy "$$policy"
+          fi
+        }
+
+        upsert_sa app "$${APP_S3_ACCESS_KEY:-}" "$${APP_S3_SECRET_KEY:-}" /tmp/app-policy.json
+
+        echo "minio-init done"
+        mc ls local/

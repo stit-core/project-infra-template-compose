@@ -51,6 +51,15 @@ template {
 #   perms       = 0400
 # }
 
+# Minio-credentials template. Раскомментируй когда корп-сторона seed'нула
+# kv/data/projects/<PROJECT_NAME>/minio (поля: root_user, root_password,
+# app_access_key, app_secret_key, buckets). После — COMPOSE_PROFILES=minio.
+# template {
+#   source      = "/etc/vault-agent/templates/minio.env.tpl"
+#   destination = "/secrets/minio.env"
+#   perms       = 0400
+# }
+
 # Marker для healthcheck. Создаётся последним — чтобы зависимые
 # сервисы (через `service_healthy`) стартовали только после того, как
 # все секреты отрендерены.
