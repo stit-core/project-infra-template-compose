@@ -20,6 +20,7 @@ services:
       VAULT_SECRET_ID: ${VAULT_SECRET_ID}
       VAULT_ADDR:      ${VAULT_ADDR}
       PROJECT_NAME:    ${PROJECT_NAME}
+      DOMAIN:          ${DOMAIN}        # для consul-template `env "DOMAIN"` в backup.env.tpl
     volumes:
       - ./configs/vault-agent/agent.hcl:/etc/vault-agent/agent.hcl:ro
       - ./configs/vault-agent/templates:/etc/vault-agent/templates:ro

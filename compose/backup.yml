@@ -28,4 +28,4 @@ services:
       - backup-cache:/cache
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
-      - backend-net      # restic → minio:9000 внутрь стека
+      - proxy            # restic → https://s3.${DOMAIN} через traefik (тот же endpoint, что у stit-админа)

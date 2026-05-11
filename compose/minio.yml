@@ -13,11 +13,13 @@ services:
     #    backup_access_key, backup_secret_key, buckets="..." опц.).
     #    Эти же пары передаются stit-админу для реестра.
     # 2) раскомментирует minio-template в configs/vault-agent/agent.hcl.tpl.
-    # Внимание: restic пишет В этот же minio (bucket "backups"), поэтому
-    # если minio-data накроется — теряется и сам app-bucket (app-uploads),
-    # и restic-репо. Это осознанный trade-off простоты против DR-гарантий.
-    # Если нужна устойчивость — настрой mc mirror в корп-S3 или offsite
-    # cron на хосте.
+    # Все клиенты (backend, restic, mc у stit-админа) ходят через публичный
+    # s3.${DOMAIN}, без привязки к docker-network. Внутренний minio:9000
+    # используется ТОЛЬКО minio-init'ом (bootstrap-sidecar в том же compose);
+    # для остальных endpoint один — публичный URL через traefik. Это значит,
+    # что restic-репо живёт в том же minio, что бекапит postgres-data: если
+    # minio-data накроется, и app-uploads, и backups теряются. Trade-off
+    # простоты против DR; для устойчивости — mc mirror в корп-S3 / offsite cron.
     profiles: [minio]
     command: server /data --console-address ":9001"
     env_file:

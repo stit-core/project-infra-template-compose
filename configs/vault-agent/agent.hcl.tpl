@@ -53,11 +53,12 @@ template {
 #   perms       = 0400
 # }
 
-# Backup-credentials template. Restic пишет в локальный minio (bucket
-# "backups"), поэтому требует minio профиль. AWS-creds (backup-SA) берутся
-# из того же kv/data/projects/<PROJECT_NAME>/minio пути; здесь только
-# RESTIC_PASSWORD из отдельного /backup пути — оператор кладёт перед
-# первым backup'ом (openssl rand -hex 32, ОБЯЗАТЕЛЬНО сохрани offsite —
+# Backup-credentials template. Restic пишет через публичный S3 endpoint
+# (s3.${DOMAIN}) в bucket "backups" — тот же URL, что используют внешние
+# инструменты со стороны stit-админа. AWS-creds (backup-SA) берутся из
+# kv/data/projects/<PROJECT_NAME>/minio (backup_access_key/secret); здесь
+# только RESTIC_PASSWORD из отдельного /backup пути — оператор кладёт
+# перед первым backup'ом (openssl rand -hex 32, ОБЯЗАТЕЛЬНО сохрани offsite —
 # без него restore из снапшотов невозможен).
 # Раскомментируй когда есть и minio-creds, и backup.password в Vault.
 # template {

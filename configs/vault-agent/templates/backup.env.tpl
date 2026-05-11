@@ -1,10 +1,8 @@
-# Restic пишет в локальный minio (bucket "backups", создаётся minio-init'ом).
-# RESTIC_REPOSITORY зашит — bucket всегда называется backups, endpoint всегда
-# внутренний minio:9000. AWS-creds — backup-SA, который оператор сгенерировал
-# и положил в kv/data/projects/<p>/minio при подъёме minio. RESTIC_PASSWORD —
-# отдельный Vault-path /backup (восстановление через DR-skill требует его без
-# доступа к minio-SA, поэтому изолирован).
-RESTIC_REPOSITORY=s3:http://minio:9000/backups
+# Restic пишет через публичный S3 endpoint (тот же URL, что и для внешних
+# инструментов — mc / aws-cli со стороны stit-админа). Никакой привязки к
+# docker-network: backup-контейнер ходит через traefik → minio, как любой
+# внешний клиент. DOMAIN приходит из env vault-agent'а (см. compose/vault-agent.yml).
+RESTIC_REPOSITORY=s3:https://s3.{{ env "DOMAIN" }}/backups
 {{ with secret (printf "kv/data/projects/%s/backup" (env "PROJECT_NAME")) }}
 RESTIC_PASSWORD={{ .Data.data.password }}
 {{ end }}
