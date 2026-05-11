@@ -74,7 +74,7 @@ bash scripts/deploy.sh
 
 ```ini
 [project_vps]
-prod ansible_host=<IP> ansible_user=root project_name=<p> project_repo_url=git@git.stit.tech:<org>/infra.git
+prod ansible_host=<IP> ansible_user=root project_name=<p> project_repo_url=git@git.stit.tech:<client-org>/infra.git
 
 [project_vps:vars]
 ansible_python_interpreter=/usr/bin/python3
@@ -95,29 +95,24 @@ ansible-playbook -i ansible/inventory.ini ansible/bootstrap.yml --skip-tags onbo
 
 **Если playbook падает** — фикси и re-run, он идемпотентен.
 
-### 3. Deploy-key для Gitea
-
-Роль `stit-onboard` (запускаемая отдельно) сгенерирует deploy-key в `/root/.ssh/id_ed25519_<project>` и выведет публичную часть. Чтобы её получить без полного onboard:
-
-```bash
-ansible-playbook -i ansible/inventory.ini ansible/bootstrap.yml --tags onboard --start-at-task "Generate deploy key"
-```
-
-(Точное имя таска проверь в `ansible/roles/stit-onboard/tasks/main.yml`.)
-
-Скопируй public-key, **попроси оператора зарегистрировать его в Gitea**:
-- Settings → Deploy Keys → Add → paste pub-key, read-only
-- На клиентский репо `<client-org>/infra`
-
-### 4. Onboard (clone repo)
-
-После регистрации deploy-key:
+### 3. Onboard: deploy-key + clone
 
 ```bash
 ansible-playbook -i ansible/inventory.ini ansible/bootstrap.yml --tags onboard
 ```
 
-Это склонирует репо в `/opt/<project>-infra`.
+Роль `stit-onboard` идемпотентно: сгенерит deploy-key в `/root/.ssh/<project>-deploy`, напечатает pubkey, попробует склонировать репо. **Первый запуск ожидаемо падает на clone** (deploy-key ещё не в Gitea — `ignore_errors: true` на этой задаче, playbook не упадёт целиком).
+
+Скопируй pubkey из вывода → **попроси оператора зарегистрировать в Gitea**:
+- `git.stit.tech/<client-org>/infra` → Settings → Deploy Keys → Add → paste pubkey, **read-only**
+
+### 4. Re-run onboard (после регистрации deploy-key)
+
+```bash
+ansible-playbook -i ansible/inventory.ini ansible/bootstrap.yml --tags onboard
+```
+
+Склонирует репо в `/opt/<project>-infra`, поставит git hooks.
 
 ### 5. Заполнить .env + сгенерить onboard-креды
 
@@ -157,10 +152,10 @@ REMOTE
 
 С laptop'а оператора (после bootstrap'а — у тебя уже есть SSH-доступ и inventory.ini):
 ```bash
-make remote-deploy
+make ship          # на чистом дереве — push + ssh-deploy. На грязном — добавь MSG="..."
 ```
 
-Либо на самом VPS:
+Либо на самом VPS (debug-mode со пошаговым stdout):
 ```bash
 ssh root@<IP>
 cd /opt/<project>-infra
@@ -186,16 +181,13 @@ Minio + backup поднимаются по дефолту (после Vault seed
 
 ### Day-2 workflow
 
-После bootstrap'а — стандартный цикл изменений шаблона / правок:
+После bootstrap'а — стандартный цикл изменений. Детали в smartdev skill (§ Deploy-флоу). Коротко:
 
 ```bash
-# 1. правки локально (compose, configs, и т.п.)
-git add -p && git commit -m "feat(...): ..."
-make ship                 # push текущей ветки; если main — авто-remote-deploy
-                          # если не main — открой PR в Gitea, мержи, потом git pull && make ship
+make ship MSG="feat(foo): bar"   # add -A + commit + push + (на main) ssh-deploy
 ```
 
-Если хочешь только триггернуть деплой (без push): `make remote-deploy`.
+Если не main — push без deploy + подсказка про PR. На чистом дереве MSG не нужен (просто push + deploy).
 
 ### 7. CrowdSec bouncer key
 
@@ -207,26 +199,16 @@ docker exec crowdsec cscli bouncers add traefik
 
 Скопируй API-key, обнови `CROWDSEC_BOUNCER_API_KEY` в `.env`, `make deploy`.
 
-### 8. Gitea-runner (если нужен)
-
-Если runner не самозарегистрировался через `GITEA_RUNNER_REG_TOKEN`:
-
-```bash
-bash scripts/register-runner.sh
-```
-
-(Получит one-shot token из Gitea admin UI, зарегистрирует.)
-
-### 9. Verify
+### 8. Verify
 
 - `make ps` — все сервисы healthy.
 - `https://api.${DOMAIN}/healthz` — backend отвечает 200.
 - `docker logs otel-agent | tail -5` — нет auth-ошибок при экспорте в `otel.stit.tech`.
 - `docker logs vault-agent | tail -10` — successful render, нет re-auth циклов.
 
-### 10. Backup smoke-test
+### 9. Backup smoke-test
 
-Host-cron для daily backup ставится ansible'ом (`stit-onboard` role): `0 3 * * * docker exec backup /usr/local/bin/run-backup.sh >> /var/log/<p>-backup.log`. Smoke прямо сейчас:
+Daily backup гоняется **внутри backup-контейнера** (busybox crond, расписание в `containers/backup/crontab` — `0 3 * * * /usr/local/bin/backup-now`). Никакого host-cron'а; legacy запись из старых версий шаблона удаляется ролью `stit-onboard`. Smoke прямо сейчас:
 
 ```bash
 make backup

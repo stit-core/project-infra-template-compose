@@ -30,7 +30,7 @@ Read-only research-агент для stit-infra. Вызывается когда
 ## Найденное
 - `compose/grafana.yml:42` — <что там>
 - `configs/traefik/dynamic/middlewares.yml.tpl:25-30` — <что там>
-- сервер: gitea-runner up 31h, healthy
+- сервер: vault-agent up 31h, healthy
 
 ## Дополнительно
 <если есть caveat или что-то странное>

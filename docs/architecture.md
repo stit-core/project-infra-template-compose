@@ -30,16 +30,15 @@ Single-VPS docker-compose стек одного проекта. Все серв�
 ```
 
 Дополнительно:
-- **Backup** (restic, профиль `backup`): сидит сбоку, по cron делает `pg_dumpall` + restic backup; пишет в локальный Minio (`s3.${DOMAIN}/backups`).
-- **Minio** (профиль `minio`): S3-storage на `s3.${DOMAIN}` / console `minio.${DOMAIN}`; bucket `app-uploads` для backend, `backups` для restic; service-accounts создаёт `minio-init`.
-- **Gitea-runner**: pull-based CI, исполняет workflows из `<org>/backend` и `<org>/infra`.
+- **Backup** (restic, in-container crond): сидит сбоку, ежедневно делает `pg_dumpall` + restic backup; пишет в локальный Minio (`s3:http://minio:9000/backups` по дефолту).
+- **Minio**: S3-storage на `s3.${DOMAIN}` / console `minio.${DOMAIN}`; bucket `app-uploads` для backend, `backups` для restic; service-accounts создаёт `minio-init`.
 - **cadvisor + node-exporter**: host-/container-метрики, скрейпятся локальным otel-agent'ом и шлются в корп под тем же tenant'ом, что и app-телеметрия (`service.namespace=$OTEL_TENANT`). Видны в корп-Grafana дашбордах cadvisor + Node Exporter Full при выборе `$tenant=<project>`.
 
 ## Сети
 
 | Network | Тип | Кто в ней |
 |---|---|---|
-| `proxy` | bridge, external | Traefik (edge), backend (для входящего HTTPS), vault-agent + otel-agent (исходящий к корпу), backup + runner (исходящий к S3 / Gitea) |
+| `proxy` | bridge, external | Traefik (edge), backend (для входящего HTTPS), vault-agent + otel-agent (исходящий к корпу), backup (исходящий к S3 / корп при off-site) |
 | `backend-net` | bridge, **internal** | postgres, backend, otel-agent (получает OTLP от backend, скрейпит cadvisor + node-exporter), cadvisor, node-exporter, vault-agent (рендерит файлы в shared volume) |
 
 Постгрес НЕ в `proxy` — он недоступен извне. Backend стучится в постгрес по hostname `postgres` через `backend-net`.
@@ -53,7 +52,8 @@ Single-VPS docker-compose стек одного проекта. Все серв�
 | `crowdsec-data` / `-config` | bouncer state, ban-lists | опционально (mostly self-rebuilds) |
 | `vault-agent-secrets` | rendered env-files | нет (рендерится из Vault) |
 | `vault-agent-bootstrap` | role-id/secret-id files | нет (из .env) |
-| `runner-data` | gitea-runner registration creds | нет (re-register если потерять) |
+| `minio-data` | S3-объекты (uploads + backups) | да (restic в bucket `backups`) |
+| `otel-agent-data` | OTel collector queue/state | нет |
 | `.runtime/secrets/` (bind-mount) | env-files для `env_file:` consumer'ов | нет |
 
 `.runtime/secrets/` — bind-mount, а не named volume, потому что compose должен резолвить `env_file:` пути на хосте при создании контейнера.
@@ -85,25 +85,24 @@ Vault AppRole + observability tenant выдаёт `stit/infra/scripts/onboard-pr
    - В V1 — `make deploy` рестартит зависимые контейнеры (через `restart-on-config-change` логику).
    - В V2 (TBD) — `command` в template-блоке делает `docker restart` автоматически.
 
-## Pull-based deploy
+## Deploy-флоу
 
 ```
-<org>/backend             <org>/infra (этот шаблон, скопированный)
-   │                          │
-   │ tag v*                   │ push main
-   ↓                          ↓
-git.stit.tech CI         gitea-runner (на VPS, label <project>-prod/<staging>)
-   │                          │
-   │ build + push image       │ ssh не нужен — runner ЛОКАЛЬНО:
-   ↓                          │   git pull && make deploy
-git.stit.tech registry        │
-                              ↓
-                          docker compose up --pull always
-                              ↓
-                          backend container с новым image:<tag>
+laptop оператора                          VPS
+   │                                        │
+   │  make ship MSG="..."                    │
+   │  ├─ git add -A && git commit -m "..."   │
+   │  ├─ git push origin main                │
+   │  └─ ssh root@vps 'cd /opt/<p>-infra && bash scripts/deploy.sh'
+   ↓                                        ↓
+                                       scripts/deploy.sh:
+                                         git pull --ff-only
+                                         render-configs (envsubst .tpl)
+                                         compose up -d --wait
+                                         (force-recreate consumers если vault-template менялся)
 ```
 
-Деплой инициируется push'ем в backend repo: tag → corp CI билдит → проектный runner подхватывает (label `<project>-prod`) и делает `make deploy`. Никаких SSH ключей в CI-secrets, никакого push'а на VPS извне.
+Никаких runner'ов, push-trigger'ов, gitea-CI. Backend-images собирает разработчик локально (`docker buildx build … && docker push git.stit.tech/<client-org>/backend:<tag>`), затем `BACKEND_TAG=<tag>` в `.env` на VPS + `make ship` для подъёма новой версии.
 
 ## Что НЕ в шаблоне (overlay-services)
 

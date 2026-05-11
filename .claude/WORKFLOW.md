@@ -36,9 +36,10 @@ VERIFY  ─── scripts/agent-tools/validate.sh
 COMMIT  ─── conventional prefix (commit-msg хук валидирует)
             push в main напрямую (solo-flow) — или в ветку → PR в Gitea → merge
      ↓
-DEPLOY  ─── `make ship` локально: push + (если main) remote-deploy через ssh
-            Альтернатива: `make remote-deploy` (без push); или на VPS `make deploy`
-            verify: `make ps` + healthchecks
+DEPLOY  ─── `make ship MSG="..."` локально: commit + push + (на main) ssh-deploy.
+            На чистом дереве — `make ship` без MSG (push + deploy).
+            Debug: на VPS `make deploy` (видишь пошаговый stdout).
+            Verify: `make ps` + healthchecks.
 ```
 
 ## 3. Сценарии
@@ -53,7 +54,7 @@ DEPLOY  ─── `make ship` локально: push + (если main) remote-de
 4. После того как playbook отдал deploy-key — оператор регистрирует его в Gitea (Settings → Deploy keys).
 5. `ansible-playbook ... --tags onboard` — клонирование репо.
 6. На VPS: `PROJECT_NAME=… DOMAIN=… VAULT_ROLE_ID=… VAULT_SECRET_ID=… bash scripts/new-env.sh` (или интерактивный запуск без env-vars). Корп-инфра (VAULT_ADDR/OTEL) зашита в скрипт.
-7. С laptop'а: `make remote-deploy` → vault-agent поднимается → рендерит `.runtime/secrets/*.env`. Backend/backup в profiles, стартуют отдельно (`COMPOSE_PROFILES=backend make remote-deploy` когда image готов).
+7. С laptop'а: `make ship` → SSH-deploy → vault-agent поднимается → рендерит `.runtime/secrets/*.env`. Backend в profile, стартует отдельно (`COMPOSE_PROFILES=backend make ship` когда image готов).
 
 ### Б. Новый сервис
 

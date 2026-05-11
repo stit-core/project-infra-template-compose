@@ -5,11 +5,10 @@ IaC шаблон проектной инфры для stit.tech: docker-compose 
 ## Что внутри
 
 - **Edge:** Traefik v3 + CrowdSec (HTTP-01 LE, WAF, IP-bans).
-- **Core:** Postgres 17, backend (image `git.stit.tech/<org>/backend`, opt-in), vault-agent (sidecar для secrets).
+- **Core:** Postgres 17, backend (image `git.stit.tech/<client-org>/backend`, opt-in), vault-agent (sidecar для secrets).
 - **Telemetry:** otel-agent — proxy на корп `otel.stit.tech` (OTLP + Bearer-token из Vault).
 - **Storage:** Minio (S3-compat), on by default — bucket `app-uploads` для backend, `backups` для restic.
 - **Backup:** self-contained контейнер (alpine + restic + pg_dumpall + busybox crond), daily в restic-репо `$RESTIC_REPOSITORY` (дефолт — `s3:http://minio:9000/backups`, внутренний minio через docker network). Для prod / off-site менять endpoint в `.env`.
-- **CI/CD:** gitea-runner на проектном VPS, pull-based деплой через тэги.
 - **Bootstrap:** ansible (apt + swap + journald + ssh-hardening + docker).
 
 См. `docs/architecture.md` для деталей.
@@ -37,9 +36,9 @@ curl -X POST -H "Authorization: token $GITEA_TOKEN" -H "Content-Type: applicatio
    ```
    Получаешь блок `.env`-переменных + AppRole.
 
-2. Создать клиентский репо `<org>/infra` из этого шаблона — через UI **Use this template** или API (см. секцию выше). Затем склонировать локально:
+2. Создать клиентский репо `<client-org>/infra` из этого шаблона — через UI **Use this template** или API (см. секцию выше). Затем склонировать локально:
    ```bash
-   git clone git@git.stit.tech:<org>/infra.git && cd infra
+   git clone git@git.stit.tech:<client-org>/infra.git && cd infra
    ```
 
 3. Заполнить `.env` + сгенерить onboard-креды (на проектном VPS, в `/opt/<project>-infra/`):
@@ -80,20 +79,19 @@ curl -X POST -H "Authorization: token $GITEA_TOKEN" -H "Content-Type: applicatio
 
 7. Первый деплой — c laptop'а оператора:
    ```bash
-   make remote-deploy        # ssh → VPS → bash scripts/deploy.sh
+   make ship          # commit + push + (на main) ssh-deploy. На чистом дереве MSG не нужен.
    ```
-   Опционально для day-2: `make ship` (push текущей ветки → если main, авто-remote-deploy).
    Minio + backup поднимаются по дефолту. Backend opt-in: image должен быть
    опубликован в `git.stit.tech/<p>/backend` → `COMPOSE_PROFILES=backend make deploy`.
 
-См. `docs/onboarding.md` для расширенной версии (DNS, runner registration, restore-from-backup).
+См. `docs/onboarding.md` для расширенной версии (DNS, restore-from-backup).
 
 ## Принципы
 
 - **Конфиг → код.** Всё декларативно в `compose/*.yml` и `configs/`. Никаких "только на сервере, в репо нет".
 - **Секреты — только в Vault.** В `.env` лежат deployment-time facts + AppRole creds. Всё остальное vault-agent забирает на старте и рендерит в `.runtime/secrets/*.env`.
 - **Изоляция per-project.** AppRole + scoped policy на корпе → проект A не читает секреты проекта B даже при компрометации VPS.
-- **Pull-based deploy.** `git push v*` в `<org>/backend` → корп-Gitea-CI собирает image → проектный gitea-runner pull'ит и `make deploy`.
+- **Локальный CI.** Билд/тесты backend-образа гоняются у разработчика; `make ship` пушит код + ssh-деплоит. Никаких gitea-runner'ов / webhook'ов / push-trigger'ов на сервере.
 
 ## Контракт с корпом
 

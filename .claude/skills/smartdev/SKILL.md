@@ -19,6 +19,43 @@ description: Entry-point для проектной инфры (<client-org>/infr
 - Юзер уже дал чёткую узкую задачу — иди прямо в работу
 - Уже идёт активная сессия с известным контекстом — не повторяй briefing
 
+## Deploy-флоу (канон)
+
+Один путь изменений → сервер:
+
+```
+make ship MSG="feat(foo): bar"
+```
+
+`scripts/ship.sh` делает (один проход, без CI / runner'ов):
+
+1. Если working tree грязный — `git add -A && git commit -m "$MSG"` (commit-msg хук валидирует Conventional Commits).
+2. `git push origin <branch>`.
+3. **Если ветка = `main`** — SSH на VPS из `ansible/inventory.ini` → `bash scripts/deploy.sh`.
+4. Если не main — push без deploy'я + подсказка про PR.
+
+`make ship` без `MSG` (на чистом дереве) = push + deploy. Используется когда нужно форс-передеплоить `main` без новых изменений.
+
+### Что делает `scripts/deploy.sh` на VPS
+
+1. `git pull --ff-only origin main` — fail если remote разошлась.
+2. `scripts/render-configs.sh` — envsubst для `.tpl`.
+3. preflight DNS + Vault — только warnings.
+4. **vault-agent first** — рендерит `.runtime/secrets/*.env` ДО старта consumer'ов (`env_file` фиксируется при CREATE контейнера).
+5. **crowdsec early** — для bouncer auto-register если `CROWDSEC_BOUNCER_API_KEY=` пустой.
+6. `docker compose up -d --remove-orphans --wait --wait-timeout 180`.
+7. Diff `prev_sha..new_sha`:
+   - `configs/vault-agent/**` → **force-recreate consumer'ов** (env_file читается только при CREATE).
+   - `configs/{traefik,crowdsec,postgres,otel-agent}/**` → restart этих сервисов.
+
+### Hot-fix прямо на VPS
+
+Допустимо при инциденте, но строго временно: `/opt/<p>-infra/` — рабочая копия git-репо. Следующий `make ship` / `make deploy` сделает `git pull --ff-only` и **затрёт правки**. Поэтому hot-fix = **обязательный backport в git в тот же день**.
+
+Если оператор упомянул что правил на хосте — флажь как `⚠ on-server drift, нужен backport`. Исключение — gitignored файлы (`.env`, `.onboard-creds`, `.runtime/`), они на VPS правятся легально.
+
+Debug-mode на самом VPS: `ssh root@<vps> 'cd /opt/<p>-infra && make deploy'` (видишь пошаговый stdout вместо `--wait`-таймаутов через SSH).
+
 ## Шаги
 
 ### 1. Собрать сводку

@@ -10,25 +10,23 @@
 |---|---|---|
 | Edge | Traefik v3 + CrowdSec | `compose/traefik.yml`, `compose/crowdsec.yml` |
 | DB | Postgres 17 | `compose/postgres.yml` |
-| App | Backend (image `git.stit.tech/<org>/backend`) | `compose/backend.yml` |
+| App | Backend (image `git.stit.tech/<client-org>/backend`) | `compose/backend.yml` |
 | Secrets | vault-agent sidecar | `compose/vault-agent.yml` |
 | Telemetry | otel-agent → `otel.stit.tech` (OTLP от backend + Prom-scrape host-метрик) | `compose/otel-agent.yml` |
 | Host metrics | cadvisor + node-exporter (скрейпятся локальным otel-agent) | `compose/cadvisor.yml`, `compose/node-exporter.yml` |
-| Storage | Minio (S3 API + Console) на `s3.${DOMAIN}` / `minio.${DOMAIN}`, профиль `minio` | `compose/minio.yml` |
+| Storage | Minio (S3 API + Console) на `s3.${DOMAIN}` / `minio.${DOMAIN}` | `compose/minio.yml` |
 | Backup | self-contained контейнер (alpine + restic + pg_dumpall + crond), пишет в `$RESTIC_REPOSITORY` (дефолт — `s3:http://minio:9000/backups`) | `compose/backup.yml`, `containers/backup/` |
-| CI | gitea-runner, профиль `ci` | `compose/runner.yml` |
 
-`backend`, `minio`, `backup`, `runner` — opt-in через `COMPOSE_PROFILES=...`. По дефолту стартует только всё, что в core (traefik/postgres/vault-agent/otel-agent/crowdsec/cadvisor/node-exporter).
+`backend` — opt-in через `COMPOSE_PROFILES=backend` (image должен быть опубликован). Всё остальное стартует по дефолту.
 
 Сети: `proxy` (наружу), `backend-net` (internal). Подробно — `docs/architecture.md`.
 
 ## 2. Команды
 
 ```
-make deploy           # на VPS: git pull → render-configs → compose up -d --wait
-make remote-deploy    # с laptop'а: ssh → VPS → deploy.sh (читает ansible/inventory.ini)
-make ship             # push текущей ветки; если main — авто-remote-deploy
-make render           # рендер .tpl-конфигов через envsubst
+make ship MSG="..."   # с laptop'а: commit + push + (если main) ssh-deploy. Канон.
+make deploy           # на VPS: git pull → render → compose up --wait. Server-side.
+make render           # envsubst для .tpl-конфигов
 make validate         # compose syntax + .env.example coverage
 make ps / logs        # статус / логи
 make restart SVC=...  # рестарт одного сервиса
@@ -69,7 +67,7 @@ VAULT_TOKEN=<root> bash scripts/onboard-project.sh <project>
 
 - **Conventional Commits** — `commit-msg` хук блокирует невалидные. Типы: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `meta`.
 - Линейная история, push в main напрямую (solo-flow) — или в ветку → PR в Gitea → merge.
-- `make ship` для push + (если main) auto-remote-deploy. Или `git push` + `make remote-deploy` отдельно.
+- `make ship MSG="..."` — единственный канон: commit + push + (на main) ssh-deploy. На чистом дереве MSG необязателен — просто push + deploy.
 - Хуки ставятся `make hooks-install`.
 
 ## 6. Границы

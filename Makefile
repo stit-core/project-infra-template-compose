@@ -1,4 +1,4 @@
-.PHONY: help deploy render validate ps logs restart hooks-install status backup remote-deploy ship
+.PHONY: help deploy render validate ps logs restart hooks-install status backup ship
 
 SHELL := /usr/bin/env bash
 
@@ -7,22 +7,11 @@ COMPOSE_ARGS := -f docker-compose.yml $(addprefix -f ,$(wildcard compose/*.yml))
 help:
 	@awk 'BEGIN{FS=":.*##"; printf "Targets:\n"} /^[a-zA-Z_-]+:.*?##/ {printf "  %-15s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
-deploy: ## git pull + render-configs + compose up --wait (запускать на сервере)
+deploy: ## на VPS: git pull + render + compose up --wait
 	bash scripts/deploy.sh
 
-remote-deploy: ## с laptop'а: SSH на проектный VPS и запустить deploy.sh
-	bash scripts/remote-deploy.sh
-
-ship: ## push текущей ветки; если main — remote-deploy. Иначе подсказка про PR
-	@branch=$$(git symbolic-ref --short HEAD); \
-	echo "→ push origin $$branch"; \
-	git push origin $$branch; \
-	if [ "$$branch" = "main" ]; then \
-	  echo "→ main: triggering remote-deploy"; \
-	  bash scripts/remote-deploy.sh; \
-	else \
-	  echo "→ branch '$$branch' запушена. Открой PR в Gitea, мержи в main, потом 'make remote-deploy' (или 'git checkout main && git pull && make ship')."; \
-	fi
+ship: ## commit + push + (если main) ssh-deploy. usage: make ship MSG="feat(foo): bar"
+	bash scripts/ship.sh "$(MSG)"
 
 render: ## envsubst для *.tpl
 	bash scripts/render-configs.sh

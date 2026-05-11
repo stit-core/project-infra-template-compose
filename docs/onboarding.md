@@ -6,7 +6,7 @@ End-to-end: от заказа VPS до работающего production-сте�
 
 - Купленный VPS (Debian 12 / Ubuntu 24.04, 2-4 GB RAM, 40+ GB disk).
 - Pубликованный домен `<project>.com` с A-записью на IP VPS (нужно для Let's Encrypt HTTP-01).
-- Доступ к корп-инфре stit.tech: Vault root token, Gitea admin (для создания репо + runner reg-token).
+- Доступ к корп-инфре stit.tech: Vault root token, Gitea admin (для создания репо).
 - Локально: ansible 2.15+, git, ssh.
 
 ## Day-0: Корп-сторона
@@ -57,13 +57,9 @@ ssh root@stit-corp 'cd /opt/stit-infra && VAULT_TOKEN=<root> bash scripts/seed-p
 - `<org>/backend` — копия `stit/go-backend-template`.
 - (опц) `<org>/frontend` / `<org>/worker`.
 
-### 4. Получить Gitea-runner registration token
-
-Gitea admin → Site Administration → Actions → Runners → **Create new runner**. Скопируй single-use token — попадёт в `.env` на проектном VPS.
-
 ## Day-1: Проектная сторона
 
-### 5. Bootstrap чистого VPS
+### 4. Bootstrap чистого VPS
 
 ```bash
 cd <client>-infra
@@ -80,7 +76,7 @@ ansible-playbook -i ansible/inventory.ini ansible/bootstrap.yml
 3. `docker` — docker-ce + compose-plugin.
 4. `stit-onboard` — `/opt/<project>-infra/`, ed25519 deploy key (печатает pubkey), clone из `<org>/infra` (упадёт на первом запуске — см. шаг 6).
 
-### 6. Зарегистрировать deploy key в Gitea
+### 5. Зарегистрировать deploy key в Gitea
 
 Из вывода ansible скопируй pubkey, добавь в `<org>/infra` → Settings → Deploy Keys (read-only). Перезапусти clone:
 
@@ -88,7 +84,7 @@ ansible-playbook -i ansible/inventory.ini ansible/bootstrap.yml
 ansible-playbook -i ansible/inventory.ini ansible/bootstrap.yml --tags onboard
 ```
 
-### 7. Заполнить `.env` на VPS + сгенерить onboard-креды
+### 6. Заполнить `.env` на VPS + сгенерить onboard-креды
 
 ```bash
 ssh root@<vps>
@@ -98,7 +94,7 @@ VAULT_ROLE_ID=<id> VAULT_SECRET_ID=<id> \
 bash scripts/new-env.sh
 ```
 
-Минимум — 4 значения; всё остальное (VAULT_ADDR, OTEL_*, ACME_EMAIL=ops@$DOMAIN, BACKEND_TAG=latest) выводится скриптом. Runner-токен/CrowdSec-key опциональны и заполняются позже руками. Создаст `.env` + `.onboard-creds` с правами 0600.
+Минимум — 4 значения; всё остальное (VAULT_ADDR, OTEL_*, ACME_EMAIL=ops@$DOMAIN, BACKEND_TAG=latest) выводится скриптом. CrowdSec-key заполняется автоматически на первом deploy'е (`scripts/deploy.sh` дёргает `cscli bouncers add traefik`). Создаст `.env` + `.onboard-creds` с правами 0600.
 
 `.onboard-creds` содержит сгенерированные minio + restic креды. Скрипт выведет блок `vault kv put` команд — **отнеси корп-админу** для seed'а в Vault:
 
@@ -109,45 +105,22 @@ ssh root@stit-corp 'cd /opt/stit-infra && VAULT_TOKEN=<root> vault kv put kv/pro
 
 Без seed'а vault-agent залипает в retry-loop'е на `kv/projects/<p>/{minio,backup}` и стек не поднимается. RESTIC_PASSWORD из `.onboard-creds` **продублируй offsite** — без него restore из снапшотов невозможен. Повторно показать блок: `bash scripts/show-onboard-creds.sh`.
 
-### 8. Первый деплой
+### 7. Первый деплой
 
 С laptop'а оператора:
 ```bash
-make remote-deploy
+make ship          # commit + push + (на main) ssh-deploy. На чистом дереве MSG не нужен.
 ```
 
-Или на VPS: `make deploy`.
+Или на VPS (debug-mode со пошаговым stdout): `make deploy`.
 
 Что произойдёт:
 1. `render-configs.sh` рендерит `.tpl` → `.yml/.hcl`.
 2. compose стартует vault-agent (логин по AppRole, рендер env-файлов в `.runtime/secrets/`).
 3. Postgres + otel-agent + minio + minio-init + backup стартуют после vault-agent.healthy.
 4. Traefik запрашивает LE-cert на публичные хосты (s3.${DOMAIN}, minio.${DOMAIN} сразу; api.${DOMAIN} — когда backend появится).
-5. **Backend по умолчанию в `profiles: [backend]`** — поднимется только когда добавишь `COMPOSE_PROFILES=backend` (т.е. когда image в `git.stit.tech/<p>/backend` опубликован).
-6. `gitea-runner` (`profiles: [ci]`) — не стартует по умолчанию; включи с `COMPOSE_PROFILES=ci` когда нужен CI.
-
-### 9. Сгенерировать CrowdSec bouncer-key
-
-CrowdSec нужно сказать Traefik'у API-key для bouncer plugin:
-
-```bash
-docker exec crowdsec cscli bouncers add traefik
-# скопируй выведенный API key
-$EDITOR /opt/acme-infra/.env   # CROWDSEC_BOUNCER_API_KEY=<key>
-make deploy                     # перерендерит middlewares.yml.tpl + рестартанет traefik
-```
-
-### 10. Скопировать workflow в `<org>/backend`
-
-В backend-репо:
-```bash
-mkdir -p .gitea/workflows
-cp <инфра-шаблон>/ci/gitea/workflows/deploy.yml .gitea/workflows/deploy.yml
-git add .gitea/ && git commit -m "ci: add deploy workflow"
-git push origin main
-```
-
-В Gitea repo → Settings → Variables → добавь `PROJECT_NAME=acme`. Push на main → staging deploy. `git tag v0.1.0 && git push --tags` → prod deploy.
+5. **Backend по умолчанию в `profiles: [backend]`** — поднимется только когда добавишь `COMPOSE_PROFILES=backend` (т.е. когда image в `git.stit.tech/<client-org>/backend` опубликован).
+6. **CrowdSec bouncer key** — `scripts/deploy.sh` авто-регистрирует bouncer'а на первом подъёме и сам заполняет `CROWDSEC_BOUNCER_API_KEY` в `.env`. Ручной шаг не нужен.
 
 ## Smoke-чек
 

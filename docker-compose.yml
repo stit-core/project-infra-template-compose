@@ -15,7 +15,7 @@ volumes:
   crowdsec-data:
   crowdsec-config:
   postgres-data:
+  minio-data:
   vault-agent-secrets:
   vault-agent-bootstrap:
   otel-agent-data:
-  runner-data:

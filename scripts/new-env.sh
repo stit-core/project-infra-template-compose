@@ -72,12 +72,10 @@ else
   # без traefik/DNS/TLS — для обкатки работает сразу. Переопределять на
   # внешний S3 (s3:http://IP:9000/backups) или prod-домен после deploy'я.
   RESTIC_REPOSITORY="${RESTIC_REPOSITORY:-s3:http://minio:9000/backups}"
-  GITEA_RUNNER_REG_TOKEN="${GITEA_RUNNER_REG_TOKEN:-}"
 
   cat > .env <<EOF
-# Сгенерировано scripts/new-env.sh. Правь руками после первого деплоя:
-#   - CROWDSEC_BOUNCER_API_KEY: после \`cscli bouncers add traefik\`
-#   - GITEA_RUNNER_REG_TOKEN:   one-shot токен из Gitea admin, если поднимаешь CI runner
+# Сгенерировано scripts/new-env.sh.
+# CROWDSEC_BOUNCER_API_KEY заполняется автоматически на первом make deploy.
 # Runtime-секреты (DB, OIDC, JWT, S3, RESTIC) живут в Vault и рендерятся
 # vault-agent'ом в .runtime/secrets/*.env. Onboard-блок для админа — в
 # .onboard-creds (создан тем же new-env.sh).
@@ -100,8 +98,6 @@ BACKEND_TAG=$BACKEND_TAG
 RESTIC_REPOSITORY=$RESTIC_REPOSITORY
 
 CROWDSEC_BOUNCER_API_KEY=
-
-GITEA_RUNNER_REG_TOKEN=$GITEA_RUNNER_REG_TOKEN
 EOF
   chmod 0600 .env
   echo "OK: .env записан (chmod 0600).$([ -n "$ACME_CASERVER" ] && echo " LE staging endpoint выбран — сертификаты будут untrusted.")"
@@ -171,14 +167,14 @@ vault kv put kv/projects/$PROJECT_NAME/backup \\
 ================================================================================
 
 Дальше — деплой:
-  bash scripts/deploy.sh           # на VPS
+  bash scripts/deploy.sh           # на VPS (debug-mode)
   # либо локально с laptop'а оператора:
-  make remote-deploy               # ssh → VPS → deploy
+  make ship                        # commit + push + (на main) ssh-deploy
 
 Опционально (по мере появления):
   • Backend:   COMPOSE_PROFILES=backend bash scripts/deploy.sh
                (image должен быть опубликован в git.stit.tech/$PROJECT_NAME/backend)
-  • CrowdSec:  docker exec crowdsec cscli bouncers add traefik
-               → CROWDSEC_BOUNCER_API_KEY в .env → redeploy
-  • Runner:    bash scripts/register-runner.sh
+  • CrowdSec:  bouncer'а deploy.sh регистрирует автоматически. Если auto-register
+               не сработал — docker exec crowdsec cscli bouncers add traefik,
+               прописать ключ в .env вручную, redeploy.
 EOF

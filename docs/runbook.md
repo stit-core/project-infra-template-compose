@@ -82,24 +82,6 @@ docker exec backup restic check
 - **Cron не триггерит**: cron внутри контейнера, не на хосте. Проверь `docker exec backup pgrep crond` и `docker logs backup --tail 20`. Если crond упал — `docker compose ... restart backup`. Расписание — `containers/backup/crontab`, rebuild при изменении.
 - **Disk full на VPS**: `df -h`. Restic-cache в `/root/.cache/restic` внутри backup-контейнера может расти — `docker exec backup restic cache --cleanup`.
 
-## Gitea-runner offline
-
-**Симптом:** push в main не триггерит staging deploy, в Gitea admin → Runners видно «offline».
-
-```bash
-docker logs gitea-runner --tail=50
-```
-
-- **Token expired / unregistered:** удали `runner-data` volume и зарегистрируй заново:
-  ```bash
-  docker compose ... stop gitea-runner
-  docker volume rm runner-data
-  # получи новый REG_TOKEN из Gitea admin
-  echo "GITEA_RUNNER_REG_TOKEN=<new>" >> .env
-  make deploy
-  ```
-- **Network issue:** runner не может достучаться до `git.stit.tech`. Outbound-firewall? DNS?
-
 ## Rollback после плохого деплоя
 
 Backend rollback (image tag):
@@ -114,8 +96,7 @@ Infra rollback (compose/configs):
 ```bash
 git log --oneline -10
 git revert <bad-sha>
-git push origin main
-make deploy   # или подожди пока gitea-runner подхватит push
+make ship
 ```
 
 ## Полная замена VPS
