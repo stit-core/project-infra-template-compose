@@ -29,8 +29,12 @@ restart: ## рестарт одного сервиса: make restart SVC=backend
 	@if [ -z "$(SVC)" ]; then echo "usage: make restart SVC=<name>"; exit 2; fi
 	docker compose $(COMPOSE_ARGS) restart $(SVC)
 
-backup: ## one-shot backup внутри backup-контейнера (daily — supercronic'ом внутри)
+backup: ## one-shot backup внутри backup-контейнера (daily — busybox crond внутри)
 	docker exec backup /usr/local/bin/backup-now
+
+restore-pg: ## restore postgres из restic-снапшота. usage: make restore-pg SNAPSHOT=latest
+	@if [ -z "$(SNAPSHOT)" ]; then echo "usage: make restore-pg SNAPSHOT=<id|latest>"; exit 2; fi
+	bash scripts/restore-pg.sh "$(SNAPSHOT)"
 
 status: ## сводка состояния репо (для /smartdev)
 	bash scripts/agent-tools/status.sh

@@ -94,7 +94,9 @@ VAULT_ROLE_ID=<id> VAULT_SECRET_ID=<id> \
 bash scripts/new-env.sh
 ```
 
-Минимум — 4 значения; всё остальное (VAULT_ADDR, OTEL_*, ACME_EMAIL=ops@$DOMAIN, BACKEND_TAG=latest) выводится скриптом. CrowdSec-key заполняется автоматически на первом deploy'е (`scripts/deploy.sh` дёргает `cscli bouncers add traefik`). Создаст `.env` + `.onboard-creds` с правами 0600.
+Минимум — 4 значения; всё остальное (VAULT_ADDR, OTEL_*, ACME_EMAIL=ops@$DOMAIN, BACKEND_TAG=latest) выводится скриптом. **`RESTIC_REPOSITORY` запрашивается отдельно** (local-default убран — см. ADR / `.env.example`): задать внешний S3 endpoint (managed S3 / bare-IP / corp minio), либо явно `s3:http://minio:9000/backups` для обкатки. CrowdSec-key заполняется автоматически на первом deploy'е. Создаст `.env` + `.onboard-creds` с правами 0600.
+
+`.env` содержит **закомментированную** строку `# COMPOSE_PROFILES=backend` — раскомментируешь когда backend image опубликован (см. шаг 8).
 
 `.onboard-creds` содержит сгенерированные minio + restic креды. Скрипт выведет блок `vault kv put` команд — **отнеси корп-админу** для seed'а в Vault:
 
@@ -119,16 +121,24 @@ make ship          # commit + push + (на main) ssh-deploy. На чистом �
 2. compose стартует vault-agent (логин по AppRole, рендер env-файлов в `.runtime/secrets/`).
 3. Postgres + otel-agent + minio + minio-init + backup стартуют после vault-agent.healthy.
 4. Traefik запрашивает LE-cert на публичные хосты (s3.${DOMAIN}, minio.${DOMAIN} сразу; api.${DOMAIN} — когда backend появится).
-5. **Backend по умолчанию в `profiles: [backend]`** — поднимется только когда добавишь `COMPOSE_PROFILES=backend` (т.е. когда image в `git.stit.tech/<client-org>/backend` опубликован).
+5. **Backend по умолчанию в `profiles: [backend]`** — не стартует пока `COMPOSE_PROFILES=backend` не активен (шаг 8 — раскомментировать строку в `.env`).
 6. **CrowdSec bouncer key** — `scripts/deploy.sh` авто-регистрирует bouncer'а на первом подъёме и сам заполняет `CROWDSEC_BOUNCER_API_KEY` в `.env`. Ручной шаг не нужен.
+
+### 8. Включить backend (когда image готов)
+
+1. Опубликовать backend image в `git.stit.tech/<client-org>/backend:<tag>`.
+2. На VPS отредактировать `.env`: раскомментировать `COMPOSE_PROFILES=backend`, обновить `BACKEND_TAG` если нужно.
+3. С laptop'а: `make ship` (без MSG, working tree чистый → push + deploy). Backend поднимется, traefik выпустит cert на `api.${DOMAIN}`.
+
+Обратно — закомментировать строку + `make ship`.
 
 ## Smoke-чек
 
 ```bash
 # На VPS
 make ps                                                # все сервисы healthy
-docker exec backend wget -qO- http://localhost:8080/healthz
-curl -fsS https://api.acme.com/healthz                 # через traefik+LE
+docker exec backend wget -qO- http://localhost:8080/health
+curl -fsS https://api.acme.com/health                  # через traefik+LE
 docker exec vault-agent ls -la /secrets/               # rendered files
 docker exec backup restic snapshots                    # пусто на старте; после первой ночи — snapshots
 ```

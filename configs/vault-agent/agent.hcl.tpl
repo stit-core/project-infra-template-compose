@@ -51,11 +51,12 @@ template {
   perms       = 0400
 }
 
-# Backup-credentials. Restic пишет через публичный S3 endpoint (s3.${DOMAIN})
-# в bucket "backups". AWS-creds (backup-SA) — из kv/projects/<p>/minio
-# (backup_access_key/secret); RESTIC_PASSWORD — из kv/projects/<p>/backup.
-# Оба значения тоже генерит scripts/new-env.sh; оператор передаёт корп-админу.
-# RESTIC_PASSWORD продублируй offsite — без него restore из снапшотов невозможен.
+# Backup-credentials. AWS-creds + RESTIC_PASSWORD оба в kv/projects/<p>/backup —
+# чтобы endpoint и его creds жили в одном KV-path. RESTIC_REPOSITORY приходит
+# из проектного .env (env-var, не KV). Для local-minio backup-SA creds совпадают
+# с теми, что в kv/projects/<p>/minio (так new-env.sh их и подставляет по умолчанию);
+# для external endpoint оператор подменяет access_key/secret_key руками перед `vault kv put`.
+# RESTIC_PASSWORD ОБЯЗАТЕЛЬНО продублировать offsite — без него restore невозможен.
 template {
   source      = "/etc/vault-agent/templates/backup.env.tpl"
   destination = "/secrets/backup.env"

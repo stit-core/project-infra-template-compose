@@ -25,7 +25,13 @@ vault kv put kv/projects/$PROJECT_NAME/minio \\
   backup_access_key='$BACKUP_S3_ACCESS_KEY' \\
   backup_secret_key='$BACKUP_S3_SECRET_KEY'
 
+# kv/projects/<p>/backup содержит restic-password + AWS-creds endpoint'а.
+# По умолчанию подставлены creds проектного minio backup-SA (для local-minio
+# rehearsal). ЕСЛИ RESTIC_REPOSITORY указывает на external S3 — замени
+# access_key/secret_key на creds того endpoint'а перед vault kv put.
 vault kv put kv/projects/$PROJECT_NAME/backup \\
-  password='$RESTIC_PASSWORD'
+  password='$RESTIC_PASSWORD' \\
+  access_key='$BACKUP_S3_ACCESS_KEY' \\
+  secret_key='$BACKUP_S3_SECRET_KEY'
 --------------------------------------------------------------------------------
 EOF

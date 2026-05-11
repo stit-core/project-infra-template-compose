@@ -7,13 +7,14 @@ services:
     # оператор относит блок корп-админу для seed'а в Vault
     # (kv/projects/<p>/minio: root_user, root_password, app_access_key,
     # app_secret_key, backup_access_key, backup_secret_key, buckets опц.).
-    # Все клиенты (backend, restic, mc у stit-админа) ходят через публичный
-    # s3.${DOMAIN}, без привязки к docker-network. Внутренний minio:9000
-    # используется ТОЛЬКО minio-init'ом (bootstrap-sidecar в том же compose);
-    # для остальных endpoint один — публичный URL через traefik. Это значит,
-    # что restic-репо живёт в том же minio, что бекапит postgres-data: если
-    # minio-data накроется, и app-uploads, и backups теряются. Trade-off
-    # простоты против DR; для устойчивости — mc mirror в корп-S3 / offsite cron.
+    #
+    # backup_access_key/secret_key в minio path нужны только для local-minio
+    # rehearsal-сценария: minio-init создаёт `backup` SA и `backups` bucket
+    # под restic, если оператор выбрал RESTIC_REPOSITORY=s3:http://minio:9000/...
+    # При external endpoint эти SA + bucket остаются неиспользуемой
+    # rehearsal-инфраструктурой (пустой bucket, неактивный SA). Реальные
+    # creds endpoint'а живут отдельно в kv/projects/<p>/backup (см.
+    # configs/vault-agent/agent.hcl.tpl).
     command: server /data --console-address ":9001"
     env_file:
       - .runtime/secrets/minio.env

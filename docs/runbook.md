@@ -26,7 +26,6 @@ docker logs backend --tail=100
 
 - **PG_DSN ошибка:** проверь `.runtime/secrets/backend.env` (под root: `cat /opt/<p>-infra/.runtime/secrets/backend.env`). Если `password` там пустой — vault не отдал поле; `vault kv get kv/projects/<p>/db` покажет что в Vault.
 - **OTLP timeout:** некритично, backend должен запускаться даже без otel-agent (Init не падает на network ошибках). Если падает — баг в backend, поднимай issue в `<org>/backend`.
-- **Migration failed:** `make exec SVC=backend ... migrate up` (если backend не делает auto-migrate на старте). Залогируй какую миграцию.
 
 ## Traefik не выдаёт LE-cert
 
@@ -42,34 +41,37 @@ docker logs traefik --tail=200 | grep -i 'acme\|challenge'
 - Rate limit LE: 50 cert/week per registered domain. Если хитанули — ждать неделю или использовать staging endpoint (отдельный `caServer` в traefik.yml).
 - `/letsencrypt/acme.json` существует и `chmod 0600`? Иногда после восстановления volume'а права слетают.
 
-## Postgres dead / volume corrupted
+## Postgres dead / data lost / wrong migration
+
+Backup-формат — `pg_dumpall | gzip | restic backup --stdin` (один файл `pgdump-<UTC>.sql.gz` внутри snapshot'а, не tree).
+
+**Не делай `restic restore --target /data`** — снапшоты не содержат volume-структуру, restore не вернёт раздел `postgres-data`. Только через `restic dump <id> <filename> | gunzip | psql`.
+
+Канон — helper-скрипт. На VPS из `/opt/<p>-infra/`:
+
+```bash
+docker exec backup restic snapshots --compact        # выбрать ID или latest
+make restore-pg SNAPSHOT=latest                       # либо SNAPSHOT=<id>
+```
+
+Что делает (см. `scripts/restore-pg.sh`):
+1. Resolve dump-файла внутри snapshot'а (`/pgdump-<UTC>.sql.gz`).
+2. Печатает план и спрашивает `y/N`.
+3. Stop backend (если в стеке).
+4. `DROP DATABASE $POSTGRES_DB`.
+5. `restic dump | gunzip | psql -d template1` — pg_dumpall script сам CREATE'ит DB + `\connect` + загружает данные.
+6. Start backend.
+
+Если postgres сам не стартует (corrupted volume, incompatible server version):
 
 ```bash
 docker logs postgres --tail=100
+# Если действительно volume corrupted и есть свежий snapshot:
+docker compose <args> stop postgres
+docker volume rm <project>_postgres-data    # !!! только когда volume точно потерян
+docker compose <args> up -d postgres        # стартует чистый
+make restore-pg SNAPSHOT=latest             # подтягивает данные из snapshot'а
 ```
-
-Если PG не стартует и в логах `database files are incompatible with server` или `corruption detected`:
-
-1. **Останови всё:**
-   ```bash
-   docker compose -f docker-compose.yml -f compose/postgres.yml stop postgres
-   ```
-2. **Если есть recent restic snapshot** — восстанови volume (env из `.runtime/secrets/backup.env`):
-   ```bash
-   set -a; . .runtime/secrets/backup.env; set +a
-   docker run --rm -v <project>_postgres-data:/data \
-     -e RESTIC_REPOSITORY -e RESTIC_PASSWORD \
-     -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY \
-     --network proxy \
-     restic/restic:0.18.1 restore latest --target /data --include /data/postgres
-   ```
-3. **Если только pg_dump есть (не raw):**
-   ```bash
-   # pg сначала надо запустить чистым
-   docker volume rm postgres-data   # !!! только если volume точно потерян
-   docker compose ... up -d postgres
-   docker exec -i postgres psql -U $POSTGRES_USER < /path/to/pgdump.sql
-   ```
 
 ## Restic backup не идёт
 
@@ -101,20 +103,37 @@ make ship
 
 ## Полная замена VPS
 
-1. Заказать новый VPS, обновить A-record `api.<DOMAIN>` на новый IP (TTL заранее снизить).
-2. `ansible-playbook -i inventory.ini bootstrap.yml` (с обновлённым `ansible_host`).
-3. На новом VPS: `bash scripts/new-env.sh` (используй те же AppRole creds — они привязаны к проекту, не к VPS).
-4. `make deploy` → стек поднимается, vault-agent логинится, постгрес — пустой.
-5. Restore из restic (env приходит из `.runtime/secrets/backup.env`, рендерится после первого `make deploy`):
+**Предусловие:** `RESTIC_REPOSITORY` указывает на **внешний** S3 (не на проектный minio — он умер вместе с хостом). Если в `.env` старого VPS был local minio — снапшоты уже потеряны вместе с host'ом, restore невозможен.
+
+1. Заказать новый VPS, обновить A-record `${DOMAIN}` и сабдомены на новый IP (TTL заранее снизить).
+2. `ansible-playbook -i inventory.ini bootstrap.yml` (с обновлённым `ansible_host`). Зарегистрировать deploy-key.
+3. На новом VPS: `bash scripts/new-env.sh` (используй те же AppRole creds — они привязаны к проекту, не к VPS). RESTIC_REPOSITORY — тот же external endpoint что был раньше.
+4. `make ship` (или на VPS `make deploy`) → стек поднимается, vault-agent логинится, postgres стартует пустой.
+5. Restore postgres из restic:
    ```bash
-   set -a; . .runtime/secrets/backup.env; set +a
-   docker run --rm -v <project>_postgres-data:/data \
-     -e RESTIC_REPOSITORY -e RESTIC_PASSWORD \
-     -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY \
-     --network proxy \
-     restic/restic:0.18.1 restore latest --target /data
+   docker exec backup restic snapshots --compact   # выбрать snapshot
+   make restore-pg SNAPSHOT=latest
    ```
 6. Сверь IP в Authentik (если OIDC redirect-uri привязан) и в любых внешних webhook'ах.
+7. App-uploads (minio-data) — не покрыто backup'ом. Если есть external mirror (`mc mirror` job в корп) — оттуда; если нет — данные потеряны.
+
+## Quarterly DR drill
+
+Backup, который ни разу не тестировался, не работает. Раз в квартал:
+
+1. Поднять throwaway-инстанс postgres локально (или на staging VPS): `docker run --rm -d --name pg-drill -e POSTGRES_PASSWORD=drill postgres:17.9-alpine`.
+2. Снять последний dump из restic в файл:
+   ```bash
+   docker exec backup restic ls latest                              # имя файла
+   docker exec backup restic dump latest /pgdump-<UTC>.sql.gz \
+     | gunzip > /tmp/drill.sql
+   ```
+3. Загрузить в throwaway: `docker exec -i pg-drill psql -U postgres < /tmp/drill.sql`.
+4. Sanity-checks: `\dt` показывает таблицы, `SELECT count(*) FROM <main_table>` адекватен.
+5. Записать результат + дату в `docs/incidents/YYYY-MM-DD-dr-drill.md` (создать папку если нет).
+6. `docker rm -f pg-drill` + `rm /tmp/drill.sql`.
+
+Если хотя бы один шаг сломался — это инцидент сам по себе. Чини backup-флоу до следующего prod-инцидента.
 
 ## Когда эскалировать на корп
 

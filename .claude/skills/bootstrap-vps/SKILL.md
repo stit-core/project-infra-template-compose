@@ -137,10 +137,22 @@ REMOTE
 В production — не передавать, дефолт = prod LE.
 
 Создаёт **два файла** (оба chmod 600, gitignored):
-- `.env` — bootstrap-vars (PROJECT_NAME, DOMAIN, VAULT_*, OTEL_*, BACKEND_TAG)
+- `.env` — bootstrap-vars (PROJECT_NAME, DOMAIN, VAULT_*, OTEL_*, BACKEND_TAG, RESTIC_REPOSITORY) + закомментированная `# COMPOSE_PROFILES=backend`
 - `.onboard-creds` — сгенерированные `openssl rand` minio-креды + RESTIC_PASSWORD
 
+**`RESTIC_REPOSITORY` обязателен** — local-default убран. Спроси оператора что использовать:
+- external managed S3 (recommended для prod): `s3:https://s3.example.com/<p>-backups`
+- bare-IP S3 на другом хосте: `s3:http://<ip>:9000/<p>-backups`
+- corp Minio: `s3:https://<corp-minio>/<p>-backups`
+- local project minio (ТОЛЬКО обкатка): `s3:http://minio:9000/backups` — оператор должен явно ввести, не подсовывай молча.
+
+В rehearsal-режиме local minio допустим; в production-режиме — спроси и предупреди, что local default = не DR.
+
+`COMPOSE_PROFILES=backend` приходит закомментированным. Раскомментировать на VPS когда backend image опубликован (см. шаг 7).
+
 В конце выводит **блок `vault kv put` команд** — отнеси корп-админу для seed'а в Vault (`kv/projects/<p>/minio` + `kv/projects/<p>/backup`). Без seed'а vault-agent залипнет в retry-loop'е → стек не поднимется.
+
+**Если `RESTIC_REPOSITORY` external** — оператор/админ должен **подменить** `access_key`/`secret_key` в блоке `kv/projects/<p>/backup` на creds того endpoint'а перед `vault kv put`. По дефолту new-env.sh подставляет creds проектного minio backup-SA — они корректны только для `RESTIC_REPOSITORY=s3:http://minio:9000/...` (rehearsal). Если оставить дефолт + external endpoint → restic будет получать 403 AccessDenied.
 
 **Stop** на этом шаге, пока админ не подтвердит seed.
 
@@ -162,7 +174,7 @@ cd /opt/<project>-infra
 make deploy
 ```
 
-Minio + backup поднимаются по дефолту (после Vault seed'а). Backend остаётся opt-in — image должен быть опубликован в `git.stit.tech/<project>/backend:<tag>` → `COMPOSE_PROFILES=backend make deploy`.
+Minio + backup поднимаются по дефолту (после Vault seed'а). Backend остаётся opt-in: после публикации image'а в `git.stit.tech/<project>/backend:<tag>` — на VPS отредактируй `.env` (раскомментируй `COMPOSE_PROFILES=backend`), и `make ship` с laptop'а. Изменение в `.env` персистится, env-var в `make deploy` команде — нет.
 
 Что произойдёт при первом `deploy`:
 1. `git pull --ff-only` (no-op на первом запуске).

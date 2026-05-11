@@ -11,6 +11,15 @@ cd "$(dirname "$0")/.."
 [ -f .env ] || { echo "ERR: .env missing" >&2; exit 1; }
 docker info >/dev/null 2>&1 || { echo "ERR: docker not reachable" >&2; exit 1; }
 
+# RESTIC_REPOSITORY обязателен. Local-default убран намеренно: на single-VPS
+# host failure уносит и postgres-data, и restic-репо. Оператор должен выбрать
+# endpoint (external managed S3 / bare-IP S3 / явный local-minio для обкатки).
+grep -qE '^RESTIC_REPOSITORY=.+' .env || {
+  echo "ERR: RESTIC_REPOSITORY пустой/отсутствует в .env." >&2
+  echo "     Задай endpoint (см. .env.example) и перезапусти deploy." >&2
+  exit 1
+}
+
 prev_sha=$(git rev-parse HEAD 2>/dev/null || echo "none")
 git pull --ff-only origin main || true
 new_sha=$(git rev-parse HEAD 2>/dev/null || echo "none")

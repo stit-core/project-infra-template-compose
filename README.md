@@ -8,7 +8,7 @@ IaC шаблон проектной инфры для stit.tech: docker-compose 
 - **Core:** Postgres 17, backend (image `git.stit.tech/<client-org>/backend`, opt-in), vault-agent (sidecar для secrets).
 - **Telemetry:** otel-agent — proxy на корп `otel.stit.tech` (OTLP + Bearer-token из Vault).
 - **Storage:** Minio (S3-compat), on by default — bucket `app-uploads` для backend, `backups` для restic.
-- **Backup:** self-contained контейнер (alpine + restic + pg_dumpall + busybox crond), daily в restic-репо `$RESTIC_REPOSITORY` (дефолт — `s3:http://minio:9000/backups`, внутренний minio через docker network). Для prod / off-site менять endpoint в `.env`.
+- **Backup:** self-contained контейнер (alpine + restic + pg_dumpall + busybox crond), daily в restic-репо `$RESTIC_REPOSITORY` (обязателен — local-default убран, чтобы случайно не указать на проектный minio: host failure уносит и postgres-data, и репо). `new-env.sh` спрашивает интерактивно.
 - **Bootstrap:** ansible (apt + swap + journald + ssh-hardening + docker).
 
 См. `docs/architecture.md` для деталей.
@@ -81,8 +81,10 @@ curl -X POST -H "Authorization: token $GITEA_TOKEN" -H "Content-Type: applicatio
    ```bash
    make ship          # commit + push + (на main) ssh-deploy. На чистом дереве MSG не нужен.
    ```
-   Minio + backup поднимаются по дефолту. Backend opt-in: image должен быть
-   опубликован в `git.stit.tech/<p>/backend` → `COMPOSE_PROFILES=backend make deploy`.
+   Minio + backup поднимаются по дефолту. Backend остаётся opt-in: после
+   публикации image'а в `git.stit.tech/<p>/backend:<tag>` — на VPS раскомментировать
+   `COMPOSE_PROFILES=backend` в `.env` (строка приходит закомментированной из
+   `new-env.sh`), затем `make ship` с laptop'а. Изменение в `.env` персистится.
 
 См. `docs/onboarding.md` для расширенной версии (DNS, restore-from-backup).
 
@@ -99,6 +101,6 @@ curl -X POST -H "Authorization: token $GITEA_TOKEN" -H "Content-Type: applicatio
 - `otel.stit.tech` — observability ingest. Tenant routing по `service.namespace=<project>` + `Authorization: Bearer <OTEL_TOKEN>`.
 - `git.stit.tech` — registry для backend/worker/frontend images.
 
-(Backup по дефолту пишет в **проектный** Minio на том же VPS — это не off-site DR, а удобная отправная точка. Если хост умрёт целиком, бэкапы умрут вместе с базой. Для off-site менять `RESTIC_REPOSITORY` в `.env` на внешний S3 / корп-Minio.)
+(Backup — `RESTIC_REPOSITORY` обязателен, local-default убран. Оператор выбирает endpoint при `new-env.sh`: external managed S3, bare-IP S3 на другом хосте, corp Minio, либо явно local minio только для обкатки. Restore через `make restore-pg SNAPSHOT=latest` — см. `docs/runbook.md`.)
 
 См. также `docs/project-secrets.md` в `stit/infra` для KV-схемы и rotation flow.

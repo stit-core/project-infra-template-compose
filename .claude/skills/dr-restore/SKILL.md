@@ -24,14 +24,16 @@ description: Disaster recovery проектной инфры — восстан�
 
 ## Базовый набор данных
 
-Self-contained backup-контейнер (alpine + restic + pg_dumpall + busybox crond) каждую ночь делает:
-1. `pg_dumpall` через TCP к postgres:5432 → gzip → `restic backup --stdin` с filename `pgdump-<UTC>.sql.gz`.
+Self-contained backup-контейнер (alpine + restic + pg_dumpall + busybox crond) каждую ночь в 03:00 UTC делает:
+- `pg_dumpall -h postgres | gzip | restic backup --stdin --stdin-filename "pgdump-<UTC>.sql.gz"`
+
+Snapshot содержит **один файл** — `/pgdump-<UTC>.sql.gz`, не volume-tree. Это критично: `restic restore --target /data` **не сработает**, восстановление только через `restic dump <id> <filename> | gunzip | psql` (см. `scripts/restore-pg.sh`).
 
 **Volumes (minio-data, app-uploads etc.) НЕ бэкапятся** по дефолту — только postgres. Если нужны volume-снапшоты, расширь `containers/backup/backup-now`.
 
-Restic-репо: значение `RESTIC_REPOSITORY` из `.env`. Дефолт — `s3:http://minio:9000/backups` (внутренний minio через docker network, без traefik/DNS/TLS — работает сразу на обкатке). Для prod / off-site — `s3:http://<IP>:9000/backups` (внешний bare-IP) или `s3:https://s3.${DOMAIN}/backups` (через traefik, нужен DNS+cert). RESTIC_PASSWORD + backup-SA access/secret — в Vault (`kv/data/projects/<p>/{backup,minio}`), vault-agent рендерит в `.runtime/secrets/backup.env`.
+Restic-репо: значение `RESTIC_REPOSITORY` из `.env`. **Local default убран намеренно**: на single-VPS host failure уносит и postgres-data, и репо. Оператор обязан задать external endpoint (managed S3 / bare-IP S3 / corp Minio). `scripts/deploy.sh` fail'ит на пустом. RESTIC_PASSWORD + backup-SA access/secret — в Vault (`kv/data/projects/<p>/{backup,minio}`), vault-agent рендерит в `.runtime/secrets/backup.env`.
 
-Retention зависит от настроек в `backup.sh` — типично 7 daily / 4 weekly / 3 monthly.
+Retention в `containers/backup/backup-now`: 7 daily / 4 weekly / 3 monthly.
 
 ## Шаги
 
@@ -54,39 +56,45 @@ docker exec backup restic snapshots --compact
 
 Покажи юзеру вывод. Спроси: какой snapshot ID? (или `latest`)
 
-### 2. Сценарий: Postgres restore
+### A. Postgres restore (broken data / wrong migration)
 
-1. **Остановить consumer'ы** (backend и пр., требует OK):
-   ```bash
-   docker compose stop backend
-   ```
+Канон — `scripts/restore-pg.sh`. На VPS из `/opt/<p>-infra/`:
 
-2. **Достать dump из restic** в контейнер postgres напрямую через pipe (`/pgdump-*.sql.gz` — внутри snapshot'а, restic dump пишет в stdout):
-   ```bash
-   docker exec backup sh -c 'restic dump <SNAPSHOT_ID> /pgdump-<UTC>.sql.gz' \
-     > /tmp/pgdump.sql.gz
-   # имя файла — точно из restic snapshots --json (или restic ls <id>).
-   ```
+```bash
+docker exec backup restic snapshots --compact   # покажи юзеру, спроси какой ID
+make restore-pg SNAPSHOT=latest                  # либо SNAPSHOT=<id>
+```
 
-3. **Drop+recreate database** (требует OK — destructive):
-   ```bash
-   docker exec postgres psql -U <user> -c "DROP DATABASE <db>; CREATE DATABASE <db>;"
-   gunzip -c /tmp/pgdump.sql.gz | docker exec -i postgres psql -U <user> -d <db>
-   ```
+Что скрипт делает (на каждый destructive — y/N):
+1. Resolve dump-файла в snapshot'е (`/pgdump-<UTC>.sql.gz`).
+2. Stop backend.
+3. `DROP DATABASE $POSTGRES_DB`.
+4. `restic dump | gunzip | psql -d template1` — pg_dumpall сам CREATE'ит DB + `\connect` + загружает.
+5. Start backend.
 
-4. Запустить consumer + verify.
+**Не пиши свой restore руками** — скрипт стандартизирован. Если он не подходит (например, нужен restore в throwaway DB для drill) — см. блок «Quarterly DR drill» в `docs/runbook.md`.
 
-#### C. Полный host-restore (новый VPS)
+### B. Single table / row recovery
 
-Высокоуровнево:
+Снапшоты — file-level (pg_dumpall.sql.gz), не PITR. Гранулярность — daily snapshots, не запись. Для одной таблицы:
+
+1. Поднять throwaway postgres: `docker run --rm -d --name pg-tmp -e POSTGRES_PASSWORD=tmp postgres:17.9-alpine`.
+2. `restic dump <id> /pgdump-<UTC>.sql.gz | gunzip | docker exec -i pg-tmp psql -U postgres`.
+3. `pg_dump pg-tmp -t <table> | psql production` — селективно вернуть таблицу.
+4. `docker rm -f pg-tmp`.
+
+### C. Полный host-restore (новый VPS)
+
+**Предусловие:** `RESTIC_REPOSITORY` указывает на **external** endpoint (managed S3 / corp Minio / bare-IP другого хоста). Если был local minio — снапшоты ушли вместе с хостом, restore невозможен.
 
 1. Provision нового VPS.
-2. Запустить skill `bootstrap-vps` (ansible-playbook + регистрация deploy-key) — поднимет Docker, склонирует репо.
-3. На новом хосте: `bash scripts/new-env.sh` — заполнить `.env` теми же AppRole creds (они scope'ятся к `project-<p>`, не к хосту).
-4. DNS → новый IP (cutover).
-5. `make deploy` — поднимет пустые сервисы, vault-agent аутентифицируется и отрендерит секреты.
-6. Сценарий "Postgres restore" выше — для базы. Volume'ы (minio-data, app-uploads) **дефолтным бэкапом не покрываются**; данные оттуда восстанавливаются из external source если есть (re-uploads, ETL), либо из off-site mirror'а если настроен.
-7. Verify все healthchecks + LE-сертификаты выпустились (HTTP-01).
+2. Skill `bootstrap-vps` (ansible-playbook + регистрация deploy-key) — поднимет Docker, склонирует репо.
+3. На новом хосте: `bash scripts/new-env.sh` — те же AppRole creds (scope'ятся к `project-<p>`, не к хосту). RESTIC_REPOSITORY — тот же external endpoint.
+4. DNS cutover на новый IP.
+5. `make ship` — стек поднимается, vault-agent рендерит секреты.
+6. Сценарий A выше — для postgres.
+7. Volume'ы (minio-data, app-uploads) — не покрыты backup'ом; восстанавливаются из external source / re-uploads / off-site mirror если настроен.
+8. Verify все healthchecks + LE-сертификаты выпустились.
 
 ### 3. Verify
 
@@ -108,8 +116,8 @@ docker exec backup restic snapshots --compact
 
 ## Что делать если restic-репо тоже потерян
 
-С дефолтом `RESTIC_REPOSITORY=s3:http://minio:9000/backups` backup-репо живёт в **том же VPS**, что и postgres-data. Если хост умрёт целиком — теряется и база, и restic-репо. Это **не off-site DR**, а удобная отправная точка для обкатки.
+Local-default `s3:http://minio:9000/backups` убран намеренно — на single-VPS он не даёт DR. Если в `.env` всё-таки local minio и хост умер — снапшоты потеряны вместе с базой. Recovery невозможен.
 
-Для prod — переключи `RESTIC_REPOSITORY` в `.env` на внешний S3 / корп-Minio / другой провайдер: `s3:http://<IP>:9000/backups` или `s3:https://s3.example.com/backups`. Тогда смерть проектного VPS не уносит бэкапы.
+Для prod — `RESTIC_REPOSITORY` должен указывать на external endpoint. `scripts/deploy.sh` fail'ит на пустом значении; от local minio защищает только дисциплина оператора.
 
-См. `docs/runbook.md` → "Полная замена VPS" для процедуры при сохранившемся репо.
+См. `docs/runbook.md` → «Полная замена VPS» при сохранившемся репо и «Quarterly DR drill» для регулярной проверки что backup восстанавливается.

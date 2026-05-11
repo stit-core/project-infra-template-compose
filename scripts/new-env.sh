@@ -68,10 +68,16 @@ else
   # пустое значение → traefik не сможет parse'нуть acme.caServer.
   ACME_CASERVER="${ACME_CASERVER:-https://acme-v02.api.letsencrypt.org/directory}"
   BACKEND_TAG="${BACKEND_TAG:-latest}"
-  # Restic endpoint. Дефолт — внутренний minio через docker network,
-  # без traefik/DNS/TLS — для обкатки работает сразу. Переопределять на
-  # внешний S3 (s3:http://IP:9000/backups) или prod-домен после deploy'я.
-  RESTIC_REPOSITORY="${RESTIC_REPOSITORY:-s3:http://minio:9000/backups}"
+  # Restic endpoint. ОБЯЗАТЕЛЬНО — local-default убран намеренно (на single-VPS
+  # host failure уносит и postgres-data, и репо вместе). Если оператор
+  # сознательно хочет local-minio для обкатки — введёт `s3:http://minio:9000/backups`.
+  echo
+  echo "=== Restic backup endpoint ==="
+  echo "Примеры:"
+  echo "  s3:https://s3.example.com/$PROJECT_NAME-backups   ← external managed S3"
+  echo "  s3:http://<ip>:9000/$PROJECT_NAME-backups          ← bare-IP S3"
+  echo "  s3:http://minio:9000/backups                        ← local minio (только обкатка)"
+  prompt RESTIC_REPOSITORY "RESTIC_REPOSITORY"
 
   cat > .env <<EOF
 # Сгенерировано scripts/new-env.sh.
@@ -94,6 +100,10 @@ OTEL_EXPORTER_OTLP_INSECURE=$OTEL_EXPORTER_OTLP_INSECURE
 OTEL_TENANT=$PROJECT_NAME
 
 BACKEND_TAG=$BACKEND_TAG
+
+# Backend opt-in. Раскомментировать когда image опубликован.
+# Несколько профилей через запятую (frontend, worker).
+# COMPOSE_PROFILES=backend
 
 RESTIC_REPOSITORY=$RESTIC_REPOSITORY
 
@@ -159,8 +169,14 @@ vault kv put kv/projects/$PROJECT_NAME/minio \\
   backup_access_key='$BACKUP_S3_ACCESS_KEY' \\
   backup_secret_key='$BACKUP_S3_SECRET_KEY'
 
+# kv/projects/<p>/backup содержит restic-password + AWS-creds endpoint'а.
+# По умолчанию подставлены creds проектного minio backup-SA (для local-minio
+# rehearsal). ЕСЛИ RESTIC_REPOSITORY указывает на external S3 — замени
+# access_key/secret_key на creds того endpoint'а перед vault kv put.
 vault kv put kv/projects/$PROJECT_NAME/backup \\
-  password='$RESTIC_PASSWORD'
+  password='$RESTIC_PASSWORD' \\
+  access_key='$BACKUP_S3_ACCESS_KEY' \\
+  secret_key='$BACKUP_S3_SECRET_KEY'
 --------------------------------------------------------------------------------
 После seed'а — \`bash scripts/deploy.sh\` (или \`make deploy\`) на VPS.
 Блок снова показать: \`bash scripts/show-onboard-creds.sh\`.
