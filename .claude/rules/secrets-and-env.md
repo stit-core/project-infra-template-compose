@@ -1,5 +1,5 @@
 ---
-description: Правила секретов в проектной инфре. .env для оператора, vault-agent рендерит .runtime/secrets/*.env, ротация = vault kv patch + рестарт. Грузится при работе с .env, .tpl, vault-agent.
+description: Правила секретов в проектной инфре. Multi-env (kv/projects/<p>/<env>/*), .env только identity+bootstrap, vault-agent рендерит .runtime/, ротация = vault kv patch + force-recreate. Грузится при работе с .env, .tpl, vault-agent.
 paths:
   - ".env*"
   - "**/*.tpl"
@@ -9,80 +9,91 @@ paths:
 
 # Секреты и .env
 
-## Два уровня секретов
+## Три уровня данных
 
 | Уровень | Что | Где | Кто пишет |
 |---|---|---|---|
-| Оператор | bootstrap: `PROJECT_NAME`, `DOMAIN`, `ACME_EMAIL`, `VAULT_ROLE_ID`, `VAULT_SECRET_ID`, `OTEL_*`, image tags, `CROWDSEC_BOUNCER_API_KEY` | `.env` (gitignored, на VPS) | оператор через `scripts/new-env.sh` |
-| Runtime | DB-пароль, OIDC client_secret, JWT key, OTEL_TOKEN, MinIO root + SA, RESTIC_PASSWORD + AWS_* | `.runtime/secrets/*.env` (gitignored, рендерится vault-agent'ом) | vault-agent из `kv/projects/<p>/{db,oidc,jwt,minio,backup}` + `kv/observability/tenants/<p>` |
+| Identity | `PROJECT_NAME`, `ENV`, `DOMAIN` | `.env` (gitignored) | `scripts/new-env.sh` |
+| Bootstrap auth | `VAULT_ROLE_ID`, `VAULT_SECRET_ID` | `.env` | оператор (из корп онбординга) |
+| Local-managed | `CROWDSEC_BOUNCER_API_KEY`, `COMPOSE_PROFILES` | `.env` | auto-register / оператор |
+| Корп-константы | `VAULT_ADDR`, `OTEL endpoint` | hardcoded в шаблоне | — |
+| Vault-managed конфиг | `BACKEND_TAG`, `ACME_EMAIL`, `ACME_CASERVER` | `kv/projects/<p>/<env>/meta` → `.runtime/env/compose.env` | корп-админ (vault kv put/patch) |
+| Vault-managed секреты | DB, OIDC, JWT, OTEL_TOKEN, MinIO, Restic + AWS | `kv/projects/<p>/<env>/{db,oidc,jwt,otel,minio,backup}` → `.runtime/secrets/*.env` | корп-админ |
 
-Backend / postgres / other consumer-сервисы читают **только** `.runtime/secrets/*.env` через `env_file:`. Они не знают про Vault напрямую.
+Consumer-сервисы (postgres, backend, minio, backup, otel-agent) читают **только** `.runtime/secrets/*.env` и `.runtime/env/compose.env` через `env_file:` / compose `--env-file`. Они не знают про Vault напрямую.
+
+## Multi-env
+
+Один проект имеет N сред (`dev`, `prod`, ...) — N **отдельных VPS**. Каждый VPS:
+- свой `.env` с `ENV=<env>` и AppRole-credentials для конкретного `(project, env)`.
+- читает свой scope в Vault: `kv/projects/<p>/<env>/*`.
+- свой restic-репо (endpoint в `kv/.../backup.repository`).
+
+AppRole policy строго ограничен `kv/data/projects/<p>/<env>/*` read-only. Невозможность залогиниться с чужим ENV = валидация. Подробнее — `.claude/rules/multi-env.md`.
 
 ## Что куда
 
 | Файл | В репо? | Зачем |
 |---|---|---|
-| `.env.example` | да | Список всех bootstrap-переменных, как сгенерировать |
-| `.env` | **нет** (gitignored, permissions.deny) | Реальные оператор-секреты на VPS |
-| `.runtime/secrets/*.env` | **нет** (gitignored, .runtime/ полностью) | Vault-agent output |
-| `.runtime/secrets-bootstrap/{role-id,secret-id}` | **нет** | Trampoline-файлы для AppRole login |
-| `configs/vault-agent/templates/*.env.tpl` | да | Vault-agent шаблоны на consul-template (`{{ with secret (printf "kv/data/projects/%s/db" (env "PROJECT_NAME")) }}...{{ end }}`) |
-| `configs/vault-agent/agent.hcl.tpl` | да | Список template-блоков (один блок на render-target) |
-| `configs/<svc>/*.tpl` | да | Не-секретные шаблоны с bootstrap-vars (например, `${CROWDSEC_BOUNCER_API_KEY}` для traefik dynamic) |
+| `.env.example` | да | Минимальный набор для bootstrap (5 переменных) |
+| `.env` | **нет** (gitignored, permissions.deny) | Реальные identity + AppRole на VPS |
+| `.runtime/secrets/*.env` | **нет** | Vault-agent rendered секреты |
+| `.runtime/env/compose.env` | **нет** | Vault-agent rendered non-secret конфиг для compose (BACKEND_TAG etc.) |
+| `.runtime/configs/traefik.yml` | **нет** | Vault-agent rendered traefik static (acme email/caServer из Vault) |
+| `.runtime/configs/vault-health.sh` | **нет** | render-configs.sh generated healthcheck-script под активные profile'ы |
+| `.runtime/secrets-bootstrap/{role-id,secret-id}` | **нет** | Trampoline для AppRole login |
+| `configs/vault-agent/templates/*.tpl` | да | Consul-template шаблоны (`{{ with secret (printf "kv/data/projects/%s/%s/db" (env "PROJECT_NAME") (env "ENV")) }}`) |
+| `configs/vault-agent/agent.hcl.parts/*.hcl` | да | head/<profile>/tail-фрагменты — render-configs.sh собирает agent.hcl под активный `COMPOSE_PROFILES` |
+| `configs/<svc>/*.tpl` | да | envsubst-шаблоны с .env-vars (например, middlewares.yml.tpl с `${CROWDSEC_BOUNCER_API_KEY}`) |
 
 ## Правила
 
 ### .env / .env.example
 
 - `.env*` НИКОГДА не коммитятся (gitignore + `permissions.deny`).
-- Любая новая bootstrap-переменная в compose/configs — обязана появиться в `.env.example` с комментарием как сгенерировать.
-- `${VAR}`, который использует только vault-agent template — **не** в `.env.example` (он живёт в Vault KV, а не в `.env`).
+- В `.env.example` живёт минимум: identity, AppRole-bootstrap, профильные switches. Vault-managed vars (`BACKEND_TAG` etc.) присутствуют **как закомментированные declarations** — нужно для `validate.sh` coverage-check, реальное значение приходит из Vault.
 - Имена: `<SERVICE>_<PURPOSE>` UPPER_SNAKE_CASE.
 
 ### .runtime/
 
-- Полностью gitignored: `.runtime/` в `.gitignore`.
-- Создаётся автоматически vault-agent'ом и `scripts/deploy.sh` (через `mkdir -p`).
-- В backup НЕ попадает (rendered, восстанавливается из Vault).
-- Permissions: vault-agent пишет `0400`. Не лезь руками.
+- Полностью gitignored.
+- Создаётся `scripts/deploy.sh` (mkdir + touch заглушек) + render-configs.sh + vault-agent.
+- В backup НЕ попадает (rendered, восстанавливается из Vault + render-configs).
+- Permissions: vault-agent пишет `0400` для secrets, `0444` для configs/env. Не лезь руками.
 
 ### Vault KV path: CLI vs API (зачем `kv/data/...`)
 
-KV v2 даёт два разных view на один и тот же путь:
+KV v2 — два view одного пути:
 
-| Где | Path | Пример |
-|---|---|---|
-| `vault kv put/get/patch` (CLI) | `kv/<path>` | `vault kv put kv/projects/roc/minio root_user=admin ...` |
-| HTTP API + consul-template `secret` | `kv/data/<path>` | `secret (printf "kv/data/projects/%s/minio" ...)` |
+| Где | Path |
+|---|---|
+| `vault kv put/get/patch` (CLI) | `kv/projects/<p>/<env>/<kind>` |
+| HTTP API + consul-template `secret` | `kv/data/projects/<p>/<env>/<kind>` |
 
-CLI прячет сегмент `data/` для удобства. API/template — нет, там path буквальный.
-Если в `.tpl` написать `kv/projects/...` без `data/` — Vault вернёт 404, vault-agent залипнет в retry-loop'е.
+CLI прячет сегмент `data/`. API/template — нет. Если в `.tpl` написать `kv/projects/...` без `data/` — Vault вернёт 404, vault-agent залипнет в retry-loop'е.
 
-Аналогично у ответа: HTTP API оборачивает поля в `{ "data": { "data": { ... } } }`,
-поэтому в шаблонах двойной `.Data.data.<key>` (первый — envelope, второй — твои поля).
+Ответ API оборачивает поля в `{ "data": { "data": { ... } } }`, поэтому двойной `.Data.data.<key>` в шаблонах.
 
 ### vault-agent шаблоны
 
-`configs/vault-agent/templates/<svc>.env.tpl` — это **consul-template** (внутри vault-agent),
-не shell-envsubst. Поэтому:
+`configs/vault-agent/templates/<svc>.{env,yml}.tpl` — **consul-template** (внутри vault-agent), не shell-envsubst:
 
-- `(env "PROJECT_NAME")`, **не** `${PROJECT_NAME}` — переменные окружения тянутся через
-  template-function.
-- `kv/data/projects/...`, не `kv/projects/...` — см. блок выше.
-- Имена полей в `.Data.data.<key>` точно совпадают с ключами, которыми клали через
-  `vault kv put` (`user`, `password`, `database`, ...). Поправка имени в Vault → правка `.tpl`.
+- `(env "PROJECT_NAME")`, `(env "ENV")` — переменные тянутся через template-function (vault-agent контейнерное окружение).
+- `kv/data/projects/...`, не `kv/projects/...`.
+- Имена полей в `.Data.data.<key>` точно совпадают с тем, что клали `vault kv put`. Поправка имени в Vault → правка `.tpl`.
 
 ```
-{{ with secret (printf "kv/data/projects/%s/db" (env "PROJECT_NAME")) -}}
+{{ with secret (printf "kv/data/projects/%s/%s/db" (env "PROJECT_NAME") (env "ENV")) -}}
 PG_DSN=postgres://{{ .Data.data.user }}:{{ .Data.data.password }}@postgres:5432/{{ .Data.data.database }}
 {{- end }}
 ```
 
-Каждый новый рендер-таргет требует двух правок:
-1. Создать `.tpl` в `configs/vault-agent/templates/`.
-2. Добавить `template { source = ...; destination = "/secrets/<svc>.env"; perms = 0400 }` блок в `agent.hcl.tpl`.
+Каждый новый render-target требует **трёх** правок:
+1. Создать `<svc>.{env,yml}.tpl` в `configs/vault-agent/templates/`.
+2. Добавить `template {}` блок в соответствующий `configs/vault-agent/agent.hcl.parts/<profile>.hcl` (или `head.hcl` если always-on).
+3. Если consumer-сервис в новом profile — добавить `profiles: [<name>]` в `compose/<svc>.yml`.
 
-После — рестарт vault-agent + **force-recreate** consumer'ов. Просто `restart` НЕ работает: docker фиксирует `env_file` при container CREATE, не start, поэтому повторное чтение требует пересоздать контейнер. `scripts/deploy.sh` делает это автоматически при изменении `.tpl` между sha (см. блок про vault-template change). Вручную:
+После — `make ship`. `scripts/deploy.sh` детектит изменения в `templates/` или `agent.hcl.parts/` + смену `COMPOSE_PROFILES` → restart vault-agent + force-recreate consumer'ов автоматически. Вручную:
 
 ```bash
 docker compose <args> restart vault-agent
@@ -91,11 +102,11 @@ docker compose <args> up -d --no-deps --force-recreate <consumer>
 
 ### Ротация
 
-Источник истины — Vault KV на корп-стороне:
+Источник истины — Vault на корп-стороне:
 
-```
+```bash
 # на корп-VPS (stit/infra)
-vault kv patch kv/projects/<p>/db password=<new>
+vault kv patch kv/projects/<p>/<env>/db password=<new>
 ```
 
 Vault-agent на проектном VPS заметит изменение и перерендерит `.runtime/secrets/<svc>.env`. **Но consumer уже прочитал env_file при создании контейнера** — нужен force-recreate, не restart:
@@ -105,20 +116,37 @@ make restart SVC=backend     # ❌ контейнер не пересоздан,
 docker compose <args> up -d --no-deps --force-recreate backend  # ✅
 ```
 
+`make ship` (без MSG, на чистом дереве) делает force-recreate автоматически когда видит смену `.tpl` / `parts/` / `COMPOSE_PROFILES` между deploy'ами.
+
 Не редактируй `.runtime/secrets/*.env` руками — vault-agent перетрёт.
+
+### Profile-based opt-in
+
+Минимальный стек (always-on) — traefik / vault-agent / crowdsec / otel-agent / node-exporter / cadvisor / landing. Поднимается на одном лишь `meta` + `otel` seed'е от корпа при онбординге.
+
+Опциональные сервисы за `COMPOSE_PROFILES`:
+
+| Profile | Сервисы | Зависит от KV |
+|---|---|---|
+| `postgres` | postgres | db |
+| `storage` | minio, minio-init, backup | minio, backup, db (+ обязательно `postgres` профиль) |
+| `backend` | backend | db, oidc, jwt |
+
+Запрос seed'а — Claude skill `/request-secret` (`.claude/skills/request-secret/SKILL.md`). Печатает stdout-блок `vault kv put kv/projects/<p>/<env>/<name>` для корп-админа; имя — произвольный slug, не enum.
 
 ## Что нельзя коммитить (cross-check)
 
 `git diff --cached` перед коммитом — убедись что нет:
 - `.env` или `.env.local` / `.env.production`
 - `.runtime/` любого уровня
+- `.onboard-creds` (legacy, не должен генериться, но safety-net в .gitignore)
 - `*.pem`, `*.key`
-- Inline-секретов в `compose/*.yml` (значения вида `password: actual_secret` — должно быть `${VAR}` или прямо через vault-agent)
+- Inline-секретов в `compose/*.yml` (значения вида `password: actual_secret` — должно быть `${VAR}` или через vault-agent)
 
 Hook `permissions.deny` страхует, но привычка проверять — золото.
 
 ## Чек перед коммитом
 
 - В `.env.example` нет реальных значений (только placeholder / пусто)?
-- Любой новый `${VAR}` в compose/configs — добавлен в `.env.example` (если bootstrap) или в vault-agent template + `agent.hcl.tpl` (если runtime)?
+- Любой новый `${VAR}` в compose/configs — добавлен в `.env.example` (как declared / закомментированный, если Vault-managed) или в vault-agent template + соответствующий `agent.hcl.parts/<profile>.hcl`?
 - `scripts/agent-tools/validate.sh` зелёный (он ловит missing vars в `.env.example`)?

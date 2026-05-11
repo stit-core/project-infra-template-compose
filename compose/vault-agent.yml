@@ -18,36 +18,26 @@ services:
     environment:
       VAULT_ROLE_ID:      ${VAULT_ROLE_ID}
       VAULT_SECRET_ID:    ${VAULT_SECRET_ID}
-      VAULT_ADDR:         ${VAULT_ADDR}
-      PROJECT_NAME:       ${PROJECT_NAME}
-      DOMAIN:             ${DOMAIN}              # для consul-template `env "DOMAIN"`
-      RESTIC_REPOSITORY:  ${RESTIC_REPOSITORY}   # endpoint для restic backup, см. backup.env.tpl
+      PROJECT_NAME:       ${PROJECT_NAME}           # consul-template (env "PROJECT_NAME")
+      ENV:                ${ENV}                    # consul-template (env "ENV") — multi-env dimension
+      DOMAIN:             ${DOMAIN}                 # резерв для шаблонов, использующих хост-имя
     volumes:
       - ./configs/vault-agent/agent.hcl:/etc/vault-agent/agent.hcl:ro
       - ./configs/vault-agent/templates:/etc/vault-agent/templates:ro
       - ./.runtime/secrets:/secrets
       - ./.runtime/secrets-bootstrap:/secrets-bootstrap
+      - ./.runtime/env:/env                          # compose.env для compose --env-file
+      - ./.runtime/configs:/configs                  # rendered configs (traefik.yml, ...)
     networks:
       - proxy            # outbound к vault.stit.tech
       - backend-net      # consumer'ы читают rendered-файлы через bind-mount
     healthcheck:
-      # Healthy = blocker-секреты непустые (backend.env + postgres.env).
-      # Просто `.ready` marker не годится: consul-template рендерит
-      # static-template (`.ready` с contents="ready") раньше, чем те,
-      # что требуют запроса в Vault — postgres / backend стартовали с
-      # пустым env_file и падали.
-      #
-      # ВАЖНО — minio.env / backup.env здесь НЕ проверяем намеренно.
-      # Это позволяет стеку подняться частично, если корп ещё не засеял
-      # kv/projects/<p>/{minio,backup}: traefik / crowdsec / landing
-      # стартуют, оператор видит работающий https://${DOMAIN} (landing),
-      # а minio / backup явно красные в `make ps`. Если добавить их сюда —
-      # vault-agent застрянет в "starting" пока админ не засеет, и
-      # все consumer'ы вместе с ним.
-      #
-      # Добавляй сюда новый render target только если он blocker для
-      # core-стека (postgres / backend / traefik-зависимый).
-      test: ["CMD-SHELL", "test -s /secrets/backend.env && test -s /secrets/postgres.env"]
+      # Healthy = ВСЕ expected outputs под активный COMPOSE_PROFILES непустые.
+      # Список output'ов profile-зависим; render-configs.sh генерит конкретный
+      # health-script в .runtime/configs/vault-health.sh при каждом deploy.
+      # Always-on проверки: /env/compose.env, /configs/traefik.yml, /secrets/otel.env.
+      # Per-profile добавки: postgres.env / backend.env / minio.env / backup.env.
+      test: ["CMD", "sh", "/configs/vault-health.sh"]
       interval: 5s
       timeout: 2s
       retries: 24        # ~2 мин на первый auth + render

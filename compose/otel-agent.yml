@@ -4,14 +4,11 @@ services:
     container_name: otel-agent
     restart: unless-stopped
     command: ["--config=/etc/otel/config.yaml"]
-    # Bearer-token берётся из backend.env (там OTEL_TOKEN). Лишние
-    # переменные из backend.env для otel-agent безвредны.
+    # Bearer-token + OTEL_TENANT приходят из .runtime/secrets/otel.env —
+    # always-on vault-agent template (профильно-независимый). OTEL endpoint
+    # hardcoded в configs/otel-agent/config.yaml — корп-константа.
     env_file:
-      - .runtime/secrets/backend.env
-    environment:
-      OTEL_TENANT: ${OTEL_TENANT}
-      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT}
-      OTEL_EXPORTER_OTLP_INSECURE: ${OTEL_EXPORTER_OTLP_INSECURE}
+      - .runtime/secrets/otel.env
     volumes:
       - ./configs/otel-agent/config.yaml:/etc/otel/config.yaml:ro
       - otel-agent-data:/var/lib/otel

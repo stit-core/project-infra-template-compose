@@ -3,6 +3,7 @@ services:
     image: postgres:17.9-alpine
     container_name: postgres
     restart: unless-stopped
+    profiles: [postgres]
     # POSTGRES_USER/PASSWORD/DB рендерятся vault-agent'ом; postgres image
     # принимает их через env_file так же, как прямой environment.
     env_file:

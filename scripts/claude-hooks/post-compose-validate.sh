@@ -43,30 +43,47 @@ if [ -f ".env.example" ]; then
     sed -E 's/^([A-Z][A-Z0-9_]*)=$/\1=placeholder/' .env.example > "$TMP_ENV"
 fi
 
-# Compose валидирует существование env_file: путей до любого парсинга. На dev-машине
-# .runtime/secrets/*.env не существует (рендерится vault-agent'ом на VPS), поэтому
-# touch'им placeholder'ы. Это та же логика что в scripts/deploy.sh. Cleanup только
+# Compose валидирует существование env_file: + bind-mount путей до любого парсинга.
+# На dev-машине .runtime/ не существует (vault-agent рендерит на VPS), поэтому
+# touch'им placeholder'ы. Та же логика что в scripts/deploy.sh. Cleanup только
 # тех файлов которые мы сами создали — чтобы не маскировать реальное состояние на VPS.
-mkdir -p .runtime/secrets
+mkdir -p .runtime/secrets .runtime/env .runtime/configs
 TOUCHED=()
-for f in backend postgres backup minio; do
-    if [ ! -e ".runtime/secrets/$f.env" ]; then
-        touch ".runtime/secrets/$f.env"
-        TOUCHED+=(".runtime/secrets/$f.env")
+touch_placeholder() {
+    if [ ! -e "$1" ]; then
+        touch "$1"
+        TOUCHED+=("$1")
     fi
+}
+for f in backend postgres backup minio otel; do
+    touch_placeholder ".runtime/secrets/$f.env"
 done
+touch_placeholder ".runtime/env/compose.env"
+touch_placeholder ".runtime/configs/traefik.yml"
 
 args=(-f docker-compose.yml)
 for f in compose/*.yml; do
     args+=(-f "$f")
 done
 
+# Активируем все profile'ы для validate: без активации compose ругается на
+# depends_on между profile-restricted сервисами ("undefined service" даже
+# если оба в одном profile). Не отражает runtime-набор, но проверяет что
+# вся модель парсится — для regression-check этого достаточно.
+all_profiles=(postgres storage backend)
+profile_args=()
+for p in "${all_profiles[@]}"; do
+    profile_args+=(--profile "$p")
+done
+
+# Makefile использует --env-file .env --env-file .runtime/env/compose.env;
+# воспроизводим тот же порядок (поздние перекрывают ранние).
 if [ -n "$TMP_ENV" ]; then
-    OUT=$(docker compose --env-file "$TMP_ENV" "${args[@]}" config -q 2>&1)
+    OUT=$(docker compose --env-file "$TMP_ENV" --env-file .runtime/env/compose.env "${profile_args[@]}" "${args[@]}" config -q 2>&1)
     EXIT=$?
     rm -f "$TMP_ENV"
 else
-    OUT=$(docker compose "${args[@]}" config -q 2>&1)
+    OUT=$(docker compose --env-file .runtime/env/compose.env "${profile_args[@]}" "${args[@]}" config -q 2>&1)
     EXIT=$?
 fi
 

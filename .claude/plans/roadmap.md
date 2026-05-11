@@ -4,7 +4,7 @@
 
 ## Активные
 
-(none — initial scaffold готов в `stit/infra` `.claude/plans/project-infra-template-compose.md`)
+(none)
 
 ## Планируется
 
@@ -12,6 +12,7 @@
 
 ## Выполненные (последние)
 
+- [done] [multi-env](multi-env.md) — multi-environment модель (dev/prod через VPS-per-env), max в Vault (kv/projects/<p>/<env>/*), profile-based lazy stack, request-secret флоу.
 - [done] initial scaffold — P-1 базового скелета (Makefile, .env.example, AGENTS.md, README.md, commit-msg hook, agent-tools status/validate, .claude/settings.json).
 
 ---

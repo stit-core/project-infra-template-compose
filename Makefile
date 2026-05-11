@@ -2,7 +2,12 @@
 
 SHELL := /usr/bin/env bash
 
-COMPOSE_ARGS := -f docker-compose.yml $(addprefix -f ,$(wildcard compose/*.yml))
+# compose интерполирует ${...} из --env-file. compose.env рендерится
+# vault-agent'ом из kv/projects/<p>/<env>/meta (BACKEND_TAG etc.). Поздние
+# --env-file перекрывают ранние; .env остаётся источником для identity и
+# bootstrap-auth, compose.env — для Vault-managed конфига.
+COMPOSE_ARGS := --env-file .env --env-file .runtime/env/compose.env \
+                -f docker-compose.yml $(addprefix -f ,$(wildcard compose/*.yml))
 
 help:
 	@awk 'BEGIN{FS=":.*##"; printf "Targets:\n"} /^[a-zA-Z_-]+:.*?##/ {printf "  %-15s %s\n", $$1, $$2}' $(MAKEFILE_LIST)

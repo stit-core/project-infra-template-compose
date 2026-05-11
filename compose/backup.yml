@@ -4,21 +4,17 @@ services:
     image: ${PROJECT_NAME:-project}/backup:local
     container_name: backup
     restart: unless-stopped
+    profiles: [storage]
     # Self-contained: alpine + restic + pg_dumpall + busybox crond. Никакой
     # host-orchestration: cron внутри контейнера дёргает /usr/local/bin/backup-now
     # ежедневно. One-shot smoke-test: `docker exec backup /usr/local/bin/backup-now`
     # (или `make backup`). Расписание — containers/backup/crontab.
     #
-    # Endpoint для restic-репо приходит из RESTIC_REPOSITORY (см. .env);
-    # дефолт `s3:http://minio:9000/backups` — внутренний minio через docker
-    # network, без traefik/DNS/TLS. Для prod / off-site — менять в .env.
-    #
-    # Креды:
-    #   POSTGRES_USER/PASSWORD/HOST — из kv/projects/<p>/db (тот же source,
-    #     что postgres-контейнер; postgres-client коннектится по backend-net)
-    #   AWS_ACCESS_KEY_ID/SECRET    — из kv/projects/<p>/minio (backup_*)
-    #   RESTIC_PASSWORD             — из kv/projects/<p>/backup
-    # Всё рендерит vault-agent в .runtime/secrets/backup.env.
+    # Все backup-параметры (endpoint, creds, restic password, postgres creds)
+    # живут в Vault и рендерятся vault-agent'ом в .runtime/secrets/backup.env:
+    #   RESTIC_REPOSITORY + RESTIC_PASSWORD + AWS_*  — kv/projects/<p>/<env>/backup
+    #   POSTGRES_USER/PASSWORD/HOST                  — kv/projects/<p>/<env>/db
+    # Ротация endpoint'а — `vault kv patch kv/projects/<p>/<env>/backup repository=...`.
     env_file:
       - .runtime/secrets/backup.env
     depends_on:

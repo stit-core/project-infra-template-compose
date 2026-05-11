@@ -7,8 +7,8 @@ IaC шаблон проектной инфры для stit.tech: docker-compose 
 - **Edge:** Traefik v3 + CrowdSec (HTTP-01 LE, WAF, IP-bans).
 - **Core:** Postgres 17, backend (image `git.stit.tech/<client-org>/backend`, opt-in), vault-agent (sidecar для secrets).
 - **Telemetry:** otel-agent — proxy на корп `otel.stit.tech` (OTLP + Bearer-token из Vault).
-- **Storage:** Minio (S3-compat), on by default — bucket `app-uploads` для backend, `backups` для restic.
-- **Backup:** self-contained контейнер (alpine + restic + pg_dumpall + busybox crond), daily в restic-репо `$RESTIC_REPOSITORY` (обязателен — local-default убран, чтобы случайно не указать на проектный minio: host failure уносит и postgres-data, и репо). `new-env.sh` спрашивает интерактивно.
+- **Storage:** Minio (S3-compat), opt-in под `COMPOSE_PROFILES=storage` — bucket `app-uploads` для backend, `backups` для restic.
+- **Backup:** self-contained контейнер (alpine + restic + pg_dumpall + busybox crond), daily в restic-репо. Endpoint + creds приходят из `kv/projects/<p>/<env>/backup` — корп-сторона выбирает (external managed S3 / bare-IP / local-minio rehearsal).
 - **Bootstrap:** ansible (apt + swap + journald + ssh-hardening + docker).
 
 См. `docs/architecture.md` для деталей.
@@ -30,34 +30,30 @@ curl -X POST -H "Authorization: token $GITEA_TOKEN" -H "Content-Type: applicatio
 
 ## Day-0 quickstart
 
+Один проект = N сред (dev/prod/...) = N VPS, по одному на ENV. См. `.claude/rules/multi-env.md` для контракта со `stit/infra`.
+
 1. На корп-стороне (`stit/infra`):
    ```bash
-   VAULT_TOKEN=<root> bash scripts/onboard-project.sh acme
+   VAULT_TOKEN=<root> bash scripts/onboard-project.sh --name acme --envs dev,prod
    ```
-   Получаешь блок `.env`-переменных + AppRole.
+   Создаст per-env AppRole + засеит `kv/projects/acme/<env>/{meta,otel}`. Вернёт по блоку `PROJECT_NAME/ENV/VAULT_ROLE_ID/VAULT_SECRET_ID` для каждого env.
 
-2. Создать клиентский репо `<client-org>/infra` из этого шаблона — через UI **Use this template** или API (см. секцию выше). Затем склонировать локально:
+2. Создать клиентский репо `<client-org>/infra` из шаблона. Клонировать локально:
    ```bash
    git clone git@git.stit.tech:<client-org>/infra.git && cd infra
    ```
 
-3. Заполнить `.env` + сгенерить onboard-креды (на проектном VPS, в `/opt/<project>-infra/`):
+3. На каждом VPS (по одному на env) — заполнить `.env`:
    ```bash
-   PROJECT_NAME=acme DOMAIN=acme.com \
+   PROJECT_NAME=acme ENV=prod DOMAIN=acme.com \
    VAULT_ROLE_ID=<id> VAULT_SECRET_ID=<id> \
    bash scripts/new-env.sh
    ```
-   Создаст `.env` (chmod 600) + `.onboard-creds` (chmod 600, gitignored) с
-   сгенерированными minio-кредами и RESTIC_PASSWORD. Выведет блок
-   `vault kv put` команд — **отнеси корп-админу**, без seed'а стек не
-   поднимется (vault-agent залипнет в retry-loop'е). Повторно показать:
-   `bash scripts/show-onboard-creds.sh`.
+   Создаст `.env` (chmod 600) с 5 переменными. Всё остальное (image tags, ACME, restic endpoint, runtime-секреты) — в Vault.
 
 4. Bootstrap чистого VPS:
    ```bash
-   # Один раз — SSH ключ на VPS (либо задай operator_ssh_pubkey в inventory.ini):
    ssh-copy-id root@<vps>
-
    ansible-playbook -i ansible/inventory.ini ansible/bootstrap.yml
    ```
 
@@ -69,38 +65,33 @@ curl -X POST -H "Authorization: token $GITEA_TOKEN" -H "Content-Type: applicatio
 
 6. (Опц., но **сильно рекомендовано** при ручной сборке с dev-машины)
    Whitelist'нуть IP dev-машины в корпном CrowdSec, иначе `docker push`
-   быстро триггерит `crowdsecurity/http-probing` бан:
-   ```bash
-   # на корп-VPS
-   bash /opt/stit-infra/scripts/onboard-project.sh <project> --source-ip <dev-ip>
-   ```
-   (Если проект уже onboard'ен — отредактируй `configs/crowdsec/whitelists.yaml`
-   и `docker compose ... restart crowdsec` руками.)
+   триггерит `crowdsecurity/http-probing` бан.
 
-7. Первый деплой — c laptop'а оператора:
+7. Первый деплой — с laptop'а оператора:
    ```bash
    make ship          # commit + push + (на main) ssh-deploy. На чистом дереве MSG не нужен.
    ```
-   Minio + backup поднимаются по дефолту. Backend остаётся opt-in: после
-   публикации image'а в `git.stit.tech/<p>/backend:<tag>` — на VPS раскомментировать
-   `COMPOSE_PROFILES=backend` в `.env` (строка приходит закомментированной из
-   `new-env.sh`), затем `make ship` с laptop'а. Изменение в `.env` персистится.
+   Минимальный стек (traefik / vault-agent / crowdsec / otel / metrics / landing) поднимается сразу.
+
+8. По мере дозревания — запрашивать seed'ы (Claude skill `/request-secret`) и активировать profile'ы:
+   - `/request-secret` → Claude формирует блок `vault kv put kv/projects/<p>/<env>/<name>` для корп-админа.
+   - После seed'а от админа — добавить нужный profile в `COMPOSE_PROFILES` в `.env` и `make ship`.
+   - Стандартные имена: `db` / `minio` / `backup` / `oidc` / `jwt`. Project-specific (`stripe-key`, etc.) — что угодно.
 
 См. `docs/onboarding.md` для расширенной версии (DNS, restore-from-backup).
 
 ## Принципы
 
 - **Конфиг → код.** Всё декларативно в `compose/*.yml` и `configs/`. Никаких "только на сервере, в репо нет".
-- **Секреты — только в Vault.** В `.env` лежат deployment-time facts + AppRole creds. Всё остальное vault-agent забирает на старте и рендерит в `.runtime/secrets/*.env`.
-- **Изоляция per-project.** AppRole + scoped policy на корпе → проект A не читает секреты проекта B даже при компрометации VPS.
+- **Максимум в Vault.** `.env` минимален (identity + AppRole-bootstrap). Image теги, ACME-config, restic endpoint, OTEL token и runtime-секреты — все в `kv/projects/<p>/<env>/*`, ротируются корп-стороной без правок репо.
+- **Multi-env через KV-dimension.** Один шаблон, N VPS, у каждого свой `ENV` и свой scope в Vault. AppRole-policy строго `kv/data/projects/<p>/<env>/*`.
+- **Lazy stack.** Минимальный стек поднимается на одном meta+otel seed'е. Постгрес/минио/бэкап/бэкенд — за `COMPOSE_PROFILES`, активируются по мере seed'ов.
 - **Локальный CI.** Билд/тесты backend-образа гоняются у разработчика; `make ship` пушит код + ssh-деплоит. Никаких gitea-runner'ов / webhook'ов / push-trigger'ов на сервере.
 
 ## Контракт с корпом
 
-- `vault.stit.tech` — secrets backend. AppRole `project-<p>` создаётся `onboard-project.sh`.
-- `otel.stit.tech` — observability ingest. Tenant routing по `service.namespace=<project>` + `Authorization: Bearer <OTEL_TOKEN>`.
+- `vault.stit.tech` — secrets backend. AppRole per `(project, env)` создаётся `onboard-project.sh --name <p> --envs ...`. См. `.claude/rules/multi-env.md` для KV-layout и onboarding-флоу.
+- `otel.stit.tech` — observability ingest. Tenant routing по `service.namespace=<project>-<env>` + Bearer-token из `kv/projects/<p>/<env>/otel`.
 - `git.stit.tech` — registry для backend/worker/frontend images.
 
-(Backup — `RESTIC_REPOSITORY` обязателен, local-default убран. Оператор выбирает endpoint при `new-env.sh`: external managed S3, bare-IP S3 на другом хосте, corp Minio, либо явно local minio только для обкатки. Restore через `make restore-pg SNAPSHOT=latest` — см. `docs/runbook.md`.)
-
-См. также `docs/project-secrets.md` в `stit/infra` для KV-схемы и rotation flow.
+Restore из backup'а — `make restore-pg SNAPSHOT=latest`, см. `docs/runbook.md`.

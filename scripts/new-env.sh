@@ -1,28 +1,20 @@
 #!/usr/bin/env bash
-# Bootstrap .env + onboard-creds на свежем проектном VPS.
+# Bootstrap .env на свежем проектном VPS.
 #
-# Корп-инфра (Vault/OTEL) зашита константами; от оператора нужны только
-# 4 значения (PROJECT_NAME/DOMAIN/VAULT_ROLE_ID/VAULT_SECRET_ID). Дальше
-# скрипт сам генерит minio-креды и restic-password, складывает их в
-# .onboard-creds (chmod 600, gitignored) и печатает блок vault kv put
-# команд, который оператор передаёт корп-админу для seed'а в Vault.
-#
-# Идемпотентно: повторный запуск НЕ перегенерит .onboard-creds (если
-# уже есть) — повторно покажет тот же блок команд. Это важно для случая,
-# когда блок потерялся в чате/терминале до того, как админ его засеял.
+# Multi-env: на каждом VPS свой ENV (dev/prod/...) и свой AppRole.
+# .env минимален: identity (PROJECT_NAME, ENV, DOMAIN) + AppRole-bootstrap.
+# Всё остальное (backend_tag, acme email/caServer, restic endpoint, runtime
+# секреты) живёт в Vault — корп-сторона засеивает при онбординге (meta+otel)
+# и по запросу через skill `/request-secret` (печатает блок vault kv put).
 #
 # Non-interactive:
-#   PROJECT_NAME=acme DOMAIN=acme.com \
+#   PROJECT_NAME=acme ENV=prod DOMAIN=acme.com \
 #   VAULT_ROLE_ID=... VAULT_SECRET_ID=... \
 #   bash scripts/new-env.sh
 #
 # Interactive: bash scripts/new-env.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."
-
-# ───────── Корп-инфра (одинакова для всех проектных VPS) ─────────
-CORP_VAULT_ADDR="https://vault.stit.tech"
-CORP_OTEL_ENDPOINT="otel.stit.tech:443"
 
 prompt() {
   # prompt VAR "Описание" [default]
@@ -41,156 +33,61 @@ prompt() {
   printf -v "$var" '%s' "$value"
 }
 
-# ───────── .env ─────────
 if [ -f .env ]; then
   echo "NOTE: .env уже существует, не перегенерирую."
-  # подхватим PROJECT_NAME из существующего .env — нужен для onboard-creds блока ниже
   PROJECT_NAME=$(awk -F= '/^PROJECT_NAME=/{print $2; exit}' .env)
-  DOMAIN=$(awk -F= '/^DOMAIN=/{print $2; exit}' .env)
+  ENV=$(awk -F= '/^ENV=/{print $2; exit}' .env)
 else
   echo "=== Project identity ==="
   prompt PROJECT_NAME "PROJECT_NAME (lowercase, e.g. acme)"
-  prompt DOMAIN "DOMAIN (e.g. acme.com)"
+  prompt ENV          "ENV (dev/prod/...; должен совпадать с env'ом в kv/projects/<p>/_meta)"
+  prompt DOMAIN       "DOMAIN (e.g. acme.com)"
 
   echo
-  echo "=== Vault AppRole (из вывода корп onboard-project.sh) ==="
-  prompt VAULT_ROLE_ID "VAULT_ROLE_ID"
+  echo "=== Vault AppRole (из вывода корп onboard-project --envs ...) ==="
+  prompt VAULT_ROLE_ID   "VAULT_ROLE_ID"
   prompt VAULT_SECRET_ID "VAULT_SECRET_ID"
 
-  VAULT_ADDR="${VAULT_ADDR:-$CORP_VAULT_ADDR}"
-  OTEL_EXPORTER_OTLP_ENDPOINT="${OTEL_EXPORTER_OTLP_ENDPOINT:-$CORP_OTEL_ENDPOINT}"
-  OTEL_EXPORTER_OTLP_INSECURE="${OTEL_EXPORTER_OTLP_INSECURE:-false}"
-  ACME_EMAIL="${ACME_EMAIL:-ops@$DOMAIN}"
-  # LE: prod по дефолту. При обкатке/тестах передавать
-  # ACME_CASERVER=https://acme-staging-v02.api.letsencrypt.org/directory
-  # через env-var (lim'ы prod LE тесные: 5 failed/host/hour, 5 dup/SAN/week).
-  # Дефолт ОБЯЗАН быть непустым: traefik.yml.tpl envsubst'ит ${ACME_CASERVER},
-  # пустое значение → traefik не сможет parse'нуть acme.caServer.
-  ACME_CASERVER="${ACME_CASERVER:-https://acme-v02.api.letsencrypt.org/directory}"
-  BACKEND_TAG="${BACKEND_TAG:-latest}"
-  # Restic endpoint. ОБЯЗАТЕЛЬНО — local-default убран намеренно (на single-VPS
-  # host failure уносит и postgres-data, и репо вместе). Если оператор
-  # сознательно хочет local-minio для обкатки — введёт `s3:http://minio:9000/backups`.
-  echo
-  echo "=== Restic backup endpoint ==="
-  echo "Примеры:"
-  echo "  s3:https://s3.example.com/$PROJECT_NAME-backups   ← external managed S3"
-  echo "  s3:http://<ip>:9000/$PROJECT_NAME-backups          ← bare-IP S3"
-  echo "  s3:http://minio:9000/backups                        ← local minio (только обкатка)"
-  prompt RESTIC_REPOSITORY "RESTIC_REPOSITORY"
-
   cat > .env <<EOF
-# Сгенерировано scripts/new-env.sh.
-# CROWDSEC_BOUNCER_API_KEY заполняется автоматически на первом make deploy.
-# Runtime-секреты (DB, OIDC, JWT, S3, RESTIC) живут в Vault и рендерятся
-# vault-agent'ом в .runtime/secrets/*.env. Onboard-блок для админа — в
-# .onboard-creds (создан тем же new-env.sh).
+# Сгенерировано scripts/new-env.sh. См. .env.example для контракта.
+# Vault-managed конфиг (backend_tag, acme email/caServer, restic endpoint)
+# и runtime-секреты — в kv/projects/$PROJECT_NAME/$ENV/*.
 
 PROJECT_NAME=$PROJECT_NAME
+ENV=$ENV
 DOMAIN=$DOMAIN
-ACME_EMAIL=$ACME_EMAIL
-ACME_CASERVER=$ACME_CASERVER
 
-VAULT_ADDR=$VAULT_ADDR
 VAULT_ROLE_ID=$VAULT_ROLE_ID
 VAULT_SECRET_ID=$VAULT_SECRET_ID
 
-OTEL_EXPORTER_OTLP_ENDPOINT=$OTEL_EXPORTER_OTLP_ENDPOINT
-OTEL_EXPORTER_OTLP_INSECURE=$OTEL_EXPORTER_OTLP_INSECURE
-OTEL_TENANT=$PROJECT_NAME
-
-BACKEND_TAG=$BACKEND_TAG
-
-# Backend opt-in. Раскомментировать когда image опубликован.
-# Несколько профилей через запятую (frontend, worker).
-# COMPOSE_PROFILES=backend
-
-RESTIC_REPOSITORY=$RESTIC_REPOSITORY
+# Profile-based opt-in. По мере того, как корп засеивает соответствующие
+# kv/projects/$PROJECT_NAME/$ENV/<kind>, добавляй сюда profile (через запятую):
+#   postgres  — нужен kv/.../db
+#   storage   — нужен kv/.../minio + kv/.../backup (+ postgres профиль)
+#   backend   — нужен kv/.../{db,oidc,jwt}
+# COMPOSE_PROFILES=
 
 CROWDSEC_BOUNCER_API_KEY=
 EOF
   chmod 0600 .env
-  echo "OK: .env записан (chmod 0600).$([ -n "$ACME_CASERVER" ] && echo " LE staging endpoint выбран — сертификаты будут untrusted.")"
+  echo "OK: .env записан (chmod 0600)."
 fi
 
-# ───────── .onboard-creds ─────────
-# Генерим minio + restic креды локально, чтобы оператор отнёс их корп-админу
-# для seed'а в Vault. Без этих секретов в Vault стек не поднимется:
-# vault-agent залипнет в retry-loop'е по kv/projects/<p>/{minio,backup}.
-
-if [ -f .onboard-creds ]; then
-  echo "NOTE: .onboard-creds уже существует, не перегенерирую (re-print ниже)."
-  # shellcheck disable=SC1091
-  . .onboard-creds
-else
-  gen() { openssl rand -hex "$1"; }
-  MINIO_ROOT_USER="${MINIO_ROOT_USER:-admin}"
-  MINIO_ROOT_PASSWORD="$(gen 24)"
-  # Minio service-account limits: access_key 3-20 chars, secret_key 8-40 chars.
-  # gen N → 2N hex chars. Use 8/16 → 16/32 chars (well under limit, ample entropy).
-  # Раньше было 12/24 → 24/48 chars, minio-init падал на admin user svcacct add
-  # с "access key length should be between 3 and 20".
-  APP_S3_ACCESS_KEY="$(gen 8)"
-  APP_S3_SECRET_KEY="$(gen 16)"
-  BACKUP_S3_ACCESS_KEY="$(gen 8)"
-  BACKUP_S3_SECRET_KEY="$(gen 16)"
-  RESTIC_PASSWORD="$(gen 32)"
-
-  umask 077
-  cat > .onboard-creds <<EOF
-# Сгенерировано scripts/new-env.sh. НЕ КОММИТИТЬ (gitignored, chmod 600).
-# Эти креды нужны корп-админу для seed'а в Vault. После seed'а stay-here
-# как back-up; rotation — через корп-сторону (vault kv put + redeploy).
-# RESTIC_PASSWORD ОБЯЗАТЕЛЬНО продублируй offsite (без него restore невозможен).
-MINIO_ROOT_USER='$MINIO_ROOT_USER'
-MINIO_ROOT_PASSWORD='$MINIO_ROOT_PASSWORD'
-APP_S3_ACCESS_KEY='$APP_S3_ACCESS_KEY'
-APP_S3_SECRET_KEY='$APP_S3_SECRET_KEY'
-BACKUP_S3_ACCESS_KEY='$BACKUP_S3_ACCESS_KEY'
-BACKUP_S3_SECRET_KEY='$BACKUP_S3_SECRET_KEY'
-RESTIC_PASSWORD='$RESTIC_PASSWORD'
-EOF
-  chmod 0600 .onboard-creds
-  echo "OK: .onboard-creds записан (chmod 0600)."
-fi
-
-# ───────── Блок для корп-админа ─────────
 cat <<EOF
 
 ================================================================================
-ОТНЕСИ ЭТО КОРП-АДМИНУ (stit/infra). До seed'а — стек НЕ поднимется.
-Команды для корп-Vault (требуется VAULT_TOKEN с правами kv.write на kv/projects/):
---------------------------------------------------------------------------------
-vault kv put kv/projects/$PROJECT_NAME/minio \\
-  root_user='$MINIO_ROOT_USER' \\
-  root_password='$MINIO_ROOT_PASSWORD' \\
-  app_access_key='$APP_S3_ACCESS_KEY' \\
-  app_secret_key='$APP_S3_SECRET_KEY' \\
-  backup_access_key='$BACKUP_S3_ACCESS_KEY' \\
-  backup_secret_key='$BACKUP_S3_SECRET_KEY'
+Минимальный стек (traefik + vault-agent + crowdsec + otel-agent + node-exporter
++ cadvisor + landing) поднимется как только корп засеит kv/projects/$PROJECT_NAME/$ENV/{meta,otel}.
+Это происходит при \`onboard-project --envs $ENV\` на корп-стороне.
 
-# kv/projects/<p>/backup содержит restic-password + AWS-creds endpoint'а.
-# По умолчанию подставлены creds проектного minio backup-SA (для local-minio
-# rehearsal). ЕСЛИ RESTIC_REPOSITORY указывает на external S3 — замени
-# access_key/secret_key на creds того endpoint'а перед vault kv put.
-vault kv put kv/projects/$PROJECT_NAME/backup \\
-  password='$RESTIC_PASSWORD' \\
-  access_key='$BACKUP_S3_ACCESS_KEY' \\
-  secret_key='$BACKUP_S3_SECRET_KEY'
---------------------------------------------------------------------------------
-После seed'а — \`bash scripts/deploy.sh\` (или \`make deploy\`) на VPS.
-Блок снова показать: \`bash scripts/show-onboard-creds.sh\`.
+Запусти:
+  make ship      # или \`bash scripts/deploy.sh\` напрямую на VPS
+
+По мере необходимости — запрашивай seed'ы вторичных секретов через Claude:
+  /request-secret               # skill в .claude/skills/request-secret/
+
+Claude сформирует блок \`vault kv put kv/projects/$PROJECT_NAME/$ENV/<name>\`
+с правильными значениями (генерит пароли где надо) — отдай корп-админу.
+После seed'а — обнови COMPOSE_PROFILES в .env и \`make ship\`.
 ================================================================================
-
-Дальше — деплой:
-  bash scripts/deploy.sh           # на VPS (debug-mode)
-  # либо локально с laptop'а оператора:
-  make ship                        # commit + push + (на main) ssh-deploy
-
-Опционально (по мере появления):
-  • Backend:   COMPOSE_PROFILES=backend bash scripts/deploy.sh
-               (image должен быть опубликован в git.stit.tech/$PROJECT_NAME/backend)
-  • CrowdSec:  bouncer'а deploy.sh регистрирует автоматически. Если auto-register
-               не сработал — docker exec crowdsec cscli bouncers add traefik,
-               прописать ключ в .env вручную, redeploy.
 EOF

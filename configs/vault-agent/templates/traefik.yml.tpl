@@ -38,13 +38,14 @@ providers:
 certificatesResolvers:
   letsencrypt:
     acme:
-      # email + caServer должны быть здесь, не CLI: traefik 3.6 при наличии
-      # acme-блока в static yaml игнорирует --certificatesresolvers.*.acme.*
-      # CLI-флаги (наблюдалось эмпирически: пустой email в acme.json + prod
-      # caServer вместо staging несмотря на CLI). Файл рендерится из
-      # traefik.yml.tpl через envsubst — переменные из .env.
-      email: ${ACME_EMAIL}
-      caServer: ${ACME_CASERVER}
+      # email + caServer обязаны быть в файле (не CLI): traefik 3.6 при наличии
+      # acme-блока в static yaml игнорирует --certificatesresolvers.*.acme.* флаги.
+      # Значения приходят из kv/projects/<p>/<env>/meta — vault-agent рендерит
+      # этот файл в .runtime/configs/traefik.yml, traefik читает через bind-mount.
+{{ with secret (printf "kv/data/projects/%s/%s/meta" (env "PROJECT_NAME") (env "ENV")) }}
+      email: {{ .Data.data.acme_email }}
+      caServer: {{ .Data.data.acme_caserver }}
+{{ end }}
       storage: /letsencrypt/acme.json
       httpChallenge:
         entryPoint: web

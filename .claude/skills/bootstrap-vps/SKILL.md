@@ -1,11 +1,11 @@
 ---
 name: bootstrap-vps
-description: Поднять новый клиентский VPS с нуля — ansible-bootstrap, регистрация deploy-key в Gitea, заполнение .env, первый make deploy. Активируй на "/bootstrap-vps", "новый VPS", "подними сервер для клиента", "первый запуск".
+description: Поднять новый клиентский VPS с нуля — ansible-bootstrap, регистрация deploy-key в Gitea, заполнение .env, первый make deploy. Multi-env (один VPS = один ENV). Активируй на "/bootstrap-vps", "новый VPS", "подними сервер для клиента", "первый запуск".
 ---
 
 # Skill: bootstrap-vps
 
-Provisioning нового VPS под клиентский проект. Цель — за один проход довести машину от чистой Debian/Ubuntu до состояния "сервисы крутятся, healthchecks зелёные".
+Provisioning нового VPS под клиентский проект — один VPS = один ENV (`dev` / `prod` / etc.). Цель: за один проход довести машину от чистой Debian/Ubuntu до состояния "always-on стек крутится, healthchecks зелёные".
 
 ## Когда применять
 
@@ -19,50 +19,48 @@ Provisioning нового VPS под клиентский проект. Цель
 
 | Режим | Триггеры | LE endpoint | Что меняется |
 |---|---|---|---|
-| **production** | "клиентский VPS", "новый проект", "поднимаем для <client>", single-shot bootstrap с заранее настроенным реальным доменом | LE prod (`acme-v02.api.letsencrypt.org`) | Дефолт — никаких флагов |
-| **rehearsal** | "обкатка", "обкатываю шаблон", "тестовый прогон", "пробую заново", "тестовый VPS", "буду повторять bootstrap", любое упоминание многократных итераций | LE staging (`acme-staging-v02.api.letsencrypt.org`) — untrusted, но rate-limits ~100× выше | При вызове `new-env.sh` передавать `ACME_CASERVER=https://acme-staging-v02.api.letsencrypt.org/directory` env-var'ом |
+| **production** | "клиентский VPS", "новый проект", "поднимаем для <client>", реальный домен заранее настроен | LE prod (`acme-v02.api.letsencrypt.org`) | Дефолт `kv/projects/<p>/<env>/meta.acme_caserver` |
+| **rehearsal** | "обкатка", "обкатываю шаблон", "тестовый прогон", "пробую заново", "тестовый VPS", "буду повторять bootstrap" | LE staging (`acme-staging-v02.api.letsencrypt.org`) — untrusted, rate-limits ~100× выше | Корп-админ patch'ит `meta.acme_caserver` на staging URL перед первым deploy'ем |
 
 **Почему важно:** LE prod лимиты тесные:
 - 5 failed validations / hostname / hour
 - 5 duplicate certs / SAN-set / week
 - 50 certs / registered domain / week
 
-При обкатке (DNS ещё не настроен → failed challenges, многократный teardown/redeploy → duplicate certs) лимит сжигается за день. Staging — те же API, лимиты ~30k/week, идеально для итераций.
+При rehearsal (DNS ещё не настроен → failed challenges, многократный teardown/redeploy → duplicate certs) лимит сжигается за день. Staging — те же API, лимиты ~30k/week.
 
-`scripts/new-env.sh` интерактивно про это **НЕ спрашивает** (caller сам решает). Это моя ответственность — переключать ACME_CASERVER исходя из триггеров выше. Если юзер не дал явный сигнал — спроси одним вопросом: "Это обкатка шаблона или production-bootstrap?".
+Контроль на корп-стороне: `acme_caserver` живёт в `kv/projects/<p>/<env>/meta` (засеивается `onboard-project.sh`). Если режим rehearsal — оператор просит корп-админа выставить staging URL при онбординге **либо** patch'ит после:
+```bash
+vault kv patch kv/projects/acme/dev/meta acme_caserver=https://acme-staging-v02.api.letsencrypt.org/directory
+```
 
-**Migration prod ↔ staging на одном VPS:** acme.json привязан к CA-серверу. Перед переключением:
+**Migration prod ↔ staging на том же VPS:** acme.json привязан к CA-серверу:
 ```bash
 docker compose <args> down traefik
-docker volume rm <p>_traefik-acme
-# поменять ACME_CASERVER в .env
-bash scripts/deploy.sh
+docker volume rm <p>-infra_traefik-acme
+# на корп-стороне: vault kv patch kv/projects/<p>/<env>/meta acme_caserver=<new>
+make ship  # vault-agent перерендерит traefik.yml, traefik подымется с новым CA
 ```
 
 ## Когда НЕ применять
 
-- Re-deploy на уже работающий хост — это `make deploy`.
-- Onboarding пользователя в Gitea — это корп-задача (skill `onboard-user` в `stit/infra`).
+- Re-deploy на уже работающий хост — это `make deploy` / `make ship`.
+- Onboarding пользователя в Gitea — корп-задача (skill `onboard-user` в `stit/infra`).
 - Bug на проде — диагностика, не bootstrap.
 
 ## Предусловия (СПРОСИ юзера)
 
-1. **Корп-сторона онбоарднула проект?** На `stit/infra` оператор выполнил:
+1. **Корп-сторона онбоарднула проект и нужный ENV?** На `stit/infra`:
    ```bash
-   VAULT_TOKEN=<root> bash scripts/onboard-project.sh <project>
+   VAULT_TOKEN=<root> bash scripts/onboard-project.sh --name <p> --envs dev,prod
    ```
-   На выходе — блок с `PROJECT_NAME`, `VAULT_ROLE_ID`, `VAULT_SECRET_ID`, `OTEL_*`. Без этого блока на проектной стороне делать нечего.
+   Создаст per-env AppRole + засеит `kv/projects/<p>/<env>/{meta,otel}`. Вернёт блок `PROJECT_NAME / ENV / VAULT_ROLE_ID / VAULT_SECRET_ID` для каждого env. Без этого делать нечего.
 
-2. **Дополнительные секреты seed'нуты?** Если backend ожидает OIDC client_secret или 3rd-party API keys — на корп-стороне:
-   ```bash
-   bash scripts/seed-project-secrets.sh <project> <env-file>
-   ```
+2. **VPS provisioned**, у тебя есть IP и root-доступ по SSH ключу (минимум один ключ в `/root/.ssh/authorized_keys`).
 
-3. **VPS provisioned**, у тебя есть IP и root-доступ по SSH ключу (минимум один ключ в `/root/.ssh/authorized_keys` уже на хосте).
+3. **DNS** для `${DOMAIN}` (а также `api.${DOMAIN}` etc. — по сабдоменам, которые будут активированы позже) указывает на IP VPS — нужно для HTTP-01 ACME challenge.
 
-4. **DNS** для `${DOMAIN}` (и `api.${DOMAIN}`, прочие сабдомены) указывает на IP VPS — нужно для HTTP-01 ACME challenge.
-
-5. **Gitea-репо** `<client-org>/infra` существует и склонирован из шаблона `project-infra-template-compose`. Адаптации (image org, домен) — внесены в файлы.
+4. **Gitea-репо** `<client-org>/infra` существует и склонирован из шаблона `project-infra-template-compose`.
 
 Без любого из этих пунктов — стопори, проси подготовить.
 
@@ -70,7 +68,7 @@ bash scripts/deploy.sh
 
 ### 1. Inventory + SSH key
 
-`ansible/inventory.ini` (gitignored — создаётся локально, скопируй из `inventory.example.ini`):
+`ansible/inventory.ini` (gitignored, скопируй из `inventory.example.ini`):
 
 ```ini
 [project_vps]
@@ -81,7 +79,7 @@ ansible_python_interpreter=/usr/bin/python3
 operator_ssh_pubkey="ssh-ed25519 AAAAC3Nz... operator@laptop"
 ```
 
-Если SSH key-auth уже работает (например `ssh-copy-id root@<vps>` запущен заранее) — `operator_ssh_pubkey` можно оставить пустым. Иначе — base-role положит pubkey в `/root/.ssh/authorized_keys` до ssh-hardening (и hardening не залочит хост).
+(Если на каждый env свой VPS — несколько inventory'ев или несколько групп в одном.)
 
 Verify connectivity: `ansible -i ansible/inventory.ini project_vps -m ping`.
 
@@ -91,9 +89,7 @@ Verify connectivity: `ansible -i ansible/inventory.ini project_vps -m ping`.
 ansible-playbook -i ansible/inventory.ini ansible/bootstrap.yml --skip-tags onboard
 ```
 
-Прогоняет roles `base` → `ssh-hardening` → `docker`. По итогам — VPS с Docker engine, ssh-hardened (passwords disabled, проверь что у тебя ключ в authorized_keys ДО запуска), системные пакеты.
-
-**Если playbook падает** — фикси и re-run, он идемпотентен.
+Roles `base` → `ssh-hardening` → `docker`. По итогам — VPS с Docker engine, ssh-hardened, системные пакеты.
 
 ### 3. Onboard: deploy-key + clone
 
@@ -101,9 +97,9 @@ ansible-playbook -i ansible/inventory.ini ansible/bootstrap.yml --skip-tags onbo
 ansible-playbook -i ansible/inventory.ini ansible/bootstrap.yml --tags onboard
 ```
 
-Роль `stit-onboard` идемпотентно: сгенерит deploy-key в `/root/.ssh/<project>-deploy`, напечатает pubkey, попробует склонировать репо. **Первый запуск ожидаемо падает на clone** (deploy-key ещё не в Gitea — `ignore_errors: true` на этой задаче, playbook не упадёт целиком).
+Сгенерит deploy-key в `/root/.ssh/<project>-deploy`, напечатает pubkey, попробует склонировать репо. **Первый запуск ожидаемо падает на clone** — deploy-key ещё не в Gitea.
 
-Скопируй pubkey из вывода → **попроси оператора зарегистрировать в Gitea**:
+Скопируй pubkey → **попроси оператора зарегистрировать в Gitea**:
 - `git.stit.tech/<client-org>/infra` → Settings → Deploy Keys → Add → paste pubkey, **read-only**
 
 ### 4. Re-run onboard (после регистрации deploy-key)
@@ -114,82 +110,76 @@ ansible-playbook -i ansible/inventory.ini ansible/bootstrap.yml --tags onboard
 
 Склонирует репо в `/opt/<project>-infra`, поставит git hooks.
 
-### 5. Заполнить .env + сгенерить onboard-креды
+### 5. Заполнить .env
 
 На VPS:
 
 ```bash
 ssh root@<IP>
 cd /opt/<project>-infra
-PROJECT_NAME=<p> DOMAIN=<d> VAULT_ROLE_ID=<id> VAULT_SECRET_ID=<id> bash scripts/new-env.sh
+PROJECT_NAME=<p> ENV=<env> DOMAIN=<d> \
+VAULT_ROLE_ID=<id> VAULT_SECRET_ID=<id> \
+bash scripts/new-env.sh
 ```
 
-**В rehearsal-режиме** добавь `ACME_CASERVER=https://acme-staging-v02.api.letsencrypt.org/directory` к env-vars'ам:
+Создаёт `.env` (chmod 600) с **5 переменными** — identity + AppRole. Всё остальное (image tags, ACME-config, restic endpoint, runtime-секреты) приходит из Vault.
 
+`.env` содержит **закомментированную** строку `# COMPOSE_PROFILES=` — будешь раскомментировать по мере активации сервисов (см. шаг 7).
+
+**Rehearsal-режим** — добавь шаг до первого deploy'я:
 ```bash
-ssh root@<IP> bash -s <<'REMOTE'
-export ACME_CASERVER='https://acme-staging-v02.api.letsencrypt.org/directory'
-export PROJECT_NAME=<p> DOMAIN=<d> VAULT_ROLE_ID=<id> VAULT_SECRET_ID=<id>
-cd /opt/<p>-infra && bash scripts/new-env.sh
-REMOTE
+# на корп-стороне
+vault kv patch kv/projects/<p>/<env>/meta acme_caserver=https://acme-staging-v02.api.letsencrypt.org/directory
 ```
 
-В production — не передавать, дефолт = prod LE.
+### 6. Первый деплой — always-on стек
 
-Создаёт **два файла** (оба chmod 600, gitignored):
-- `.env` — bootstrap-vars (PROJECT_NAME, DOMAIN, VAULT_*, OTEL_*, BACKEND_TAG, RESTIC_REPOSITORY) + закомментированная `# COMPOSE_PROFILES=backend`
-- `.onboard-creds` — сгенерированные `openssl rand` minio-креды + RESTIC_PASSWORD
-
-**`RESTIC_REPOSITORY` обязателен** — local-default убран. Спроси оператора что использовать:
-- external managed S3 (recommended для prod): `s3:https://s3.example.com/<p>-backups`
-- bare-IP S3 на другом хосте: `s3:http://<ip>:9000/<p>-backups`
-- corp Minio: `s3:https://<corp-minio>/<p>-backups`
-- local project minio (ТОЛЬКО обкатка): `s3:http://minio:9000/backups` — оператор должен явно ввести, не подсовывай молча.
-
-В rehearsal-режиме local minio допустим; в production-режиме — спроси и предупреди, что local default = не DR.
-
-`COMPOSE_PROFILES=backend` приходит закомментированным. Раскомментировать на VPS когда backend image опубликован (см. шаг 7).
-
-В конце выводит **блок `vault kv put` команд** — отнеси корп-админу для seed'а в Vault (`kv/projects/<p>/minio` + `kv/projects/<p>/backup`). Без seed'а vault-agent залипнет в retry-loop'е → стек не поднимется.
-
-**Если `RESTIC_REPOSITORY` external** — оператор/админ должен **подменить** `access_key`/`secret_key` в блоке `kv/projects/<p>/backup` на creds того endpoint'а перед `vault kv put`. По дефолту new-env.sh подставляет creds проектного minio backup-SA — они корректны только для `RESTIC_REPOSITORY=s3:http://minio:9000/...` (rehearsal). Если оставить дефолт + external endpoint → restic будет получать 403 AccessDenied.
-
-**Stop** на этом шаге, пока админ не подтвердит seed.
-
-Повторно показать блок (если терялся): `bash scripts/show-onboard-creds.sh`.
-
-`RESTIC_PASSWORD` из `.onboard-creds` ОБЯЗАТЕЛЬНО продублируй offsite (без него restore из снапшотов невозможен).
-
-### 6. Первый деплой
-
-С laptop'а оператора (после bootstrap'а — у тебя уже есть SSH-доступ и inventory.ini):
+С laptop'а оператора:
 ```bash
-make ship          # на чистом дереве — push + ssh-deploy. На грязном — добавь MSG="..."
+make ship          # commit + push + (на main) ssh-deploy
 ```
 
-Либо на самом VPS (debug-mode со пошаговым stdout):
+Либо на VPS (debug-mode со пошаговым stdout):
 ```bash
 ssh root@<IP>
 cd /opt/<project>-infra
 make deploy
 ```
 
-Minio + backup поднимаются по дефолту (после Vault seed'а). Backend остаётся opt-in: после публикации image'а в `git.stit.tech/<project>/backend:<tag>` — на VPS отредактируй `.env` (раскомментируй `COMPOSE_PROFILES=backend`), и `make ship` с laptop'а. Изменение в `.env` персистится, env-var в `make deploy` команде — нет.
+Что произойдёт:
+1. `render-configs.sh` собирает `agent.hcl` из `agent.hcl.parts/` под пустой `COMPOSE_PROFILES` (только always-on блок) + envsubst для middlewares/landing + генерит `.runtime/configs/vault-health.sh`.
+2. `compose up vault-agent` → AppRole-логин, рендер `.runtime/{env/compose.env, configs/traefik.yml, secrets/otel.env, secrets/.ready}` из `kv/projects/<p>/<env>/{meta,otel}`.
+3. CrowdSec early для bouncer auto-register.
+4. Остальные always-on: traefik / otel-agent / node-exporter / cadvisor / landing.
+5. Traefik запрашивает LE-cert на `${DOMAIN}` (landing).
 
-Что произойдёт при первом `deploy`:
-1. `git pull --ff-only` (no-op на первом запуске).
-2. `scripts/render-configs.sh` — envsubst для `.tpl` (vault-agent agent.hcl, traefik middlewares).
-3. `docker compose up -d --wait --wait-timeout 180`:
-   - vault-agent аутентифицируется в Vault, рендерит `.runtime/secrets/*.env`, выставляет `.ready`.
-   - Postgres + minio + backup + otel-agent + crowdsec стартуют после vault-agent.healthy.
-   - minio-init создаёт bucket'ы (app-uploads, backups) и service accounts из minio.env.
-   - Traefik стартует, LE-certs выпустятся на публичные роуты (s3.${DOMAIN}, minio.${DOMAIN} сразу).
-
-**Если что-то не поднимается** — `docker compose logs <svc>` для конкретного сервиса. Типовые проблемы:
-- vault-agent не healthy / retry-loop на kv/projects/<p>/{minio,backup} → корп не засеял Vault (см. шаг 5).
-- minio-init упал с `<no value>` в bucket name → Vault поле `buckets` отсутствует — это не блокер, шаблон даёт пустую строку → дефолт `app-uploads`. Если видишь старый сбой — обнови `configs/vault-agent/templates/minio.env.tpl`.
+**Если что-то не поднимается:**
+- vault-agent не healthy / retry-loop на `kv/.../meta` или `kv/.../otel` → корп не онбоарднул env (см. предусловия). `bash scripts/preflight-vault.sh` покажет какие KV-paths отсутствуют.
 - LE cert не выпустился → DNS не указывает на VPS, или 80/443 закрыты файрволом.
-- backend падает → секреты в `.runtime/secrets/backend.env` не сматчили image-expectations.
+- crowdsec bouncer auto-register не сработал → fallback `docker exec crowdsec cscli bouncers add traefik`, прописать в `.env`, `make deploy`.
+
+### 7. Активация дополнительных профилей (по мере необходимости)
+
+Каждый сервис кроме always-on'а — за `COMPOSE_PROFILES`. Активация требует двух шагов:
+1. Корп-админ засевает соответствующий KV-объект.
+2. Оператор обновляет `COMPOSE_PROFILES` в `.env` и `make ship`.
+
+Запросить scaffold для админа — Claude skill `/request-secret` (см. `.claude/skills/request-secret/SKILL.md`). Skill спросит имя KV-объекта (произвольный slug: `db`, `minio`, `backup`, `oidc`, `jwt`, project-specific), сгенерит случайные поля где надо, напечатает блок `vault kv put kv/projects/<p>/<env>/<name>` для копи-паста админу.
+
+После seed'а — на VPS:
+```bash
+$EDITOR .env   # COMPOSE_PROFILES=postgres,storage,backend
+make ship
+```
+
+**Storage обязательно с postgres** (backup делает pg_dumpall, без postgres сразу падает — deploy.sh валидирует, ругнётся явно).
+
+**Restic endpoint** живёт в `kv/projects/<p>/<env>/backup.repository`. Корп-админ выбирает:
+- external managed S3 (recommended для prod): `s3:https://s3.example.com/<p>-<env>-backups`
+- bare-IP S3 на другом хосте: `s3:http://<ip>:9000/<p>-<env>-backups`
+- local project minio (ТОЛЬКО rehearsal): `s3:http://minio:9000/backups`
+
+`RESTIC_PASSWORD` (в `.../backup.password`) **обязательно продублирован offsite** — без него restore из снапшотов невозможен. Это политика корп-стороны.
 
 ### Day-2 workflow
 
@@ -199,49 +189,39 @@ Minio + backup поднимаются по дефолту (после Vault seed
 make ship MSG="feat(foo): bar"   # add -A + commit + push + (на main) ssh-deploy
 ```
 
-Если не main — push без deploy + подсказка про PR. На чистом дереве MSG не нужен (просто push + deploy).
+На чистом дереве MSG не нужен — просто push + deploy. Смена `COMPOSE_PROFILES` в `.env` подхватывается `deploy.sh` (rerender agent.hcl + force-recreate vault-agent + consumer'ов).
 
-### 7. CrowdSec bouncer key
+### Verify
 
-`scripts/deploy.sh` автоматически дёргает `cscli bouncers add traefik` при первом подъёме, прописывает ключ в `.env` и перерендеривает traefik dynamic config — ручной шаг не нужен. Если по какой-то причине auto-register не сработал, fallback:
-
-```bash
-docker exec crowdsec cscli bouncers add traefik
-```
-
-Скопируй API-key, обнови `CROWDSEC_BOUNCER_API_KEY` в `.env`, `make deploy`.
-
-### 8. Verify
-
-- `make ps` — все сервисы healthy.
-- `https://api.${DOMAIN}/healthz` — backend отвечает 200.
+- `make ps` — always-on сервисы healthy.
+- `https://${DOMAIN}/` — landing отдаётся через traefik + LE.
+- `docker exec vault-agent ls -la /secrets/ /env /configs` — rendered файлы.
 - `docker logs otel-agent | tail -5` — нет auth-ошибок при экспорте в `otel.stit.tech`.
 - `docker logs vault-agent | tail -10` — successful render, нет re-auth циклов.
 
-### 9. Backup smoke-test
+### Backup smoke-test (после активации storage профиля)
 
-Daily backup гоняется **внутри backup-контейнера** (busybox crond, расписание в `containers/backup/crontab` — `0 3 * * * /usr/local/bin/backup-now`). Никакого host-cron'а; legacy запись из старых версий шаблона удаляется ролью `stit-onboard`. Smoke прямо сейчас:
+Daily backup гоняется внутри backup-контейнера (busybox crond, расписание в `containers/backup/crontab` — `0 3 * * * /usr/local/bin/backup-now`). Smoke прямо сейчас:
 
 ```bash
 make backup
 ```
 
-Должно завершиться успехом. Проверь в проектном Minio:
+Должно завершиться успехом. Проверь в проектном Minio (или external endpoint):
 ```bash
 docker exec minio mc ls local/backups/
 ```
-После первого backup-run появятся restic-объекты (config, snapshots/, data/).
 
 ## Guard'рейлы
 
-- **Не запускай ssh-hardening без проверки** что в `/root/.ssh/authorized_keys` есть твой ключ. Роль `ssh-hardening` обязана это assert'нуть, но дополнительно проверь руками — `ansible -m shell -a 'cat /root/.ssh/authorized_keys' project_vps`.
+- **Не запускай ssh-hardening без проверки** что в `/root/.ssh/authorized_keys` есть твой ключ. Роль `ssh-hardening` обязана это assert'нуть, но дополнительно проверь руками.
 - **Не публикуй deploy-key из stdout/log'а** — это секрет. Передай оператору приватным каналом.
 - **DNS-cutover до первого deploy** — иначе LE rate-limit съедает попытки выпуска.
-- **Rehearsal → ВСЕГДА staging** — production LE сжигается за день многократных итераций. Если режим обкатка, но `ACME_CASERVER` не передан — это твоя ошибка, обнови процесс.
-- **Production → НИКОГДА staging** — клиент получит untrusted cert, браузер красным. Если режим production и видишь staging endpoint в `.env` — стоп, перепроверь с юзером.
+- **Rehearsal → ВСЕГДА staging** — production LE сжигается за день многократных итераций. Если режим rehearsal, но `meta.acme_caserver` указывает на prod — это твоя ошибка, проси корп-патч.
+- **Production → НИКОГДА staging** — клиент получит untrusted cert. Если режим production и видишь staging в `kv/.../meta.acme_caserver` — стоп, перепроверь с юзером.
 
 ## После
 
 - Записать в credentials store клиента: IP VPS, deploy-key fingerprint, `.env` хеш / Vaultwarden ссылку.
-- На корп-стороне — добавить uptime-kuma monitor на `https://api.${DOMAIN}/healthz`.
+- На корп-стороне — добавить uptime-kuma monitor на `https://${DOMAIN}/`.
 - Создать `docs/incidents/` skeleton (если ещё нет).
