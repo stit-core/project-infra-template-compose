@@ -43,9 +43,10 @@ kv/projects/<p>/
 
 1. Создать `kv/projects/<p>/_meta` с `{envs: [...], created: <date>}`.
 2. Per env:
-   1. Создать AppRole `projects/<p>/<env>` с policy:
+   1. Создать AppRole `projects-<p>-<env>` (flat, дефис-разделитель — Vault не принимает слеши в `auth/approle/role/<name>`; KV-слой остаётся иерархическим) с policy:
       ```hcl
-      path "kv/data/projects/<p>/<env>/*" { capabilities = ["read"] }
+      path "kv/data/projects/<p>/<env>/*"     { capabilities = ["read"] }
+      path "kv/metadata/projects/<p>/<env>/*" { capabilities = ["read", "list"] }
       ```
    2. Засеять `kv/projects/<p>/<env>/otel` (OTEL-tenant token).
    3. Засеять `kv/projects/<p>/<env>/meta` с дефолтами:
