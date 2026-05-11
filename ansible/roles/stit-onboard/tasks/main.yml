@@ -63,3 +63,14 @@
     chdir: "{{ project_root }}"
   when: not (clone.failed | default(false))
   changed_when: false
+
+# Backup тикает host-cron'ом, не cron внутри контейнера: backup-сервис
+# долгоживущий (tail -f), а cron дёргает его через docker exec. Логи —
+# в /var/log/<project>-backup.log; journald уже ограничен base-role'ом.
+- name: Host cron — daily backup at 03:00 UTC
+  ansible.builtin.cron:
+    name: "{{ project_name }} daily backup"
+    minute: "0"
+    hour: "3"
+    job: "docker exec backup /usr/local/bin/run-backup.sh >> /var/log/{{ project_name }}-backup.log 2>&1"
+    state: present

@@ -17,10 +17,13 @@ new_sha=$(git rev-parse HEAD 2>/dev/null || echo "none")
 
 bash scripts/render-configs.sh
 
-# DNS preflight: warning'и если A-записи не указывают на этот VPS.
-# Не fail'ится — стек поднимется, оператор видит warning до того, как
-# полезет диагностировать "почему cert не выпустился".
+# Preflight: DNS A-records + Vault seed.
+# DNS: warning'и если A-записи не указывают на этот VPS.
+# Vault: warning'и если корп ещё не засеял kv/projects/<p>/{minio,backup}.
+# Оба не fail'ятся — стек поднимется, traefik / vault-agent сами ретрайнут
+# когда зависимости появятся. Цель — поймать в логах ДО compose-wait.
 bash scripts/preflight-dns.sh || true
+bash scripts/preflight-vault.sh || true
 
 # Создаём runtime-директории до того, как vault-agent попытается их bind-mount'ить.
 mkdir -p .runtime/secrets .runtime/secrets-bootstrap
@@ -69,6 +72,25 @@ if [ "$prev_sha" != "$new_sha" ] && [ "$prev_sha" != "none" ]; then
 fi
 
 docker compose "${args[@]}" up -d --remove-orphans --wait --wait-timeout 180
+
+# CrowdSec bouncer auto-register. Если в .env ключ пустой и crowdsec
+# запущен — генерим, sed'аем в .env, перерендериваем traefik dynamic
+# config (middlewares.yml.tpl содержит ${CROWDSEC_BOUNCER_API_KEY},
+# traefik file-provider с watch:true подхватит изменение без рестарта).
+# Идемпотентно: после первого прогона блок пропускается.
+if grep -qE '^CROWDSEC_BOUNCER_API_KEY=$' .env; then
+  if docker compose "${args[@]}" ps --status running crowdsec >/dev/null 2>&1 \
+     && docker exec crowdsec true >/dev/null 2>&1; then
+    echo "→ auto-registering CrowdSec bouncer (traefik)"
+    if key=$(docker exec crowdsec cscli bouncers add traefik -o raw 2>/dev/null); then
+      [ -n "$key" ] && {
+        sed -i "s|^CROWDSEC_BOUNCER_API_KEY=$|CROWDSEC_BOUNCER_API_KEY=$key|" .env
+        bash scripts/render-configs.sh
+        echo "→ CROWDSEC_BOUNCER_API_KEY set; traefik подхватит через file-watcher"
+      }
+    fi
+  fi
+fi
 
 # Рестарт сервисов с изменёнными bind-mounted конфигами (не vault-templates —
 # их обработали выше; это про traefik/crowdsec/postgres/otel-agent configs).

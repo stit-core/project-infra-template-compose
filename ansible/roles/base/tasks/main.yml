@@ -1,4 +1,14 @@
 ---
+# Pubkey оператора заливаем ДО ssh-hardening (он выключит password auth).
+# Если ключ оператора уже на хосте — переменная не нужна, опциональна.
+# Передаётся через group_vars / inventory: operator_ssh_pubkey="ssh-ed25519 AAAA..."
+- name: Install operator SSH pubkey (before ssh-hardening disables passwords)
+  ansible.posix.authorized_key:
+    user: root
+    key: "{{ operator_ssh_pubkey }}"
+    state: present
+  when: operator_ssh_pubkey is defined and (operator_ssh_pubkey | length) > 0
+
 - name: Update apt cache
   ansible.builtin.apt:
     update_cache: true

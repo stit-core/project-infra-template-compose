@@ -56,6 +56,9 @@ curl -X POST -H "Authorization: token $GITEA_TOKEN" -H "Content-Type: applicatio
 
 4. Bootstrap чистого VPS:
    ```bash
+   # Один раз — SSH ключ на VPS (либо задай operator_ssh_pubkey в inventory.ini):
+   ssh-copy-id root@<vps>
+
    ansible-playbook -i ansible/inventory.ini ansible/bootstrap.yml
    ```
 

@@ -68,7 +68,9 @@ Gitea admin → Site Administration → Actions → Runners → **Create new run
 ```bash
 cd <client>-infra
 cp ansible/inventory.example.ini ansible/inventory.ini
-$EDITOR ansible/inventory.ini   # ansible_host, project_name, project_repo_url
+$EDITOR ansible/inventory.ini   # ansible_host, project_name, project_repo_url, operator_ssh_pubkey
+# Один раз — SSH ключ на VPS (если operator_ssh_pubkey не задан в inventory):
+ssh-copy-id root@<vps>
 ansible-playbook -i ansible/inventory.ini ansible/bootstrap.yml
 ```
 

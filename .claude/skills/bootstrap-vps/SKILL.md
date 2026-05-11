@@ -43,18 +43,20 @@ Provisioning нового VPS под клиентский проект. Цель
 
 ## Шаги
 
-### 1. Inventory
+### 1. Inventory + SSH key
 
-`ansible/inventory.ini` (gitignored — создаётся локально):
+`ansible/inventory.ini` (gitignored — создаётся локально, скопируй из `inventory.example.ini`):
 
 ```ini
 [project_vps]
-<client>-prod ansible_host=<IP> ansible_user=root
+prod ansible_host=<IP> ansible_user=root project_name=<p> project_repo_url=git@git.stit.tech:<org>/infra.git
 
 [project_vps:vars]
-project_name=<client>
-project_repo_url=https://git.stit.tech/<client-org>/infra.git
+ansible_python_interpreter=/usr/bin/python3
+operator_ssh_pubkey="ssh-ed25519 AAAAC3Nz... operator@laptop"
 ```
+
+Если SSH key-auth уже работает (например `ssh-copy-id root@<vps>` запущен заранее) — `operator_ssh_pubkey` можно оставить пустым. Иначе — base-role положит pubkey в `/root/.ssh/authorized_keys` до ssh-hardening (и hardening не залочит хост).
 
 Verify connectivity: `ansible -i ansible/inventory.ini project_vps -m ping`.
 
@@ -160,13 +162,13 @@ make ship                 # push текущей ветки; если main — а
 
 ### 7. CrowdSec bouncer key
 
-После первого подъёма CrowdSec'а:
+`scripts/deploy.sh` автоматически дёргает `cscli bouncers add traefik` при первом подъёме, прописывает ключ в `.env` и перерендеривает traefik dynamic config — ручной шаг не нужен. Если по какой-то причине auto-register не сработал, fallback:
 
 ```bash
 docker exec crowdsec cscli bouncers add traefik
 ```
 
-Скопируй API-key, обнови `CROWDSEC_BOUNCER_API_KEY` в `.env`, `make deploy` (или `make restart SVC=traefik`).
+Скопируй API-key, обнови `CROWDSEC_BOUNCER_API_KEY` в `.env`, `make deploy`.
 
 ### 8. Gitea-runner (если нужен)
 
@@ -186,6 +188,8 @@ bash scripts/register-runner.sh
 - `docker logs vault-agent | tail -10` — successful render, нет re-auth циклов.
 
 ### 10. Backup smoke-test
+
+Host-cron для daily backup ставится ansible'ом (`stit-onboard` role): `0 3 * * * docker exec backup /usr/local/bin/run-backup.sh >> /var/log/<p>-backup.log`. Smoke прямо сейчас:
 
 ```bash
 make backup
