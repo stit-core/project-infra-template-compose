@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # envsubst для .tpl → файл без .tpl. На сервере запускается перед
 # `docker compose up`. Локально (с заполненным .env) — для validate.sh dry-run.
+#
+# ВАЖНО: configs/vault-agent/templates/ исключаются. Эти .tpl читаются
+# vault-agent'ом напрямую (consul-template syntax: {{ with secret ... }}),
+# envsubst здесь только засрёт директорию orphan-копиями без .tpl,
+# которые никто не читает.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -18,4 +23,4 @@ while IFS= read -r tpl; do
   out="${tpl%.tpl}"
   envsubst < "$tpl" > "$out"
   echo "rendered $out"
-done < <(find configs -type f -name '*.tpl')
+done < <(find configs -type f -name '*.tpl' -not -path 'configs/vault-agent/templates/*')
