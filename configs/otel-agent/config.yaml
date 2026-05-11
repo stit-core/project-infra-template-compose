@@ -39,7 +39,7 @@ processors:
         action: upsert
 
 exporters:
-  otlphttp/corp:
+  otlp_http/corp:
     endpoint: https://${env:OTEL_EXPORTER_OTLP_ENDPOINT}
     headers:
       Authorization: "Bearer ${env:OTEL_TOKEN}"
@@ -56,12 +56,12 @@ service:
     traces:
       receivers: [otlp]
       processors: [memory_limiter, resource, batch]
-      exporters: [otlphttp/corp]
+      exporters: [otlp_http/corp]
     metrics:
       receivers: [otlp, prometheus]
       processors: [memory_limiter, resource, batch]
-      exporters: [otlphttp/corp]
+      exporters: [otlp_http/corp]
     logs:
       receivers: [otlp]
       processors: [memory_limiter, resource, batch]
-      exporters: [otlphttp/corp]
+      exporters: [otlp_http/corp]
