@@ -1,0 +1,39 @@
+services:
+  landing:
+    image: nginx:1.27-alpine
+    container_name: landing
+    restart: unless-stopped
+    # Заглушка на корневой ${DOMAIN}. Без неё нет ни одного роутера на корень
+    # → traefik не запрашивает LE-cert на ${DOMAIN}, ACME цепочку нечем
+    # smoke-тестить. С landing:
+    # 1) cert на корень выпускается при первом deploy (DNS на root всегда
+    #    настроен раньше сабдоменов — это первое что оператор делает);
+    # 2) `curl -fsS https://${DOMAIN}/` отдаёт статичную HTML-плашку —
+    #    smoke-тест traefik → LE → cert chain;
+    # 3) если cert на сабдомены ещё не выпущен (DNS в процессе), оператор
+    #    видит работающий HTTPS на корне и понимает что проблема не в стеке.
+    #
+    # Когда появится клиентский landing/frontend на корне — он автоматически
+    # перебьёт этот сервис (priority=1 ниже traefik-default 0). После
+    # раскатки фронта compose/landing.yml + configs/landing/ можно удалить.
+    volumes:
+      - ./configs/landing:/usr/share/nginx/html:ro
+    networks:
+      - proxy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: proxy
+      traefik.http.routers.landing.rule: Host(`${DOMAIN}`)
+      traefik.http.routers.landing.entrypoints: websecure
+      traefik.http.routers.landing.tls: "true"
+      traefik.http.routers.landing.tls.certresolver: letsencrypt
+      # priority=1 — любой явный роутер на ${DOMAIN} (фронт) с дефолтным
+      # priority перебьёт landing без конфликтов.
+      traefik.http.routers.landing.priority: "1"
+      traefik.http.routers.landing.middlewares: crowdsec@file,secure-headers@file,rate-limit@file
+      traefik.http.services.landing.loadbalancer.server.port: "80"
