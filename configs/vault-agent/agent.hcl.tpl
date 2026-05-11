@@ -40,23 +40,29 @@ template {
   perms       = 0400
 }
 
-# Backup-credentials template. Раскомментируй ТОЛЬКО когда корп-сторона
-# seed'нула kv/data/projects/<PROJECT_NAME>/backup (поля: repository, password,
-# aws_access_key_id, aws_secret_access_key). Иначе vault-agent залипнет
-# в retry-loop'е на отсутствующем secret'е и весь стек не поднимется.
-# После включения — также подними backup-сервис: COMPOSE_PROFILES=backup.
-# template {
-#   source      = "/etc/vault-agent/templates/backup.env.tpl"
-#   destination = "/secrets/backup.env"
-#   perms       = 0400
-# }
-
-# Minio-credentials template. Раскомментируй когда корп-сторона seed'нула
-# kv/data/projects/<PROJECT_NAME>/minio (поля: root_user, root_password,
-# app_access_key, app_secret_key, buckets). После — COMPOSE_PROFILES=minio.
+# Minio-credentials template. Раскомментируй когда оператор сгенерировал
+# minio-creds и положил в kv/data/projects/<PROJECT_NAME>/minio (поля:
+# root_user, root_password, app_access_key, app_secret_key,
+# backup_access_key, backup_secret_key, buckets — space-separated, опц).
+# Эти же access/secret пары оператор передаёт stit-админу для реестра.
+# Без секрета в Vault vault-agent залипнет в retry-loop'е — не раскомментируй
+# до seed'а. После включения — COMPOSE_PROFILES=minio.
 # template {
 #   source      = "/etc/vault-agent/templates/minio.env.tpl"
 #   destination = "/secrets/minio.env"
+#   perms       = 0400
+# }
+
+# Backup-credentials template. Restic пишет в локальный minio (bucket
+# "backups"), поэтому требует minio профиль. AWS-creds (backup-SA) берутся
+# из того же kv/data/projects/<PROJECT_NAME>/minio пути; здесь только
+# RESTIC_PASSWORD из отдельного /backup пути — оператор кладёт перед
+# первым backup'ом (openssl rand -hex 32, ОБЯЗАТЕЛЬНО сохрани offsite —
+# без него restore из снапшотов невозможен).
+# Раскомментируй когда есть и minio-creds, и backup.password в Vault.
+# template {
+#   source      = "/etc/vault-agent/templates/backup.env.tpl"
+#   destination = "/secrets/backup.env"
 #   perms       = 0400
 # }
 

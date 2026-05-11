@@ -7,12 +7,17 @@ services:
     container_name: minio
     restart: unless-stopped
     # Opt-in: COMPOSE_PROFILES=minio. Перед включением:
-    # 1) корп-сторона seed'ит kv/data/projects/<project>/minio в Vault
+    # 1) оператор генерит access/secret pairs локально (для root, app SA,
+    #    backup SA), кладёт в Vault как kv/data/projects/<project>/minio
     #    (поля: root_user, root_password, app_access_key, app_secret_key,
-    #    buckets="app-uploads ..." опц.);
-    # 2) раскомментируй minio-template в configs/vault-agent/agent.hcl.tpl.
-    # Volume minio-data попадает в restic-backup автоматически (префикс
-    # <project>_ в scripts/backup.sh).
+    #    backup_access_key, backup_secret_key, buckets="..." опц.).
+    #    Эти же пары передаются stit-админу для реестра.
+    # 2) раскомментирует minio-template в configs/vault-agent/agent.hcl.tpl.
+    # Внимание: restic пишет В этот же minio (bucket "backups"), поэтому
+    # если minio-data накроется — теряется и сам app-bucket (app-uploads),
+    # и restic-репо. Это осознанный trade-off простоты против DR-гарантий.
+    # Если нужна устойчивость — настрой mc mirror в корп-S3 или offsite
+    # cron на хосте.
     profiles: [minio]
     command: server /data --console-address ":9001"
     env_file:
@@ -87,10 +92,12 @@ services:
           mc mb --ignore-existing "local/$$b"
         done
 
-        # Default policy: full access на bucket app-uploads. Если добавляешь
-        # bucket'ы / service-accounts — расширяй блок policy + upsert_sa
-        # вызовы. См. stit/infra/compose/minio.yml как пример с несколькими
-        # tenant'ами (gitea/loki/tempo).
+        # Bucket "backups" — restic-repo для backup-сервиса. Создаём всегда,
+        # даже если backup-профиль выключен: bucket в idle minio места почти
+        # не занимает, а включение backup'а позже не потребует доп. шага.
+        mc mb --ignore-existing local/backups
+
+        # Policies — bucket-scoped, по одной на SA.
         cat >/tmp/app-policy.json <<'EOF'
         {
           "Version": "2012-10-17",
@@ -98,6 +105,17 @@ services:
             "Effect": "Allow",
             "Action": ["s3:*"],
             "Resource": ["arn:aws:s3:::app-uploads", "arn:aws:s3:::app-uploads/*"]
+          }]
+        }
+        EOF
+
+        cat >/tmp/backup-policy.json <<'EOF'
+        {
+          "Version": "2012-10-17",
+          "Statement": [{
+            "Effect": "Allow",
+            "Action": ["s3:*"],
+            "Resource": ["arn:aws:s3:::backups", "arn:aws:s3:::backups/*"]
           }]
         }
         EOF
@@ -115,7 +133,8 @@ services:
           fi
         }
 
-        upsert_sa app "$${APP_S3_ACCESS_KEY:-}" "$${APP_S3_SECRET_KEY:-}" /tmp/app-policy.json
+        upsert_sa app    "$${APP_S3_ACCESS_KEY:-}"    "$${APP_S3_SECRET_KEY:-}"    /tmp/app-policy.json
+        upsert_sa backup "$${BACKUP_S3_ACCESS_KEY:-}" "$${BACKUP_S3_SECRET_KEY:-}" /tmp/backup-policy.json
 
         echo "minio-init done"
         mc ls local/
