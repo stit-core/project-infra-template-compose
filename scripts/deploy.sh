@@ -51,6 +51,30 @@ done
 echo "→ vault-agent first (renders runtime secrets)"
 docker compose "${args[@]}" up -d --wait --wait-timeout 60 vault-agent
 
+# CrowdSec early: чтобы успеть зарегистрировать bouncer ДО старта traefik.
+# Если первый прогон и в .env CROWDSEC_BOUNCER_API_KEY= (пустой), без этого
+# traefik вываливает "CrowdsecLapiKey ... cannot be all empty" на каждом
+# роуте — плагин валидирует ключ при загрузке роута, file-watcher на
+# middlewares.yml не подхватит уже-сломанный плагин без recreate.
+# Идемпотентно: после первого прогона .env уже с ключом, блок ниже skip'ает.
+echo "→ crowdsec early (для bouncer auto-register)"
+docker compose "${args[@]}" up -d --wait --wait-timeout 60 crowdsec
+
+# CrowdSec bouncer auto-register. Если в .env ключ пустой — генерим сейчас,
+# ДО старта traefik (см. комментарий выше про порядок). Раньше блок жил в
+# конце deploy.sh, после полного --wait — partial failure (например,
+# minio-init exit 1) обрывал set -euo pipefail и блок никогда не запускался.
+if grep -qE '^CROWDSEC_BOUNCER_API_KEY=$' .env; then
+  echo "→ auto-registering CrowdSec bouncer (traefik)"
+  if key=$(docker exec crowdsec cscli bouncers add traefik -o raw 2>/dev/null); then
+    [ -n "$key" ] && {
+      sed -i "s|^CROWDSEC_BOUNCER_API_KEY=$|CROWDSEC_BOUNCER_API_KEY=$key|" .env
+      bash scripts/render-configs.sh
+      echo "→ CROWDSEC_BOUNCER_API_KEY set + middlewares re-rendered"
+    }
+  fi
+fi
+
 # Если vault-templates поменялись (.tpl или agent.hcl.tpl) — vault-agent
 # перерендерит при рестарте, но consumer-контейнеры уже работают со
 # старым env_file. Force-recreate чтобы они перечитали — env_file
@@ -72,25 +96,6 @@ if [ "$prev_sha" != "$new_sha" ] && [ "$prev_sha" != "none" ]; then
 fi
 
 docker compose "${args[@]}" up -d --remove-orphans --wait --wait-timeout 180
-
-# CrowdSec bouncer auto-register. Если в .env ключ пустой и crowdsec
-# запущен — генерим, sed'аем в .env, перерендериваем traefik dynamic
-# config (middlewares.yml.tpl содержит ${CROWDSEC_BOUNCER_API_KEY},
-# traefik file-provider с watch:true подхватит изменение без рестарта).
-# Идемпотентно: после первого прогона блок пропускается.
-if grep -qE '^CROWDSEC_BOUNCER_API_KEY=$' .env; then
-  if docker compose "${args[@]}" ps --status running crowdsec >/dev/null 2>&1 \
-     && docker exec crowdsec true >/dev/null 2>&1; then
-    echo "→ auto-registering CrowdSec bouncer (traefik)"
-    if key=$(docker exec crowdsec cscli bouncers add traefik -o raw 2>/dev/null); then
-      [ -n "$key" ] && {
-        sed -i "s|^CROWDSEC_BOUNCER_API_KEY=$|CROWDSEC_BOUNCER_API_KEY=$key|" .env
-        bash scripts/render-configs.sh
-        echo "→ CROWDSEC_BOUNCER_API_KEY set; traefik подхватит через file-watcher"
-      }
-    fi
-  fi
-fi
 
 # Рестарт сервисов с изменёнными bind-mounted конфигами (не vault-templates —
 # их обработали выше; это про traefik/crowdsec/postgres/otel-agent configs).
