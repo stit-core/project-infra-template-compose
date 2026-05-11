@@ -1,0 +1,31 @@
+services:
+  smoketest:
+    image: traefik/whoami:v1.11.0
+    container_name: smoketest
+    restart: unless-stopped
+    # Заглушка на корневой ${DOMAIN}. Без неё нет ни одного роутера на корень
+    # → traefik не запрашивает LE-cert на ${DOMAIN}, ACME цепочку нечем
+    # smoke-тестить. С whoami:
+    # 1) cert на корень выпускается при первом deploy (DNS на root всегда
+    #    настроен раньше сабдоменов — это первое что оператор делает);
+    # 2) `curl -fsS https://${DOMAIN}/` echo'ит host headers — быстрый
+    #    smoke-тест что traefik → LE → cert chain жив;
+    # 3) если cert на сабдомены ещё не выпущен (DNS в процессе), оператор
+    #    видит работающий HTTPS на корне и понимает что проблема не в стеке.
+    # Когда появится клиентский landing/frontend — заменить на него.
+    networks:
+      - proxy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: proxy
+      traefik.http.routers.smoketest.rule: Host(`${DOMAIN}`)
+      traefik.http.routers.smoketest.entrypoints: websecure
+      traefik.http.routers.smoketest.tls: "true"
+      traefik.http.routers.smoketest.tls.certresolver: letsencrypt
+      traefik.http.routers.smoketest.middlewares: crowdsec@file,secure-headers@file,rate-limit@file
+      traefik.http.services.smoketest.loadbalancer.server.port: "80"

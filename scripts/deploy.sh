@@ -17,6 +17,11 @@ new_sha=$(git rev-parse HEAD 2>/dev/null || echo "none")
 
 bash scripts/render-configs.sh
 
+# DNS preflight: warning'и если A-записи не указывают на этот VPS.
+# Не fail'ится — стек поднимется, оператор видит warning до того, как
+# полезет диагностировать "почему cert не выпустился".
+bash scripts/preflight-dns.sh || true
+
 # Создаём runtime-директории до того, как vault-agent попытается их bind-mount'ить.
 mkdir -p .runtime/secrets .runtime/secrets-bootstrap
 chmod 0700 .runtime/secrets .runtime/secrets-bootstrap
