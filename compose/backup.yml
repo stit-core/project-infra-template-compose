@@ -3,13 +3,15 @@ services:
     image: restic/restic:0.18.1
     container_name: backup
     restart: "no"
-    # On by default. Пишет в локальный bucket `backups` (minio-init создаёт).
-    # Креды (BACKUP_S3_ACCESS_KEY/SECRET в kv/projects/<p>/minio + RESTIC_PASSWORD
+    # Пишет в локальный bucket `backups` (minio-init создаёт). Креды
+    # (BACKUP_S3_ACCESS_KEY/SECRET в kv/projects/<p>/minio + RESTIC_PASSWORD
     # в kv/projects/<p>/backup) генерит scripts/new-env.sh, оператор относит
-    # корп-админу для seed'а в Vault. Долгоживущий контейнер, дёргается через
-    # host-cron: `docker exec backup /usr/local/bin/run-backup.sh`. Альтернатива —
-    # отдельный image c crond внутри; не делаем ради простоты, host-cron
-    # и так уже точка управления backup.sh.
+    # корп-админу для seed'а в Vault.
+    #
+    # Долгоживущий sleep-контейнер. Host-orchestration: scripts/backup.sh
+    # на хосте дёргает `docker exec backup restic ...`. Контейнеру не нужны
+    # ни bash, ни docker CLI — только restic + креды + примонтированные
+    # /cache (для dump-файлов, host пишет туда pg_dumpall pipe) + /data/postgres.
     entrypoint: ["sh", "-c", "tail -f /dev/null"]
     env_file:
       - .runtime/secrets/backup.env
@@ -18,8 +20,8 @@ services:
         condition: service_healthy
     volumes:
       - postgres-data:/data/postgres:ro
-      - ./scripts/backup.sh:/usr/local/bin/run-backup.sh:ro
-      - backup-cache:/cache
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # bind-mount, не named volume: host scripts/backup.sh пишет
+      # pg_dumpall сюда, restic в контейнере читает.
+      - ./.runtime/backup-cache:/cache
     networks:
-      - proxy            # restic → https://s3.${DOMAIN} через traefik (тот же endpoint, что у stit-админа)
+      - proxy            # restic → https://s3.${DOMAIN}

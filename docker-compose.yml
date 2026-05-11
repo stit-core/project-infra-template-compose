@@ -18,5 +18,4 @@ volumes:
   vault-agent-secrets:
   vault-agent-bootstrap:
   otel-agent-data:
-  backup-cache:
   runner-data:

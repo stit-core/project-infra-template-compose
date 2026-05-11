@@ -64,13 +64,15 @@
   when: not (clone.failed | default(false))
   changed_when: false
 
-# Backup тикает host-cron'ом, не cron внутри контейнера: backup-сервис
-# долгоживущий (tail -f), а cron дёргает его через docker exec. Логи —
+# Backup тикает host-cron'ом, не cron внутри контейнера: scripts/backup.sh
+# на хосте оркестрирует pg_dumpall (docker exec postgres) + restic backup
+# (docker exec backup). Backup-контейнер — restic/restic alpine, без bash
+# и без docker CLI, поэтому полная оркестрация только с хоста. Логи —
 # в /var/log/<project>-backup.log; journald уже ограничен base-role'ом.
 - name: Host cron — daily backup at 03:00 UTC
   ansible.builtin.cron:
     name: "{{ project_name }} daily backup"
     minute: "0"
     hour: "3"
-    job: "docker exec backup /usr/local/bin/run-backup.sh >> /var/log/{{ project_name }}-backup.log 2>&1"
+    job: "bash {{ project_root }}/scripts/backup.sh >> /var/log/{{ project_name }}-backup.log 2>&1"
     state: present
