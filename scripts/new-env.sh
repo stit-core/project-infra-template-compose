@@ -64,7 +64,9 @@ else
   # LE: prod по дефолту. При обкатке/тестах передавать
   # ACME_CASERVER=https://acme-staging-v02.api.letsencrypt.org/directory
   # через env-var (lim'ы prod LE тесные: 5 failed/host/hour, 5 dup/SAN/week).
-  ACME_CASERVER="${ACME_CASERVER:-}"
+  # Дефолт ОБЯЗАН быть непустым: traefik.yml.tpl envsubst'ит ${ACME_CASERVER},
+  # пустое значение → traefik не сможет parse'нуть acme.caServer.
+  ACME_CASERVER="${ACME_CASERVER:-https://acme-v02.api.letsencrypt.org/directory}"
   BACKEND_TAG="${BACKEND_TAG:-latest}"
   GITEA_RUNNER_REG_TOKEN="${GITEA_RUNNER_REG_TOKEN:-}"
 
@@ -112,10 +114,14 @@ else
   gen() { openssl rand -hex "$1"; }
   MINIO_ROOT_USER="${MINIO_ROOT_USER:-admin}"
   MINIO_ROOT_PASSWORD="$(gen 24)"
-  APP_S3_ACCESS_KEY="$(gen 12)"
-  APP_S3_SECRET_KEY="$(gen 24)"
-  BACKUP_S3_ACCESS_KEY="$(gen 12)"
-  BACKUP_S3_SECRET_KEY="$(gen 24)"
+  # Minio service-account limits: access_key 3-20 chars, secret_key 8-40 chars.
+  # gen N → 2N hex chars. Use 8/16 → 16/32 chars (well under limit, ample entropy).
+  # Раньше было 12/24 → 24/48 chars, minio-init падал на admin user svcacct add
+  # с "access key length should be between 3 and 20".
+  APP_S3_ACCESS_KEY="$(gen 8)"
+  APP_S3_SECRET_KEY="$(gen 16)"
+  BACKUP_S3_ACCESS_KEY="$(gen 8)"
+  BACKUP_S3_SECRET_KEY="$(gen 16)"
   RESTIC_PASSWORD="$(gen 32)"
 
   umask 077
