@@ -2,6 +2,10 @@
 .env.*
 !.env.example
 
+# Локально-сгенерированные креды для seed'а в корп-Vault (chmod 600).
+# Создаются scripts/new-env.sh, показываются повторно через scripts/show-onboard-creds.sh.
+.onboard-creds
+
 # vault-agent rendered secrets + bootstrap files
 .runtime/
 

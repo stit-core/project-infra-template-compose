@@ -5,10 +5,10 @@ IaC шаблон проектной инфры для stit.tech: docker-compose 
 ## Что внутри
 
 - **Edge:** Traefik v3 + CrowdSec (HTTP-01 LE, WAF, IP-bans).
-- **Core:** Postgres 17, backend (image `git.stit.tech/<org>/backend`), vault-agent (sidecar для secrets).
+- **Core:** Postgres 17, backend (image `git.stit.tech/<org>/backend`, opt-in), vault-agent (sidecar для secrets).
 - **Telemetry:** otel-agent — proxy на корп `otel.stit.tech` (OTLP + Bearer-token из Vault).
-- **Backup:** restic-cron — daily в проектный Minio (`s3.${DOMAIN}/backups`). Для off-site — настрой mirror руками.
-- **Storage:** Minio (S3-compat) под профилем `minio` — bucket `app-uploads` для backend, `backups` для restic.
+- **Storage:** Minio (S3-compat), on by default — bucket `app-uploads` для backend, `backups` для restic.
+- **Backup:** restic-cron, on by default — daily в проектный Minio (`s3.${DOMAIN}/backups`). Для off-site — настрой mirror руками.
 - **CI/CD:** gitea-runner на проектном VPS, pull-based деплой через тэги.
 - **Bootstrap:** ansible (apt + swap + journald + ssh-hardening + docker).
 
@@ -42,7 +42,17 @@ curl -X POST -H "Authorization: token $GITEA_TOKEN" -H "Content-Type: applicatio
    git clone git@git.stit.tech:<org>/infra.git && cd infra
    ```
 
-3. Заполнить `.env` (на проектном VPS, в `/opt/<project>-infra/`) через `bash scripts/new-env.sh`. Скрипт env-driven: достаточно `PROJECT_NAME`, `DOMAIN`, `VAULT_ROLE_ID`, `VAULT_SECRET_ID` (остальное зашито в дефолты).
+3. Заполнить `.env` + сгенерить onboard-креды (на проектном VPS, в `/opt/<project>-infra/`):
+   ```bash
+   PROJECT_NAME=acme DOMAIN=acme.com \
+   VAULT_ROLE_ID=<id> VAULT_SECRET_ID=<id> \
+   bash scripts/new-env.sh
+   ```
+   Создаст `.env` (chmod 600) + `.onboard-creds` (chmod 600, gitignored) с
+   сгенерированными minio-кредами и RESTIC_PASSWORD. Выведет блок
+   `vault kv put` команд — **отнеси корп-админу**, без seed'а стек не
+   поднимется (vault-agent залипнет в retry-loop'е). Повторно показать:
+   `bash scripts/show-onboard-creds.sh`.
 
 4. Bootstrap чистого VPS:
    ```bash
@@ -70,7 +80,8 @@ curl -X POST -H "Authorization: token $GITEA_TOKEN" -H "Content-Type: applicatio
    make remote-deploy        # ssh → VPS → bash scripts/deploy.sh
    ```
    Опционально для day-2: `make ship` (push текущей ветки → если main, авто-remote-deploy).
-   Backend/backup/minio в шаблоне — opt-in profiles, поднимутся через `COMPOSE_PROFILES=...`.
+   Minio + backup поднимаются по дефолту. Backend opt-in: image должен быть
+   опубликован в `git.stit.tech/<p>/backend` → `COMPOSE_PROFILES=backend make deploy`.
 
 См. `docs/onboarding.md` для расширенной версии (DNS, runner registration, restore-from-backup).
 

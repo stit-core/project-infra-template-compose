@@ -3,19 +3,13 @@ services:
     image: restic/restic:0.18.1
     container_name: backup
     restart: "no"
-    # Opt-in: COMPOSE_PROFILES=backup. Требует включённого minio (restic
-    # пишет в локальный bucket `backups`, который создаёт minio-init).
-    # Обычно вместе: COMPOSE_PROFILES=minio,backup.
-    # Перед включением:
-    # 1) оператор сгенерировал backup-SA при подъёме minio (access/secret в
-    #    kv/data/projects/<project>/minio: backup_access_key, backup_secret_key);
-    # 2) положил RESTIC_PASSWORD в kv/data/projects/<project>/backup;
-    # 3) раскомментировал backup-template в configs/vault-agent/agent.hcl.tpl.
-    # Долгоживущий контейнер, дёргается через host-cron:
-    # `docker exec backup /usr/local/bin/run-backup.sh`. Альтернатива —
+    # On by default. Пишет в локальный bucket `backups` (minio-init создаёт).
+    # Креды (BACKUP_S3_ACCESS_KEY/SECRET в kv/projects/<p>/minio + RESTIC_PASSWORD
+    # в kv/projects/<p>/backup) генерит scripts/new-env.sh, оператор относит
+    # корп-админу для seed'а в Vault. Долгоживущий контейнер, дёргается через
+    # host-cron: `docker exec backup /usr/local/bin/run-backup.sh`. Альтернатива —
     # отдельный image c crond внутри; не делаем ради простоты, host-cron
     # и так уже точка управления backup.sh.
-    profiles: [backup]
     entrypoint: ["sh", "-c", "tail -f /dev/null"]
     env_file:
       - .runtime/secrets/backup.env

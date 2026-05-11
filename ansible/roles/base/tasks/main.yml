@@ -17,6 +17,7 @@
       - gettext-base       # envsubst
       - chrony             # NTP
       - unattended-upgrades
+      - make               # для `make deploy` / `make backup` на VPS
     state: present
 
 - name: Configure swap (2G if missing)

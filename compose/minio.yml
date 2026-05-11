@@ -6,13 +6,10 @@ services:
     image: minio/minio:RELEASE.2025-09-07T16-13-09Z-cpuv1
     container_name: minio
     restart: unless-stopped
-    # Opt-in: COMPOSE_PROFILES=minio. Перед включением:
-    # 1) оператор генерит access/secret pairs локально (для root, app SA,
-    #    backup SA), кладёт в Vault как kv/data/projects/<project>/minio
-    #    (поля: root_user, root_password, app_access_key, app_secret_key,
-    #    backup_access_key, backup_secret_key, buckets="..." опц.).
-    #    Эти же пары передаются stit-админу для реестра.
-    # 2) раскомментирует minio-template в configs/vault-agent/agent.hcl.tpl.
+    # On by default. Креды генерит scripts/new-env.sh (.onboard-creds),
+    # оператор относит блок корп-админу для seed'а в Vault
+    # (kv/projects/<p>/minio: root_user, root_password, app_access_key,
+    # app_secret_key, backup_access_key, backup_secret_key, buckets опц.).
     # Все клиенты (backend, restic, mc у stit-админа) ходят через публичный
     # s3.${DOMAIN}, без привязки к docker-network. Внутренний minio:9000
     # используется ТОЛЬКО minio-init'ом (bootstrap-sidecar в том же compose);
@@ -20,7 +17,6 @@ services:
     # что restic-репо живёт в том же minio, что бекапит postgres-data: если
     # minio-data накроется, и app-uploads, и backups теряются. Trade-off
     # простоты против DR; для устойчивости — mc mirror в корп-S3 / offsite cron.
-    profiles: [minio]
     command: server /data --console-address ":9001"
     env_file:
       - .runtime/secrets/minio.env
@@ -73,7 +69,6 @@ services:
     restart: "no"
     # Идемпотентный bootstrap: создаёт bucket'ы и service-account'ы по
     # значениям из minio.env. Безопасно прогонять на каждом deploy.
-    profiles: [minio]
     depends_on:
       minio:
         condition: service_healthy

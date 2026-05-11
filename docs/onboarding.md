@@ -86,7 +86,7 @@ ansible-playbook -i ansible/inventory.ini ansible/bootstrap.yml
 ansible-playbook -i ansible/inventory.ini ansible/bootstrap.yml --tags onboard
 ```
 
-### 7. Заполнить `.env` на VPS
+### 7. Заполнить `.env` на VPS + сгенерить onboard-креды
 
 ```bash
 ssh root@<vps>
@@ -96,7 +96,16 @@ VAULT_ROLE_ID=<id> VAULT_SECRET_ID=<id> \
 bash scripts/new-env.sh
 ```
 
-Минимум — 4 значения; всё остальное (VAULT_ADDR, OTEL_*, ACME_EMAIL=ops@$DOMAIN, BACKEND_TAG=latest) выводится скриптом. Runner-токен/CrowdSec-key опциональны и заполняются позже руками. Создаст `.env` с правами 0600.
+Минимум — 4 значения; всё остальное (VAULT_ADDR, OTEL_*, ACME_EMAIL=ops@$DOMAIN, BACKEND_TAG=latest) выводится скриптом. Runner-токен/CrowdSec-key опциональны и заполняются позже руками. Создаст `.env` + `.onboard-creds` с правами 0600.
+
+`.onboard-creds` содержит сгенерированные minio + restic креды. Скрипт выведет блок `vault kv put` команд — **отнеси корп-админу** для seed'а в Vault:
+
+```bash
+ssh root@stit-corp 'cd /opt/stit-infra && VAULT_TOKEN=<root> vault kv put kv/projects/acme/minio root_user=... ...'
+ssh root@stit-corp 'cd /opt/stit-infra && VAULT_TOKEN=<root> vault kv put kv/projects/acme/backup password=...'
+```
+
+Без seed'а vault-agent залипает в retry-loop'е на `kv/projects/<p>/{minio,backup}` и стек не поднимается. RESTIC_PASSWORD из `.onboard-creds` **продублируй offsite** — без него restore из снапшотов невозможен. Повторно показать блок: `bash scripts/show-onboard-creds.sh`.
 
 ### 8. Первый деплой
 
@@ -110,10 +119,10 @@ make remote-deploy
 Что произойдёт:
 1. `render-configs.sh` рендерит `.tpl` → `.yml/.hcl`.
 2. compose стартует vault-agent (логин по AppRole, рендер env-файлов в `.runtime/secrets/`).
-3. Postgres + otel-agent стартуют после vault-agent.healthy. **Backend по умолчанию в `profiles: [backend]`** — поднимется только когда добавишь `COMPOSE_PROFILES=backend` (т.е. когда image в `git.stit.tech/<p>/backend` опубликован).
-4. Traefik запрашивает LE-cert на `api.<DOMAIN>` через HTTP-01 — выпустится когда backend появится (router-rule зависит от profile).
-5. `gitea-runner` (`profiles: [ci]`) — не стартует по умолчанию; включи с `COMPOSE_PROFILES=ci` когда нужен CI.
-6. `minio` + `backup` — `profiles: [minio]` / `[backup]`; см. `configs/vault-agent/agent.hcl.tpl` для seed-инструкций.
+3. Postgres + otel-agent + minio + minio-init + backup стартуют после vault-agent.healthy.
+4. Traefik запрашивает LE-cert на публичные хосты (s3.${DOMAIN}, minio.${DOMAIN} сразу; api.${DOMAIN} — когда backend появится).
+5. **Backend по умолчанию в `profiles: [backend]`** — поднимется только когда добавишь `COMPOSE_PROFILES=backend` (т.е. когда image в `git.stit.tech/<p>/backend` опубликован).
+6. `gitea-runner` (`profiles: [ci]`) — не стартует по умолчанию; включи с `COMPOSE_PROFILES=ci` когда нужен CI.
 
 ### 9. Сгенерировать CrowdSec bouncer-key
 

@@ -92,28 +92,27 @@ ansible-playbook -i ansible/inventory.ini ansible/bootstrap.yml --tags onboard
 
 Это склонирует репо в `/opt/<project>-infra`.
 
-### 5. Заполнить .env
+### 5. Заполнить .env + сгенерить onboard-креды
 
 На VPS:
 
 ```bash
 ssh root@<IP>
 cd /opt/<project>-infra
-bash scripts/new-env.sh
+PROJECT_NAME=<p> DOMAIN=<d> VAULT_ROLE_ID=<id> VAULT_SECRET_ID=<id> bash scripts/new-env.sh
 ```
 
-Минимально нужны 4 значения: `PROJECT_NAME`, `DOMAIN`, `VAULT_ROLE_ID`, `VAULT_SECRET_ID`. Всё остальное (VAULT_ADDR, OTEL endpoint, ACME_EMAIL=ops@$DOMAIN, BACKEND_TAG=latest) — зашиты в скрипт / выведены автоматически.
+Создаёт **два файла** (оба chmod 600, gitignored):
+- `.env` — bootstrap-vars (PROJECT_NAME, DOMAIN, VAULT_*, OTEL_*, BACKEND_TAG)
+- `.onboard-creds` — сгенерированные `openssl rand` minio-креды + RESTIC_PASSWORD
 
-Не-интерактивный режим — оператор подаёт значения env-vars'ами:
-```bash
-PROJECT_NAME=acme DOMAIN=acme.com \
-VAULT_ROLE_ID=<id> VAULT_SECRET_ID=<id> \
-bash scripts/new-env.sh
-```
+В конце выводит **блок `vault kv put` команд** — отнеси корп-админу для seed'а в Vault (`kv/projects/<p>/minio` + `kv/projects/<p>/backup`). Без seed'а vault-agent залипнет в retry-loop'е → стек не поднимется.
 
-`RESTIC_*` / `AWS_*` в .env не пишутся — backup-креды живут в Vault (`kv/data/projects/<project>/backup`), vault-agent отрендерит `.runtime/secrets/backup.env` когда раскомментирован backup-template в `configs/vault-agent/agent.hcl.tpl`.
+**Stop** на этом шаге, пока админ не подтвердит seed.
 
-В конце — `.env` создан с `chmod 0600`.
+Повторно показать блок (если терялся): `bash scripts/show-onboard-creds.sh`.
+
+`RESTIC_PASSWORD` из `.onboard-creds` ОБЯЗАТЕЛЬНО продублируй offsite (без него restore из снапшотов невозможен).
 
 ### 6. Первый деплой
 
@@ -129,22 +128,21 @@ cd /opt/<project>-infra
 make deploy
 ```
 
-Backend и backup в шаблоне помечены `profiles: [backend]` / `profiles: [backup]` и **не стартуют по умолчанию**. Поднимутся только когда:
-- **backend**: image опубликован в `git.stit.tech/<project>/backend:<tag>` → `COMPOSE_PROFILES=backend make deploy` (на VPS) или `COMPOSE_PROFILES=backend make remote-deploy`.
-- **backup**: корп-сторона seed'нула `kv/data/projects/<project>/backup` в Vault → раскомментируй backup-template в `configs/vault-agent/agent.hcl.tpl` → `COMPOSE_PROFILES=backup make deploy`.
+Minio + backup поднимаются по дефолту (после Vault seed'а). Backend остаётся opt-in — image должен быть опубликован в `git.stit.tech/<project>/backend:<tag>` → `COMPOSE_PROFILES=backend make deploy`.
 
 Что произойдёт при первом `deploy`:
 1. `git pull --ff-only` (no-op на первом запуске).
 2. `scripts/render-configs.sh` — envsubst для `.tpl` (vault-agent agent.hcl, traefik middlewares).
-3. `docker compose up -d --wait --wait-timeout 120`:
-   - Traefik стартует (LE-certs выпустятся когда появятся routers под публичные хосты — т.е. при включении backend).
+3. `docker compose up -d --wait --wait-timeout 180`:
    - vault-agent аутентифицируется в Vault, рендерит `.runtime/secrets/*.env`, выставляет `.ready`.
-   - Postgres стартует.
-   - otel-agent форвардит в `otel.stit.tech`.
+   - Postgres + minio + backup + otel-agent + crowdsec стартуют после vault-agent.healthy.
+   - minio-init создаёт bucket'ы (app-uploads, backups) и service accounts из minio.env.
+   - Traefik стартует, LE-certs выпустятся на публичные роуты (s3.${DOMAIN}, minio.${DOMAIN} сразу).
 
 **Если что-то не поднимается** — `docker compose logs <svc>` для конкретного сервиса. Типовые проблемы:
-- vault-agent не healthy → AppRole creds в `.env` неправильные / Vault unreachable.
-- LE cert не выпустился → DNS не указывает на VPS, или 80/443 закрыты файрволом (выпуск произойдёт когда backend будет включён).
+- vault-agent не healthy / retry-loop на kv/projects/<p>/{minio,backup} → корп не засеял Vault (см. шаг 5).
+- minio-init упал с `<no value>` в bucket name → Vault поле `buckets` отсутствует — это не блокер, шаблон даёт пустую строку → дефолт `app-uploads`. Если видишь старый сбой — обнови `configs/vault-agent/templates/minio.env.tpl`.
+- LE cert не выпустился → DNS не указывает на VPS, или 80/443 закрыты файрволом.
 - backend падает → секреты в `.runtime/secrets/backend.env` не сматчили image-expectations.
 
 ### Day-2 workflow
@@ -187,7 +185,7 @@ bash scripts/register-runner.sh
 - `docker logs otel-agent | tail -5` — нет auth-ошибок при экспорте в `otel.stit.tech`.
 - `docker logs vault-agent | tail -10` — successful render, нет re-auth циклов.
 
-### 10. Backup smoke-test (если minio + backup профили включены)
+### 10. Backup smoke-test
 
 ```bash
 make backup
@@ -195,7 +193,7 @@ make backup
 
 Должно завершиться успехом. Проверь в проектном Minio:
 ```bash
-docker exec minio-init mc ls local/backups/
+docker exec minio mc ls local/backups/
 ```
 После первого backup-run появятся restic-объекты (config, snapshots/, data/).
 

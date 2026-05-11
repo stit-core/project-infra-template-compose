@@ -40,32 +40,27 @@ template {
   perms       = 0400
 }
 
-# Minio-credentials template. Раскомментируй когда оператор сгенерировал
-# minio-creds и положил в kv/data/projects/<PROJECT_NAME>/minio (поля:
-# root_user, root_password, app_access_key, app_secret_key,
-# backup_access_key, backup_secret_key, buckets — space-separated, опц).
-# Эти же access/secret пары оператор передаёт stit-админу для реестра.
-# Без секрета в Vault vault-agent залипнет в retry-loop'е — не раскомментируй
-# до seed'а. После включения — COMPOSE_PROFILES=minio.
-# template {
-#   source      = "/etc/vault-agent/templates/minio.env.tpl"
-#   destination = "/secrets/minio.env"
-#   perms       = 0400
-# }
+# Minio-credentials. Креды генерит scripts/new-env.sh (.onboard-creds),
+# оператор относит блок корп-админу → vault kv put kv/projects/<p>/minio.
+# Поля: root_user, root_password, app_access_key, app_secret_key,
+# backup_access_key, backup_secret_key, buckets — space-separated, опц.
+# Без seed'а vault-agent залипает в retry-loop'е и стек не поднимется.
+template {
+  source      = "/etc/vault-agent/templates/minio.env.tpl"
+  destination = "/secrets/minio.env"
+  perms       = 0400
+}
 
-# Backup-credentials template. Restic пишет через публичный S3 endpoint
-# (s3.${DOMAIN}) в bucket "backups" — тот же URL, что используют внешние
-# инструменты со стороны stit-админа. AWS-creds (backup-SA) берутся из
-# kv/data/projects/<PROJECT_NAME>/minio (backup_access_key/secret); здесь
-# только RESTIC_PASSWORD из отдельного /backup пути — оператор кладёт
-# перед первым backup'ом (openssl rand -hex 32, ОБЯЗАТЕЛЬНО сохрани offsite —
-# без него restore из снапшотов невозможен).
-# Раскомментируй когда есть и minio-creds, и backup.password в Vault.
-# template {
-#   source      = "/etc/vault-agent/templates/backup.env.tpl"
-#   destination = "/secrets/backup.env"
-#   perms       = 0400
-# }
+# Backup-credentials. Restic пишет через публичный S3 endpoint (s3.${DOMAIN})
+# в bucket "backups". AWS-creds (backup-SA) — из kv/projects/<p>/minio
+# (backup_access_key/secret); RESTIC_PASSWORD — из kv/projects/<p>/backup.
+# Оба значения тоже генерит scripts/new-env.sh; оператор передаёт корп-админу.
+# RESTIC_PASSWORD продублируй offsite — без него restore из снапшотов невозможен.
+template {
+  source      = "/etc/vault-agent/templates/backup.env.tpl"
+  destination = "/secrets/backup.env"
+  perms       = 0400
+}
 
 # Marker для healthcheck. Создаётся последним — чтобы зависимые
 # сервисы (через `service_healthy`) стартовали только после того, как

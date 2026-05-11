@@ -5,5 +5,5 @@ APP_S3_ACCESS_KEY={{ .Data.data.app_access_key }}
 APP_S3_SECRET_KEY={{ .Data.data.app_secret_key }}
 BACKUP_S3_ACCESS_KEY={{ .Data.data.backup_access_key }}
 BACKUP_S3_SECRET_KEY={{ .Data.data.backup_secret_key }}
-MINIO_BUCKETS={{ .Data.data.buckets }}
+MINIO_BUCKETS={{ or (index .Data.data "buckets") "" }}
 {{ end }}
