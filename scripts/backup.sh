@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Restic backup: pg_dumpall + volume snapshots → corp Minio (или client S3).
+# Restic backup: pg_dumpall + volume snapshots → проектный Minio
+# (s3.${DOMAIN}/backups). Env (RESTIC_* / AWS_*) приходит из env_file
+# .runtime/secrets/backup.env, отрендеренного vault-agent'ом.
 # Бинд-маунтится в `backup` container как /usr/local/bin/run-backup.sh.
 # Триггер — host cron: docker exec backup /usr/local/bin/run-backup.sh
 set -euo pipefail

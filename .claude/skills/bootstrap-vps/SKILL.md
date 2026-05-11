@@ -187,13 +187,17 @@ bash scripts/register-runner.sh
 - `docker logs otel-agent | tail -5` — нет auth-ошибок при экспорте в `otel.stit.tech`.
 - `docker logs vault-agent | tail -10` — successful render, нет re-auth циклов.
 
-### 10. Backup smoke-test
+### 10. Backup smoke-test (если minio + backup профили включены)
 
 ```bash
 make backup
 ```
 
-Должно завершиться успехом. Проверь на корп-Minio: `mc ls corp/backups-<project>/` — должен появиться initial snapshot.
+Должно завершиться успехом. Проверь в проектном Minio:
+```bash
+docker exec minio-init mc ls local/backups/
+```
+После первого backup-run появятся restic-объекты (config, snapshots/, data/).
 
 ## Guard'рейлы
 

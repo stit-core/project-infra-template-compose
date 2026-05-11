@@ -74,7 +74,7 @@ ansible-playbook -i ansible/inventory.ini ansible/bootstrap.yml
 
 Что произойдёт:
 1. `base` — apt update, swap 2G, journald limits, sysctl tuning.
-2. `ssh-hardening` — port 2222, no password auth, fail2ban.
+2. `ssh-hardening` — no password auth, root login key-only, fail2ban на :22.
 3. `docker` — docker-ce + compose-plugin.
 4. `stit-onboard` — `/opt/<project>-infra/`, ed25519 deploy key (печатает pubkey), clone из `<org>/infra` (упадёт на первом запуске — см. шаг 6).
 
@@ -89,25 +89,31 @@ ansible-playbook -i ansible/inventory.ini ansible/bootstrap.yml --tags onboard
 ### 7. Заполнить `.env` на VPS
 
 ```bash
-ssh -p 2222 root@<vps>
+ssh root@<vps>
 cd /opt/acme-infra
+PROJECT_NAME=acme DOMAIN=acme.com \
+VAULT_ROLE_ID=<id> VAULT_SECRET_ID=<id> \
 bash scripts/new-env.sh
 ```
 
-Интерактивно подставит блок от `onboard-project.sh` + restic creds + runner reg-token. Создаст `.env` с правами 0600.
+Минимум — 4 значения; всё остальное (VAULT_ADDR, OTEL_*, ACME_EMAIL=ops@$DOMAIN, BACKEND_TAG=latest) выводится скриптом. Runner-токен/CrowdSec-key опциональны и заполняются позже руками. Создаст `.env` с правами 0600.
 
 ### 8. Первый деплой
 
+С laptop'а оператора:
 ```bash
-make deploy
+make remote-deploy
 ```
+
+Или на VPS: `make deploy`.
 
 Что произойдёт:
 1. `render-configs.sh` рендерит `.tpl` → `.yml/.hcl`.
 2. compose стартует vault-agent (логин по AppRole, рендер env-файлов в `.runtime/secrets/`).
-3. Postgres + backend + otel-agent стартуют после vault-agent.healthy.
-4. Traefik запрашивает LE-cert на `api.<DOMAIN>` через HTTP-01.
-5. `gitea-runner` саморегистрируется (если REG_TOKEN в .env) и появляется в Gitea admin Runners list.
+3. Postgres + otel-agent стартуют после vault-agent.healthy. **Backend по умолчанию в `profiles: [backend]`** — поднимется только когда добавишь `COMPOSE_PROFILES=backend` (т.е. когда image в `git.stit.tech/<p>/backend` опубликован).
+4. Traefik запрашивает LE-cert на `api.<DOMAIN>` через HTTP-01 — выпустится когда backend появится (router-rule зависит от profile).
+5. `gitea-runner` (`profiles: [ci]`) — не стартует по умолчанию; включи с `COMPOSE_PROFILES=ci` когда нужен CI.
+6. `minio` + `backup` — `profiles: [minio]` / `[backup]`; см. `configs/vault-agent/agent.hcl.tpl` для seed-инструкций.
 
 ### 9. Сгенерировать CrowdSec bouncer-key
 

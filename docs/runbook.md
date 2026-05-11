@@ -54,12 +54,14 @@ docker logs postgres --tail=100
    ```bash
    docker compose -f docker-compose.yml -f compose/postgres.yml stop postgres
    ```
-2. **Если есть recent restic snapshot** — восстанови volume:
+2. **Если есть recent restic snapshot** — восстанови volume (env из `.runtime/secrets/backup.env`):
    ```bash
-   docker run --rm -v postgres-data:/data \
+   set -a; . .runtime/secrets/backup.env; set +a
+   docker run --rm -v <project>_postgres-data:/data \
      -e RESTIC_REPOSITORY -e RESTIC_PASSWORD \
      -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY \
-     restic/restic:0.17.3 restore latest --target /data --include /data/postgres
+     --network proxy \
+     restic/restic:0.18.1 restore latest --target /data --include /data/postgres
    ```
 3. **Если только pg_dump есть (не raw):**
    ```bash
@@ -76,7 +78,7 @@ docker exec backup restic snapshots
 docker exec backup restic check
 ```
 
-- **`Fatal: unable to open repo`**: `RESTIC_REPOSITORY`/`RESTIC_PASSWORD`/`AWS_*` rotated на корпе. Sync `.env`.
+- **`Fatal: unable to open repo`**: `RESTIC_PASSWORD` / minio creds ротированы. Меняются в Vault (`kv/data/projects/<p>/{backup,minio}`), vault-agent перерендерит `.runtime/secrets/backup.env`, после — `docker compose ... up -d --no-deps --force-recreate backup` (env_file подхватывается только при CREATE, не restart).
 - **Cron не триггерит**: `crontab -l | grep backup`. Должно быть что-то типа `0 3 * * * docker exec backup /usr/local/bin/run-backup.sh >> /var/log/backup.log 2>&1`. Добавь если нет.
 - **Disk full на VPS**: `df -h`. `backup-cache` volume может разрастись — `docker exec backup restic cache --cleanup`.
 
@@ -122,10 +124,14 @@ make deploy   # или подожди пока gitea-runner подхватит p
 2. `ansible-playbook -i inventory.ini bootstrap.yml` (с обновлённым `ansible_host`).
 3. На новом VPS: `bash scripts/new-env.sh` (используй те же AppRole creds — они привязаны к проекту, не к VPS).
 4. `make deploy` → стек поднимается, vault-agent логинится, постгрес — пустой.
-5. Restore из restic:
+5. Restore из restic (env приходит из `.runtime/secrets/backup.env`, рендерится после первого `make deploy`):
    ```bash
-   docker run --rm -v postgres-data:/data \
-     -e RESTIC_REPOSITORY ... restic/restic restore latest --target /data
+   set -a; . .runtime/secrets/backup.env; set +a
+   docker run --rm -v <project>_postgres-data:/data \
+     -e RESTIC_REPOSITORY -e RESTIC_PASSWORD \
+     -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY \
+     --network proxy \
+     restic/restic:0.18.1 restore latest --target /data
    ```
 6. Сверь IP в Authentik (если OIDC redirect-uri привязан) и в любых внешних webhook'ах.
 
@@ -134,6 +140,5 @@ make deploy   # или подожди пока gitea-runner подхватит p
 - Vault sealed.
 - otel.stit.tech не принимает данные (tenant 401).
 - git.stit.tech registry pull fails.
-- s3.stit.tech 5xx на restic.
 
 Эскалация в `#corp-infra` Slack или ntfy.stit.tech.

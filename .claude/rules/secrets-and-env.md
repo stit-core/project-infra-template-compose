@@ -13,8 +13,8 @@ paths:
 
 | Уровень | Что | Где | Кто пишет |
 |---|---|---|---|
-| Оператор | bootstrap: `VAULT_ROLE_ID`, `VAULT_SECRET_ID`, `RESTIC_PASSWORD`, `AWS_*`, image tags, `DOMAIN` | `.env` (gitignored, на VPS) | оператор через `scripts/new-env.sh` |
-| Runtime | DB-пароль, OIDC client_secret, JWT key, OTEL_TOKEN | `.runtime/secrets/*.env` (gitignored, рендерится vault-agent'ом) | vault-agent из `kv/projects/<p>/*` |
+| Оператор | bootstrap: `PROJECT_NAME`, `DOMAIN`, `ACME_EMAIL`, `VAULT_ROLE_ID`, `VAULT_SECRET_ID`, `OTEL_*`, image tags, `CROWDSEC_BOUNCER_API_KEY`, `GITEA_RUNNER_REG_TOKEN` | `.env` (gitignored, на VPS) | оператор через `scripts/new-env.sh` |
+| Runtime | DB-пароль, OIDC client_secret, JWT key, OTEL_TOKEN, MinIO root + SA, RESTIC_PASSWORD + AWS_* | `.runtime/secrets/*.env` (gitignored, рендерится vault-agent'ом) | vault-agent из `kv/projects/<p>/{db,oidc,jwt,minio,backup}` + `kv/observability/tenants/<p>` |
 
 Backend / postgres / other consumer-сервисы читают **только** `.runtime/secrets/*.env` через `env_file:`. Они не знают про Vault напрямую.
 

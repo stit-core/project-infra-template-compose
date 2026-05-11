@@ -1,6 +1,6 @@
 ---
 name: dr-restore
-description: Disaster recovery проектной инфры — восстановление сервиса/volume/всего хоста из restic-снапшота в корп Minio. Каждый destructive шаг требует явного OK. Активируй на "/dr-restore", "восстанови из бэкапа", "вернуть данные", "перезалей volume", "host crashed".
+description: Disaster recovery проектной инфры — восстановление сервиса/volume/всего хоста из restic-снапшота (проектный Minio). Каждый destructive шаг требует явного OK. Активируй на "/dr-restore", "восстанови из бэкапа", "вернуть данные", "перезалей volume", "host crashed".
 ---
 
 # Skill: dr-restore
@@ -28,7 +28,7 @@ description: Disaster recovery проектной инфры — восстан�
 1. `pg_dumpall` для `postgres` контейнера → restic stdin с tag `pg_dump=<container>`.
 2. `tar` всех `<project>_*` named volumes → restic stdin с tag `volume=<volname>`.
 
-Restic-репо: `s3:https://s3.stit.tech/backups-<project>` (корп Minio). AppRole-secrets для S3 — в `.env`.
+Restic-репо: `s3:https://s3.${DOMAIN}/backups` — bucket в **проектном** minio, через traefik (тот же endpoint, что использует stit-админ извне). RESTIC_PASSWORD + backup-SA access/secret — в Vault (`kv/data/projects/<p>/{backup,minio}`), vault-agent рендерит в `.runtime/secrets/backup.env`.
 
 Retention зависит от настроек в `backup.sh` — типично 7 daily / 4 weekly / 3 monthly.
 
@@ -48,12 +48,12 @@ Retention зависит от настроек в `backup.sh` — типично
 На VPS:
 
 ```bash
-cd /opt/<project>-infra && set -a && . .env && set +a && \
+cd /opt/<project>-infra && set -a && . .runtime/secrets/backup.env && set +a && \
   docker run --rm \
     -e RESTIC_REPOSITORY -e RESTIC_PASSWORD \
     -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY \
     --network proxy \
-    restic/restic:0.17.3 snapshots --compact
+    restic/restic:0.18.1 snapshots --compact
 ```
 
 Покажи юзеру вывод. Спроси: какой snapshot ID? (или `latest`)
@@ -73,13 +73,13 @@ cd /opt/<project>-infra && set -a && . .env && set +a && \
      sh -c "rm -rf /data/* /data/.[!.]* /data/..?* 2>/dev/null || true"
    ```
 
-3. **Restore из restic** (idempotent):
+3. **Restore из restic** (idempotent; env из `.runtime/secrets/backup.env` уже в shell):
    ```bash
    docker run --rm \
      -e RESTIC_REPOSITORY -e RESTIC_PASSWORD \
      -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY \
      --network proxy \
-     restic/restic:0.17.3 dump <SNAPSHOT_ID> /<volume>.tar | \
+     restic/restic:0.18.1 dump <SNAPSHOT_ID> /<volume>.tar | \
    docker run --rm -i -v <project>_<volume>:/restore alpine:3.20 tar -C /restore -xf -
    ```
 
@@ -100,7 +100,7 @@ cd /opt/<project>-infra && set -a && . .env && set +a && \
    ```bash
    docker run --rm -e RESTIC_REPOSITORY -e RESTIC_PASSWORD \
      -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY --network proxy \
-     restic/restic:0.17.3 dump <SNAPSHOT_ID> /postgres.sql > /tmp/postgres.sql
+     restic/restic:0.18.1 dump <SNAPSHOT_ID> /postgres.sql > /tmp/postgres.sql
    ```
 
 3. **Drop+recreate database** (требует OK — destructive):
@@ -138,9 +138,9 @@ cd /opt/<project>-infra && set -a && . .env && set +a && \
 
 - **Каждый destructive шаг — явный OK у пользователя.** Не один общий OK на всё.
 - **Не делай drop database без двойной проверки** что снапшот загружен и читается.
-- **AppRole для restic** живёт в `.env`. Если потерян `.env` — операторская задача восстановить из credentials.md / Vault на корп-стороне.
+- **Backup creds** живут в Vault (`kv/data/projects/<p>/{backup,minio}`), vault-agent рендерит в `.runtime/secrets/backup.env`. Если хост потерян целиком — пересоздаёшь .env с теми же AppRole, vault-agent рендерит секреты автоматически.
 - **Restic check** перед критичным restore — `restic check --read-data` (медленно, но валидирует данные).
 
 ## Что делать если restic-репо тоже потерян
 
-Off-site copy backup'а — забота корп-стороны (Minio replication / external mirror). На проектной стороне — если репо потерян, данные потеряны. См. `docs/runbook.md` → "Catastrophic loss" если он покрыт.
+Backup-репо живёт в **проектном** Minio (тот же бакет в той же VPS, что данные). Если minio-data накроется — теряется и postgres-snapshot, и restic-repo. На проектной стороне off-site защиту шаблон НЕ обеспечивает — настрой `mc mirror backups → corp-S3` отдельным host-cron'ом если нужно. См. `docs/runbook.md` → "Полная замена VPS" для процедуры при сохранившемся репо.

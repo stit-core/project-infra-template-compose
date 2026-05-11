@@ -14,15 +14,20 @@
 | Secrets | vault-agent sidecar | `compose/vault-agent.yml` |
 | Telemetry | otel-agent → `otel.stit.tech` (OTLP от backend + Prom-scrape host-метрик) | `compose/otel-agent.yml` |
 | Host metrics | cadvisor + node-exporter (скрейпятся локальным otel-agent) | `compose/cadvisor.yml`, `compose/node-exporter.yml` |
-| Backup | restic-cron → corp Minio | `compose/backup.yml` |
-| CI | gitea-runner | `compose/runner.yml` |
+| Storage | Minio (S3 API + Console) на `s3.${DOMAIN}` / `minio.${DOMAIN}`, профиль `minio` | `compose/minio.yml` |
+| Backup | restic-cron → проектный Minio (`s3.${DOMAIN}/backups`), профиль `backup` | `compose/backup.yml` |
+| CI | gitea-runner, профиль `ci` | `compose/runner.yml` |
+
+`backend`, `minio`, `backup`, `runner` — opt-in через `COMPOSE_PROFILES=...`. По дефолту стартует только всё, что в core (traefik/postgres/vault-agent/otel-agent/crowdsec/cadvisor/node-exporter).
 
 Сети: `proxy` (наружу), `backend-net` (internal). Подробно — `docs/architecture.md`.
 
 ## 2. Команды
 
 ```
-make deploy           # git pull → render-configs → compose up -d --wait
+make deploy           # на VPS: git pull → render-configs → compose up -d --wait
+make remote-deploy    # с laptop'а: ssh → VPS → deploy.sh (читает ansible/inventory.ini)
+make ship             # push текущей ветки; если main — авто-remote-deploy
 make render           # рендер .tpl-конфигов через envsubst
 make validate         # compose syntax + .env.example coverage
 make ps / logs        # статус / логи
@@ -63,7 +68,8 @@ VAULT_TOKEN=<root> bash scripts/onboard-project.sh <project>
 ## 5. Git workflow
 
 - **Conventional Commits** — `commit-msg` хук блокирует невалидные. Типы: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `meta`.
-- Линейная история, push в main напрямую (solo-flow на проектной стороне).
+- Линейная история, push в main напрямую (solo-flow) — или в ветку → PR в Gitea → merge.
+- `make ship` для push + (если main) auto-remote-deploy. Или `git push` + `make remote-deploy` отдельно.
 - Хуки ставятся `make hooks-install`.
 
 ## 6. Границы
@@ -94,7 +100,7 @@ VAULT_TOKEN=<root> bash scripts/onboard-project.sh <project>
 
 Минимальный set:
 
-1. `.env` — заполнить блоком от `onboard-project.sh` + клиентским доменом + image tags.
+1. `.env` — `bash scripts/new-env.sh` (env-driven: PROJECT_NAME, DOMAIN, VAULT_ROLE_ID, VAULT_SECRET_ID; остальное зашито в дефолты).
 2. `docker-compose.yml` — проверить network names (если нужен conflict-free на shared VPS).
 3. `compose/backend.yml` (и опционально frontend/worker) — `image:` под клиентский org, healthcheck path под backend API.
 4. `configs/vault-agent/templates/backend.env.tpl` — добавить project-specific env-переменные если backend читает что-то сверх стандартного контракта.

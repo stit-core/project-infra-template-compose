@@ -30,7 +30,8 @@ Single-VPS docker-compose стек одного проекта. Все серв�
 ```
 
 Дополнительно:
-- **Backup** (restic): сидит сбоку, по cron делает `pg_dumpall` + restic backup volume.
+- **Backup** (restic, профиль `backup`): сидит сбоку, по cron делает `pg_dumpall` + restic backup; пишет в локальный Minio (`s3.${DOMAIN}/backups`).
+- **Minio** (профиль `minio`): S3-storage на `s3.${DOMAIN}` / console `minio.${DOMAIN}`; bucket `app-uploads` для backend, `backups` для restic; service-accounts создаёт `minio-init`.
 - **Gitea-runner**: pull-based CI, исполняет workflows из `<org>/backend` и `<org>/infra`.
 - **cadvisor + node-exporter**: host-/container-метрики, скрейпятся локальным otel-agent'ом и шлются в корп под тем же tenant'ом, что и app-телеметрия (`service.namespace=$OTEL_TENANT`). Видны в корп-Grafana дашбордах cadvisor + Node Exporter Full при выборе `$tenant=<project>`.
 
@@ -65,7 +66,8 @@ Single-VPS docker-compose стек одного проекта. Все серв�
 | Vault | Secrets backend, AppRole-логин для проекта | `https://vault.stit.tech` |
 | OTel ingest | Telemetry (logs/metrics/traces) с tenant routing | `https://otel.stit.tech` |
 | Gitea | Source + container registry | `https://git.stit.tech` |
-| Minio | Restic backup destination (default) | `https://s3.stit.tech` |
+
+Backup пишет в **проектный** Minio (`s3.${DOMAIN}/backups`), не в корп S3 — проектная сторона autonomous по storage. Для off-site защиты — настрой mirror в корп Minio отдельно (`mc mirror` job).
 
 Vault AppRole + observability tenant выдаёт `stit/infra/scripts/onboard-project.sh <project>`. См. `stit/infra/docs/project-secrets.md`.
 
@@ -76,7 +78,8 @@ Vault AppRole + observability tenant выдаёт `stit/infra/scripts/onboard-pr
    - entrypoint пишет `role-id`/`secret-id` в `.runtime/secrets-bootstrap/`.
    - `auto_auth` логинится по AppRole, получает Vault token (TTL 10m, max 30m).
    - templates читают `kv/projects/<p>/{db,oidc,jwt}` + `kv/observability/tenants/<p>`, рендерят `backend.env` и `postgres.env` в `.runtime/secrets/`.
-   - последний template создаёт `.ready` marker → healthcheck зелёный.
+   - Опциональные templates (`minio.env`, `backup.env`) — закомментированы в `agent.hcl.tpl` по умолчанию, раскомментируются после seed'а соответствующих Vault-путей.
+   - Healthcheck = backend.env + postgres.env непустые.
 3. Postgres + backend + otel-agent ждут `vault-agent: condition: service_healthy`, потом стартуют и читают `env_file: .runtime/secrets/<svc>.env`.
 4. На rotation секрета (например `vault kv patch kv/projects/<p>/db password=NEW`):
    - vault-agent видит изменение, перерендеривает `.env`-файлы.

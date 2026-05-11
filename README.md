@@ -7,7 +7,8 @@ IaC шаблон проектной инфры для stit.tech: docker-compose 
 - **Edge:** Traefik v3 + CrowdSec (HTTP-01 LE, WAF, IP-bans).
 - **Core:** Postgres 17, backend (image `git.stit.tech/<org>/backend`), vault-agent (sidecar для secrets).
 - **Telemetry:** otel-agent — proxy на корп `otel.stit.tech` (OTLP + Bearer-token из Vault).
-- **Backup:** restic-cron — daily в корп Minio (или клиентский S3).
+- **Backup:** restic-cron — daily в проектный Minio (`s3.${DOMAIN}/backups`). Для off-site — настрой mirror руками.
+- **Storage:** Minio (S3-compat) под профилем `minio` — bucket `app-uploads` для backend, `backups` для restic.
 - **CI/CD:** gitea-runner на проектном VPS, pull-based деплой через тэги.
 - **Bootstrap:** ansible (apt + swap + journald + ssh-hardening + docker).
 
@@ -41,7 +42,7 @@ curl -X POST -H "Authorization: token $GITEA_TOKEN" -H "Content-Type: applicatio
    git clone git@git.stit.tech:<org>/infra.git && cd infra
    ```
 
-3. Заполнить `.env` (на проектном VPS, в `/opt/<project>-infra/`) блоком из step 1 + клиентским доменом, BACKEND_TAG, restic-кредами.
+3. Заполнить `.env` (на проектном VPS, в `/opt/<project>-infra/`) через `bash scripts/new-env.sh`. Скрипт env-driven: достаточно `PROJECT_NAME`, `DOMAIN`, `VAULT_ROLE_ID`, `VAULT_SECRET_ID` (остальное зашито в дефолты).
 
 4. Bootstrap чистого VPS:
    ```bash
@@ -64,10 +65,12 @@ curl -X POST -H "Authorization: token $GITEA_TOKEN" -H "Content-Type: applicatio
    (Если проект уже onboard'ен — отредактируй `configs/crowdsec/whitelists.yaml`
    и `docker compose ... restart crowdsec` руками.)
 
-7. Первый деплой:
+7. Первый деплой — c laptop'а оператора:
    ```bash
-   ssh root@<vps> 'cd /opt/<project>-infra && make deploy'
+   make remote-deploy        # ssh → VPS → bash scripts/deploy.sh
    ```
+   Опционально для day-2: `make ship` (push текущей ветки → если main, авто-remote-deploy).
+   Backend/backup/minio в шаблоне — opt-in profiles, поднимутся через `COMPOSE_PROFILES=...`.
 
 См. `docs/onboarding.md` для расширенной версии (DNS, runner registration, restore-from-backup).
 
@@ -83,6 +86,7 @@ curl -X POST -H "Authorization: token $GITEA_TOKEN" -H "Content-Type: applicatio
 - `vault.stit.tech` — secrets backend. AppRole `project-<p>` создаётся `onboard-project.sh`.
 - `otel.stit.tech` — observability ingest. Tenant routing по `service.namespace=<project>` + `Authorization: Bearer <OTEL_TOKEN>`.
 - `git.stit.tech` — registry для backend/worker/frontend images.
-- `s3.stit.tech` — restic backup destination (по умолчанию).
+
+(Backup пишет в проектный Minio, не в корп S3. Если нужен off-site — настрой `mc mirror` в корп-Minio отдельно.)
 
 См. также `docs/project-secrets.md` в `stit/infra` для KV-схемы и rotation flow.

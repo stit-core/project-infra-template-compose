@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# SSH-обёртка операций на проектном VPS. Читает SSH_HOST/SSH_PORT из
-# .env (или окружения), чтобы не помнить connection-строки.
+# SSH-обёртка операций на проектном VPS. Connection-данные берутся из
+# ansible/inventory.ini (первая запись под [project_vps]); override через
+# HOST=user@ip или SSH_HOST/SSH_PORT/SSH_USER/PROJECT_NAME env.
 #
 # Subcommands:
 #   status       — remote `make ps` + status.sh
@@ -11,12 +12,26 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
-[ -f .env ] && set -a && . ./.env && set +a
+# Парсим inventory если HOST не задан явно.
+if [ -z "${HOST:-}" ] && [ -f ansible/inventory.ini ]; then
+  line=$(awk '/^\[project_vps\]/{flag=1; next} /^\[/{flag=0} flag && /ansible_host/' \
+         ansible/inventory.ini | head -1)
+  SSH_HOST="${SSH_HOST:-$(grep -oE 'ansible_host=[^ ]+' <<<"$line" | cut -d= -f2)}"
+  SSH_PORT="${SSH_PORT:-$(grep -oE 'ansible_port=[^ ]+' <<<"$line" | cut -d= -f2)}"
+  SSH_USER="${SSH_USER:-$(grep -oE 'ansible_user=[^ ]+' <<<"$line" | cut -d= -f2)}"
+  PROJECT_NAME="${PROJECT_NAME:-$(grep -oE 'project_name=[^ ]+' <<<"$line" | cut -d= -f2)}"
+fi
 
-: "${SSH_HOST:?SSH_HOST not set (add to .env or export)}"
-: "${SSH_PORT:=22}"
-: "${PROJECT_NAME:?PROJECT_NAME not set}"
-: "${SSH_USER:=root}"
+# HOST=user@ip override (например для разовой сессии на staging).
+if [ -n "${HOST:-}" ]; then
+  SSH_USER="${HOST%@*}"
+  SSH_HOST="${HOST#*@}"
+fi
+
+: "${SSH_HOST:?SSH_HOST не определён (ansible/inventory.ini нет, и HOST не задан)}"
+: "${PROJECT_NAME:?PROJECT_NAME не определён}"
+SSH_PORT="${SSH_PORT:-22}"
+SSH_USER="${SSH_USER:-root}"
 
 REMOTE_DIR="/opt/${PROJECT_NAME}-infra"
 SSH="ssh -p $SSH_PORT $SSH_USER@$SSH_HOST"
