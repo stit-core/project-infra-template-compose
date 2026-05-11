@@ -38,8 +38,13 @@ providers:
 certificatesResolvers:
   letsencrypt:
     acme:
-      # email подаётся через CLI flag в compose/traefik.yml (static config
-      # не envsubst'ится — traefik принимает только литерал, иначе LE invalidContact).
+      # email + caServer должны быть здесь, не CLI: traefik 3.6 при наличии
+      # acme-блока в static yaml игнорирует --certificatesresolvers.*.acme.*
+      # CLI-флаги (наблюдалось эмпирически: пустой email в acme.json + prod
+      # caServer вместо staging несмотря на CLI). Файл рендерится из
+      # traefik.yml.tpl через envsubst — переменные из .env.
+      email: ${ACME_EMAIL}
+      caServer: ${ACME_CASERVER}
       storage: /letsencrypt/acme.json
       httpChallenge:
         entryPoint: web
