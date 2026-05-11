@@ -3,6 +3,10 @@ services:
     image: git.stit.tech/${PROJECT_NAME}/backend:${BACKEND_TAG}
     container_name: backend
     restart: unless-stopped
+    # Opt-in: COMPOSE_PROFILES=backend. Без опубликованного image'а в
+    # git.stit.tech/<project>/backend `compose up --wait` упадёт на pull'е,
+    # поэтому стартуем только когда image реально доступен.
+    profiles: [backend]
     # Non-secret env из .env. Секреты (PG_DSN, OIDC, JWT, OTEL_TOKEN) —
     # из vault-agent rendered backend.env через env_file ниже.
     environment:

@@ -11,7 +11,7 @@ Read-only research-агент для stit-infra. Вызывается когда
 ## Что ты делаешь
 
 1. Получаешь конкретный вопрос ("где упоминается этот секрет?", "что слушает порт 4317?", "сейчас vault sealed?").
-2. Читаешь нужные файлы (Read, Glob, Grep) или дёргаешь сервер через `ssh -p 2222 root@85.209.135.95 '<read-cmd>'`.
+2. Читаешь нужные файлы (Read, Glob, Grep) или дёргаешь сервер через ssh-alias из inventory (`ssh <project-host> '<read-cmd>'`).
 3. Возвращаешь **сжатую сводку 1-2k токенов**, не сырые файлы.
 
 ## Что ты НЕ делаешь
@@ -62,6 +62,6 @@ Read-only research-агент для stit-infra. Вызывается когда
   - `scripts/agent-tools/ssh.sh status` / `... logs <svc>` — readonly-команды на сервере
   - `git log`, `git show`, `git blame`, `git diff` — но **избегай** длинной истории без явной нужды (см. memory feedback)
   - `docker compose config` (локально) — валидация
-  - `ssh -p 2222 root@85.209.135.95 'docker ps|logs|exec <readonly>'` — состояние сервера
+  - `ssh <project-host> 'docker ps|logs|exec <readonly>'` — состояние сервера
 
 Не делай: deploy, restart, image pull, docker exec с записью, git push, git reset.

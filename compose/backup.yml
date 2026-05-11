@@ -3,16 +3,21 @@ services:
     image: restic/restic:0.18.1
     container_name: backup
     restart: "no"
+    # Opt-in: COMPOSE_PROFILES=backup. Перед включением:
+    # 1) корп-сторона seed'ит kv/data/projects/<project>/backup в Vault
+    #    (поля: repository, password, aws_access_key_id, aws_secret_access_key);
+    # 2) раскомментируй backup-template в configs/vault-agent/agent.hcl.tpl.
     # Долгоживущий контейнер, дёргается через host-cron:
     # `docker exec backup /usr/local/bin/run-backup.sh`. Альтернатива —
     # отдельный image c crond внутри; не делаем ради простоты, host-cron
     # и так уже точка управления backup.sh.
+    profiles: [backup]
     entrypoint: ["sh", "-c", "tail -f /dev/null"]
-    environment:
-      RESTIC_REPOSITORY: ${RESTIC_REPOSITORY}
-      RESTIC_PASSWORD: ${RESTIC_PASSWORD}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+    env_file:
+      - .runtime/secrets/backup.env
+    depends_on:
+      vault-agent:
+        condition: service_healthy
     volumes:
       - postgres-data:/data/postgres:ro
       - ./scripts/backup.sh:/usr/local/bin/run-backup.sh:ro

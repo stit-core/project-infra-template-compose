@@ -1,4 +1,4 @@
-.PHONY: help deploy render validate ps logs restart hooks-install status backup
+.PHONY: help deploy render validate ps logs restart hooks-install status backup remote-deploy ship
 
 SHELL := /usr/bin/env bash
 
@@ -9,6 +9,20 @@ help:
 
 deploy: ## git pull + render-configs + compose up --wait (запускать на сервере)
 	bash scripts/deploy.sh
+
+remote-deploy: ## с laptop'а: SSH на проектный VPS и запустить deploy.sh
+	bash scripts/remote-deploy.sh
+
+ship: ## push текущей ветки; если main — remote-deploy. Иначе подсказка про PR
+	@branch=$$(git symbolic-ref --short HEAD); \
+	echo "→ push origin $$branch"; \
+	git push origin $$branch; \
+	if [ "$$branch" = "main" ]; then \
+	  echo "→ main: triggering remote-deploy"; \
+	  bash scripts/remote-deploy.sh; \
+	else \
+	  echo "→ branch '$$branch' запушена. Открой PR в Gitea, мержи в main, потом 'make remote-deploy' (или 'git checkout main && git pull && make ship')."; \
+	fi
 
 render: ## envsubst для *.tpl
 	bash scripts/render-configs.sh

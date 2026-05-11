@@ -1,5 +1,5 @@
 ---
-# sshd на 2222, disable password auth, fail2ban.
+# Disable password auth + root-with-password, fail2ban на стандартном :22.
 # Pubkey оператора предполагается уже в /root/.ssh/authorized_keys
 # (из VPS-provisioning); иначе роль залочит доступ.
 - name: Verify root authorized_keys non-empty (refuse to harden a passworded box)
@@ -16,7 +16,6 @@
   ansible.builtin.copy:
     dest: /etc/ssh/sshd_config.d/10-stit-hardening.conf
     content: |
-      Port 2222
       PermitRootLogin prohibit-password
       PasswordAuthentication no
       ChallengeResponseAuthentication no
@@ -42,7 +41,6 @@
 
       [sshd]
       enabled = true
-      port = 2222
       logpath = %(sshd_log)s
       backend = systemd
     mode: "0644"

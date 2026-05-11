@@ -102,36 +102,63 @@ cd /opt/<project>-infra
 bash scripts/new-env.sh
 ```
 
-Скрипт интерактивный — он попросит:
-- `PROJECT_NAME`, `DOMAIN`, `ACME_EMAIL`
-- `VAULT_ROLE_ID` / `VAULT_SECRET_ID` / `VAULT_ADDR` (paste из onboard-блока)
-- `OTEL_*`
-- `BACKEND_TAG` (image версия)
-- `RESTIC_*` + `AWS_*` (для backup в корп Minio)
-- `GITEA_RUNNER_REG_TOKEN` (опционально, можно пустым — потом через `register-runner.sh`)
+Минимально нужны 4 значения: `PROJECT_NAME`, `DOMAIN`, `VAULT_ROLE_ID`, `VAULT_SECRET_ID`. Всё остальное (VAULT_ADDR, OTEL endpoint, ACME_EMAIL=ops@$DOMAIN, BACKEND_TAG=latest) — зашиты в скрипт / выведены автоматически.
+
+Не-интерактивный режим — оператор подаёт значения env-vars'ами:
+```bash
+PROJECT_NAME=acme DOMAIN=acme.com \
+VAULT_ROLE_ID=<id> VAULT_SECRET_ID=<id> \
+bash scripts/new-env.sh
+```
+
+`RESTIC_*` / `AWS_*` в .env не пишутся — backup-креды живут в Vault (`kv/data/projects/<project>/backup`), vault-agent отрендерит `.runtime/secrets/backup.env` когда раскомментирован backup-template в `configs/vault-agent/agent.hcl.tpl`.
 
 В конце — `.env` создан с `chmod 0600`.
 
 ### 6. Первый деплой
 
+С laptop'а оператора (после bootstrap'а — у тебя уже есть SSH-доступ и inventory.ini):
 ```bash
+make remote-deploy
+```
+
+Либо на самом VPS:
+```bash
+ssh root@<IP>
+cd /opt/<project>-infra
 make deploy
 ```
 
-Что произойдёт:
+Backend и backup в шаблоне помечены `profiles: [backend]` / `profiles: [backup]` и **не стартуют по умолчанию**. Поднимутся только когда:
+- **backend**: image опубликован в `git.stit.tech/<project>/backend:<tag>` → `COMPOSE_PROFILES=backend make deploy` (на VPS) или `COMPOSE_PROFILES=backend make remote-deploy`.
+- **backup**: корп-сторона seed'нула `kv/data/projects/<project>/backup` в Vault → раскомментируй backup-template в `configs/vault-agent/agent.hcl.tpl` → `COMPOSE_PROFILES=backup make deploy`.
+
+Что произойдёт при первом `deploy`:
 1. `git pull --ff-only` (no-op на первом запуске).
 2. `scripts/render-configs.sh` — envsubst для `.tpl` (vault-agent agent.hcl, traefik middlewares).
 3. `docker compose up -d --wait --wait-timeout 120`:
-   - Traefik стартует, пытается выпустить LE certs (HTTP-01).
+   - Traefik стартует (LE-certs выпустятся когда появятся routers под публичные хосты — т.е. при включении backend).
    - vault-agent аутентифицируется в Vault, рендерит `.runtime/secrets/*.env`, выставляет `.ready`.
    - Postgres стартует.
-   - Backend ждёт vault-agent + postgres, потом стартует.
-   - otel-agent стартует, форвардит в `otel.stit.tech`.
+   - otel-agent форвардит в `otel.stit.tech`.
 
 **Если что-то не поднимается** — `docker compose logs <svc>` для конкретного сервиса. Типовые проблемы:
 - vault-agent не healthy → AppRole creds в `.env` неправильные / Vault unreachable.
-- LE cert не выпустился → DNS не указывает на VPS, или 80/443 закрыты файрволом.
+- LE cert не выпустился → DNS не указывает на VPS, или 80/443 закрыты файрволом (выпуск произойдёт когда backend будет включён).
 - backend падает → секреты в `.runtime/secrets/backend.env` не сматчили image-expectations.
+
+### Day-2 workflow
+
+После bootstrap'а — стандартный цикл изменений шаблона / правок:
+
+```bash
+# 1. правки локально (compose, configs, и т.п.)
+git add -p && git commit -m "feat(...): ..."
+make ship                 # push текущей ветки; если main — авто-remote-deploy
+                          # если не main — открой PR в Gitea, мержи, потом git pull && make ship
+```
+
+Если хочешь только триггернуть деплой (без push): `make remote-deploy`.
 
 ### 7. CrowdSec bouncer key
 

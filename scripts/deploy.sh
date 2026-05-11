@@ -26,7 +26,7 @@ chmod 0700 .runtime/secrets .runtime/secrets-bootstrap
 # реальный контент — без этих заглушек compose отказывается стартовать.
 # Vault-agent перепишет файлы по мере рендера. Если добавляешь новый
 # template в configs/vault-agent/templates/ — добавь имя сюда же.
-for f in backend postgres; do
+for f in backend postgres backup; do
   [ -e ".runtime/secrets/$f.env" ] || touch ".runtime/secrets/$f.env"
 done
 
