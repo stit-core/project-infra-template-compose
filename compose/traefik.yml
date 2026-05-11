@@ -5,11 +5,12 @@ services:
     restart: unless-stopped
     command:
       - "--configFile=/etc/traefik/traefik.yml"
+      # ACME email через CLI: traefik.yml не envsubst'ится (нет .tpl),
+      # static config'у нужен литерал email — иначе LE → invalidContact.
+      - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}"
     ports:
       - "80:80"
       - "443:443"
-    environment:
-      ACME_EMAIL: ${ACME_EMAIL}
     volumes:
       - ./configs/traefik/traefik.yml:/etc/traefik/traefik.yml:ro
       - ./configs/traefik/dynamic:/etc/traefik/dynamic:ro

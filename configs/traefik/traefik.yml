@@ -38,7 +38,8 @@ providers:
 certificatesResolvers:
   letsencrypt:
     acme:
-      email: "${ACME_EMAIL}"
+      # email подаётся через CLI flag в compose/traefik.yml (static config
+      # не envsubst'ится — traefik принимает только литерал, иначе LE invalidContact).
       storage: /letsencrypt/acme.json
       httpChallenge:
         entryPoint: web
