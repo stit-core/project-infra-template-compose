@@ -8,6 +8,12 @@ services:
       # ACME email через CLI: traefik.yml не envsubst'ится (нет .tpl),
       # static config'у нужен литерал email — иначе LE → invalidContact.
       - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}"
+      # ACME CA server: prod LE по дефолту, staging для обкатки шаблона
+      # (rate-limits в ~100× выше, но сертификаты untrusted). Переключение —
+      # ACME_CASERVER=https://acme-staging-v02.api.letsencrypt.org/directory
+      # в .env + удалить volume traefik-acme (acme.json привязан к CA-серверу,
+      # старые order'ы не работают на новом CA).
+      - "--certificatesresolvers.letsencrypt.acme.caserver=${ACME_CASERVER:-https://acme-v02.api.letsencrypt.org/directory}"
     ports:
       - "80:80"
       - "443:443"
