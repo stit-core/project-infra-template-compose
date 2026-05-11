@@ -34,7 +34,7 @@ Code reviewer со свежим контекстом. Вызывают чтоб�
 - Все сервисы имеют `restart`, `healthcheck`, `container_name`, `networks`?
 - `image:` закреплён версией (не `:latest`)?
 - Новый named volume → попадает в `stit-infra_*` (проверь префикс)?
-- Новый Postgres → добавлен в `pg_dumps=()` в `scripts/backup.sh`?
+- Новый Postgres → добавлен ещё один `pg_dumpall` блок в `containers/backup/backup-now`?
 - Cross-network ссылки осмысленны (proxy для публичного, internal для backend)?
 - depends_on с `condition: service_healthy` где нужно?
 

@@ -1,0 +1,3 @@
+# Daily backup в 03:00 UTC (alpine container timezone дефолт UTC).
+# Менять расписание → правь этот файл + `docker compose build backup`.
+0 3 * * * /usr/local/bin/backup-now

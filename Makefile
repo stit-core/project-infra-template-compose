@@ -40,8 +40,8 @@ restart: ## рестарт одного сервиса: make restart SVC=backend
 	@if [ -z "$(SVC)" ]; then echo "usage: make restart SVC=<name>"; exit 2; fi
 	docker compose $(COMPOSE_ARGS) restart $(SVC)
 
-backup: ## one-shot restic backup (триггерится host-cron'ом ночью)
-	bash scripts/backup.sh
+backup: ## one-shot backup внутри backup-контейнера (daily — supercronic'ом внутри)
+	docker exec backup /usr/local/bin/backup-now
 
 status: ## сводка состояния репо (для /smartdev)
 	bash scripts/agent-tools/status.sh

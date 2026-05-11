@@ -1,27 +1,37 @@
 services:
   backup:
-    image: restic/restic:0.18.1
+    build: ./containers/backup
+    image: ${PROJECT_NAME:-project}/backup:local
     container_name: backup
-    restart: "no"
-    # Пишет в локальный bucket `backups` (minio-init создаёт). Креды
-    # (BACKUP_S3_ACCESS_KEY/SECRET в kv/projects/<p>/minio + RESTIC_PASSWORD
-    # в kv/projects/<p>/backup) генерит scripts/new-env.sh, оператор относит
-    # корп-админу для seed'а в Vault.
+    restart: unless-stopped
+    # Self-contained: alpine + restic + pg_dumpall + busybox crond. Никакой
+    # host-orchestration: cron внутри контейнера дёргает /usr/local/bin/backup-now
+    # ежедневно. One-shot smoke-test: `docker exec backup /usr/local/bin/backup-now`
+    # (или `make backup`). Расписание — containers/backup/crontab.
     #
-    # Долгоживущий sleep-контейнер. Host-orchestration: scripts/backup.sh
-    # на хосте дёргает `docker exec backup restic ...`. Контейнеру не нужны
-    # ни bash, ни docker CLI — только restic + креды + примонтированные
-    # /cache (для dump-файлов, host пишет туда pg_dumpall pipe) + /data/postgres.
-    entrypoint: ["sh", "-c", "tail -f /dev/null"]
+    # Endpoint для restic-репо приходит из RESTIC_REPOSITORY (см. .env);
+    # дефолт `s3:http://minio:9000/backups` — внутренний minio через docker
+    # network, без traefik/DNS/TLS. Для prod / off-site — менять в .env.
+    #
+    # Креды:
+    #   POSTGRES_USER/PASSWORD/HOST — из kv/projects/<p>/db (тот же source,
+    #     что postgres-контейнер; postgres-client коннектится по backend-net)
+    #   AWS_ACCESS_KEY_ID/SECRET    — из kv/projects/<p>/minio (backup_*)
+    #   RESTIC_PASSWORD             — из kv/projects/<p>/backup
+    # Всё рендерит vault-agent в .runtime/secrets/backup.env.
     env_file:
       - .runtime/secrets/backup.env
     depends_on:
       vault-agent:
         condition: service_healthy
-    volumes:
-      - postgres-data:/data/postgres:ro
-      # bind-mount, не named volume: host scripts/backup.sh пишет
-      # pg_dumpall сюда, restic в контейнере читает.
-      - ./.runtime/backup-cache:/cache
+      postgres:
+        condition: service_healthy
     networks:
-      - proxy            # restic → https://s3.${DOMAIN}
+      - backend-net      # подключение к postgres:5432 + minio:9000
+      - proxy            # внешний S3 endpoint (если переопределён в .env)
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep crond >/dev/null"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

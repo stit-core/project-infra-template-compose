@@ -24,11 +24,12 @@ description: Disaster recovery проектной инфры — восстан�
 
 ## Базовый набор данных
 
-`scripts/backup.sh` каждую ночь делает:
-1. `pg_dumpall` для `postgres` контейнера → restic stdin с tag `pg_dump=<container>`.
-2. `tar` всех `<project>_*` named volumes → restic stdin с tag `volume=<volname>`.
+Self-contained backup-контейнер (alpine + restic + pg_dumpall + busybox crond) каждую ночь делает:
+1. `pg_dumpall` через TCP к postgres:5432 → gzip → `restic backup --stdin` с filename `pgdump-<UTC>.sql.gz`.
 
-Restic-репо: `s3:https://s3.${DOMAIN}/backups` — bucket в **проектном** minio, через traefik (тот же endpoint, что использует stit-админ извне). RESTIC_PASSWORD + backup-SA access/secret — в Vault (`kv/data/projects/<p>/{backup,minio}`), vault-agent рендерит в `.runtime/secrets/backup.env`.
+**Volumes (minio-data, app-uploads etc.) НЕ бэкапятся** по дефолту — только postgres. Если нужны volume-снапшоты, расширь `containers/backup/backup-now`.
+
+Restic-репо: значение `RESTIC_REPOSITORY` из `.env`. Дефолт — `s3:http://minio:9000/backups` (внутренний minio через docker network, без traefik/DNS/TLS — работает сразу на обкатке). Для prod / off-site — `s3:http://<IP>:9000/backups` (внешний bare-IP) или `s3:https://s3.${DOMAIN}/backups` (через traefik, нужен DNS+cert). RESTIC_PASSWORD + backup-SA access/secret — в Vault (`kv/data/projects/<p>/{backup,minio}`), vault-agent рендерит в `.runtime/secrets/backup.env`.
 
 Retention зависит от настроек в `backup.sh` — типично 7 daily / 4 weekly / 3 monthly.
 
@@ -45,68 +46,32 @@ Retention зависит от настроек в `backup.sh` — типично
 
 ### 1. Список снапшотов
 
-На VPS:
+На VPS (backup-контейнер должен быть up; если стек down — поднять `vault-agent` + `postgres` + `backup` отдельно через compose up).
 
 ```bash
-cd /opt/<project>-infra && set -a && . .runtime/secrets/backup.env && set +a && \
-  docker run --rm \
-    -e RESTIC_REPOSITORY -e RESTIC_PASSWORD \
-    -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY \
-    --network proxy \
-    restic/restic:0.18.1 snapshots --compact
+docker exec backup restic snapshots --compact
 ```
 
 Покажи юзеру вывод. Спроси: какой snapshot ID? (или `latest`)
 
-### 2. Сценарии
-
-#### A. Один named volume
-
-1. **Остановить consumer-сервис** (требует OK):
-   ```bash
-   docker compose -f docker-compose.yml -f compose/<svc>.yml stop <svc>
-   ```
-
-2. **Очистить volume** (требует OK — destructive):
-   ```bash
-   docker run --rm -v <project>_<volume>:/data alpine:3.20 \
-     sh -c "rm -rf /data/* /data/.[!.]* /data/..?* 2>/dev/null || true"
-   ```
-
-3. **Restore из restic** (idempotent; env из `.runtime/secrets/backup.env` уже в shell):
-   ```bash
-   docker run --rm \
-     -e RESTIC_REPOSITORY -e RESTIC_PASSWORD \
-     -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY \
-     --network proxy \
-     restic/restic:0.18.1 dump <SNAPSHOT_ID> /<volume>.tar | \
-   docker run --rm -i -v <project>_<volume>:/restore alpine:3.20 tar -C /restore -xf -
-   ```
-
-   Подробности — `docs/runbook.md`.
-
-4. **Запустить сервис**: `make deploy`.
-
-5. **Verify** — healthcheck, данные на месте через UI / логи.
-
-#### B. Postgres
+### 2. Сценарий: Postgres restore
 
 1. **Остановить consumer'ы** (backend и пр., требует OK):
    ```bash
    docker compose stop backend
    ```
 
-2. **Dump из restic** (НЕ запускай restore прямо в running postgres):
+2. **Достать dump из restic** в контейнер postgres напрямую через pipe (`/pgdump-*.sql.gz` — внутри snapshot'а, restic dump пишет в stdout):
    ```bash
-   docker run --rm -e RESTIC_REPOSITORY -e RESTIC_PASSWORD \
-     -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY --network proxy \
-     restic/restic:0.18.1 dump <SNAPSHOT_ID> /postgres.sql > /tmp/postgres.sql
+   docker exec backup sh -c 'restic dump <SNAPSHOT_ID> /pgdump-<UTC>.sql.gz' \
+     > /tmp/pgdump.sql.gz
+   # имя файла — точно из restic snapshots --json (или restic ls <id>).
    ```
 
 3. **Drop+recreate database** (требует OK — destructive):
    ```bash
    docker exec postgres psql -U <user> -c "DROP DATABASE <db>; CREATE DATABASE <db>;"
-   docker exec -i postgres psql -U <user> -d <db> < /tmp/postgres.sql
+   gunzip -c /tmp/pgdump.sql.gz | docker exec -i postgres psql -U <user> -d <db>
    ```
 
 4. Запустить consumer + verify.
@@ -120,7 +85,7 @@ cd /opt/<project>-infra && set -a && . .runtime/secrets/backup.env && set +a && 
 3. На новом хосте: `bash scripts/new-env.sh` — заполнить `.env` теми же AppRole creds (они scope'ятся к `project-<p>`, не к хосту).
 4. DNS → новый IP (cutover).
 5. `make deploy` — поднимет пустые сервисы, vault-agent аутентифицируется и отрендерит секреты.
-6. Сценарий B для postgres + сценарий A для каждого critical volume.
+6. Сценарий "Postgres restore" выше — для базы. Volume'ы (minio-data, app-uploads) **дефолтным бэкапом не покрываются**; данные оттуда восстанавливаются из external source если есть (re-uploads, ETL), либо из off-site mirror'а если настроен.
 7. Verify все healthchecks + LE-сертификаты выпустились (HTTP-01).
 
 ### 3. Verify
@@ -143,4 +108,8 @@ cd /opt/<project>-infra && set -a && . .runtime/secrets/backup.env && set +a && 
 
 ## Что делать если restic-репо тоже потерян
 
-Backup-репо живёт в **проектном** Minio (тот же бакет в той же VPS, что данные). Если minio-data накроется — теряется и postgres-snapshot, и restic-repo. На проектной стороне off-site защиту шаблон НЕ обеспечивает — настрой `mc mirror backups → corp-S3` отдельным host-cron'ом если нужно. См. `docs/runbook.md` → "Полная замена VPS" для процедуры при сохранившемся репо.
+С дефолтом `RESTIC_REPOSITORY=s3:http://minio:9000/backups` backup-репо живёт в **том же VPS**, что и postgres-data. Если хост умрёт целиком — теряется и база, и restic-репо. Это **не off-site DR**, а удобная отправная точка для обкатки.
+
+Для prod — переключи `RESTIC_REPOSITORY` в `.env` на внешний S3 / корп-Minio / другой провайдер: `s3:http://<IP>:9000/backups` или `s3:https://s3.example.com/backups`. Тогда смерть проектного VPS не уносит бэкапы.
+
+См. `docs/runbook.md` → "Полная замена VPS" для процедуры при сохранившемся репо.

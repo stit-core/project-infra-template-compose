@@ -15,7 +15,7 @@
 | Telemetry | otel-agent → `otel.stit.tech` (OTLP от backend + Prom-scrape host-метрик) | `compose/otel-agent.yml` |
 | Host metrics | cadvisor + node-exporter (скрейпятся локальным otel-agent) | `compose/cadvisor.yml`, `compose/node-exporter.yml` |
 | Storage | Minio (S3 API + Console) на `s3.${DOMAIN}` / `minio.${DOMAIN}`, профиль `minio` | `compose/minio.yml` |
-| Backup | restic-cron → проектный Minio (`s3.${DOMAIN}/backups`), профиль `backup` | `compose/backup.yml` |
+| Backup | self-contained контейнер (alpine + restic + pg_dumpall + crond), пишет в `$RESTIC_REPOSITORY` (дефолт — `s3:http://minio:9000/backups`) | `compose/backup.yml`, `containers/backup/` |
 | CI | gitea-runner, профиль `ci` | `compose/runner.yml` |
 
 `backend`, `minio`, `backup`, `runner` — opt-in через `COMPOSE_PROFILES=...`. По дефолту стартует только всё, что в core (traefik/postgres/vault-agent/otel-agent/crowdsec/cadvisor/node-exporter).
@@ -32,7 +32,7 @@ make render           # рендер .tpl-конфигов через envsubst
 make validate         # compose syntax + .env.example coverage
 make ps / logs        # статус / логи
 make restart SVC=...  # рестарт одного сервиса
-make backup           # one-shot restic
+make backup           # one-shot backup внутри backup-контейнера
 make status           # сводка состояния репо для /smartdev
 make hooks-install    # поставить commit-msg hook
 ```
@@ -84,7 +84,7 @@ VAULT_TOKEN=<root> bash scripts/onboard-project.sh <project>
 
 - `compose/traefik.yml` static config — глобальные изменения требуют рестарта Traefik.
 - `compose/vault-agent.yml` / `configs/vault-agent/` — security-sensitive.
-- `scripts/backup.sh` — изменение backup-стратегии может потерять restore-points.
+- `containers/backup/` или `compose/backup.yml` — изменение backup-стратегии может потерять restore-points.
 
 ### Не делать никогда
 

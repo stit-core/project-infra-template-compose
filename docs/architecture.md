@@ -48,13 +48,12 @@ Single-VPS docker-compose стек одного проекта. Все серв�
 
 | Volume | Что | Backup |
 |---|---|---|
-| `postgres-data` | PG datadir | да — pg_dumpall + raw volume |
+| `postgres-data` | PG datadir | да — `pg_dumpall` из `containers/backup` |
 | `traefik-acme` | LE cert storage | нет (восстанавливается через ACME) |
 | `crowdsec-data` / `-config` | bouncer state, ban-lists | опционально (mostly self-rebuilds) |
 | `vault-agent-secrets` | rendered env-files | нет (рендерится из Vault) |
 | `vault-agent-bootstrap` | role-id/secret-id files | нет (из .env) |
 | `runner-data` | gitea-runner registration creds | нет (re-register если потерять) |
-| `backup-cache` | restic local cache | нет |
 | `.runtime/secrets/` (bind-mount) | env-files для `env_file:` consumer'ов | нет |
 
 `.runtime/secrets/` — bind-mount, а не named volume, потому что compose должен резолвить `env_file:` пути на хосте при создании контейнера.

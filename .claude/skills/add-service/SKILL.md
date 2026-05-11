@@ -123,8 +123,9 @@ services:
 
 ### 5. Backup coverage
 
-- Если есть named volume — попадает в `<project>_*` префиксу автоматически (`scripts/backup.sh` берёт всё).
-- Если есть Postgres — добавь в `pg_dumps=()` в `scripts/backup.sh`.
+- Backup-контейнер дефолтом бэкапит **только** postgres (через `pg_dumpall`). Если новый сервис хранит state в named volume — он **не** попадает в backup автоматически.
+- Если нужен — расширь `containers/backup/backup-now` (например `tar` volume → restic stdin).
+- Если добавляешь ещё один Postgres — обнови `backup-now` чтоб бэкапить и его (либо отдельным host'ом в restic, либо ещё один pg_dumpall с другим target'ом).
 
 ### 6. Validate + deploy
 

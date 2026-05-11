@@ -42,7 +42,7 @@ bash scripts/agent-tools/status.sh
 | Меньше 5 атомарных шагов, без неочевидностей | Иди делать. План не нужен. |
 | Меняет vault-agent config / agent.hcl.tpl / templates/ | Security-sensitive — нужен план + явный OK. |
 | Меняет traefik static (`configs/traefik/traefik.yml`) | Нужен план — рестарт Traefik = downtime. |
-| Меняет `scripts/backup.sh` | Сначала спросить — может потерять restore-points. |
+| Меняет `containers/backup/` или `compose/backup.yml` | Сначала спросить — может потерять restore-points. |
 | Затрагивает >2 сервиса или их networking | План рекомендован. Спроси: "план или сразу делать?" |
 | Disaster-recovery / restore | Активируй skill `dr-restore`. |
 | Подъём нового VPS / клиента | Активируй skill `bootstrap-vps`. |

@@ -8,7 +8,7 @@ IaC шаблон проектной инфры для stit.tech: docker-compose 
 - **Core:** Postgres 17, backend (image `git.stit.tech/<org>/backend`, opt-in), vault-agent (sidecar для secrets).
 - **Telemetry:** otel-agent — proxy на корп `otel.stit.tech` (OTLP + Bearer-token из Vault).
 - **Storage:** Minio (S3-compat), on by default — bucket `app-uploads` для backend, `backups` для restic.
-- **Backup:** restic-cron, on by default — daily в проектный Minio (`s3.${DOMAIN}/backups`). Для off-site — настрой mirror руками.
+- **Backup:** self-contained контейнер (alpine + restic + pg_dumpall + busybox crond), daily в restic-репо `$RESTIC_REPOSITORY` (дефолт — `s3:http://minio:9000/backups`, внутренний minio через docker network). Для prod / off-site менять endpoint в `.env`.
 - **CI/CD:** gitea-runner на проектном VPS, pull-based деплой через тэги.
 - **Bootstrap:** ansible (apt + swap + journald + ssh-hardening + docker).
 
@@ -101,6 +101,6 @@ curl -X POST -H "Authorization: token $GITEA_TOKEN" -H "Content-Type: applicatio
 - `otel.stit.tech` — observability ingest. Tenant routing по `service.namespace=<project>` + `Authorization: Bearer <OTEL_TOKEN>`.
 - `git.stit.tech` — registry для backend/worker/frontend images.
 
-(Backup пишет в проектный Minio, не в корп S3. Если нужен off-site — настрой `mc mirror` в корп-Minio отдельно.)
+(Backup по дефолту пишет в **проектный** Minio на том же VPS — это не off-site DR, а удобная отправная точка. Если хост умрёт целиком, бэкапы умрут вместе с базой. Для off-site менять `RESTIC_REPOSITORY` в `.env` на внешний S3 / корп-Minio.)
 
 См. также `docs/project-secrets.md` в `stit/infra` для KV-схемы и rotation flow.

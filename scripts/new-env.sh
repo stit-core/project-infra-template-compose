@@ -68,6 +68,10 @@ else
   # пустое значение → traefik не сможет parse'нуть acme.caServer.
   ACME_CASERVER="${ACME_CASERVER:-https://acme-v02.api.letsencrypt.org/directory}"
   BACKEND_TAG="${BACKEND_TAG:-latest}"
+  # Restic endpoint. Дефолт — внутренний minio через docker network,
+  # без traefik/DNS/TLS — для обкатки работает сразу. Переопределять на
+  # внешний S3 (s3:http://IP:9000/backups) или prod-домен после deploy'я.
+  RESTIC_REPOSITORY="${RESTIC_REPOSITORY:-s3:http://minio:9000/backups}"
   GITEA_RUNNER_REG_TOKEN="${GITEA_RUNNER_REG_TOKEN:-}"
 
   cat > .env <<EOF
@@ -92,6 +96,8 @@ OTEL_EXPORTER_OTLP_INSECURE=$OTEL_EXPORTER_OTLP_INSECURE
 OTEL_TENANT=$PROJECT_NAME
 
 BACKEND_TAG=$BACKEND_TAG
+
+RESTIC_REPOSITORY=$RESTIC_REPOSITORY
 
 CROWDSEC_BOUNCER_API_KEY=
 

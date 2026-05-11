@@ -79,8 +79,8 @@ docker exec backup restic check
 ```
 
 - **`Fatal: unable to open repo`**: `RESTIC_PASSWORD` / minio creds ротированы. Меняются в Vault (`kv/data/projects/<p>/{backup,minio}`), vault-agent перерендерит `.runtime/secrets/backup.env`, после — `docker compose ... up -d --no-deps --force-recreate backup` (env_file подхватывается только при CREATE, не restart).
-- **Cron не триггерит**: `crontab -l | grep backup`. Должно быть что-то типа `0 3 * * * docker exec backup /usr/local/bin/run-backup.sh >> /var/log/backup.log 2>&1`. Добавь если нет.
-- **Disk full на VPS**: `df -h`. `backup-cache` volume может разрастись — `docker exec backup restic cache --cleanup`.
+- **Cron не триггерит**: cron внутри контейнера, не на хосте. Проверь `docker exec backup pgrep crond` и `docker logs backup --tail 20`. Если crond упал — `docker compose ... restart backup`. Расписание — `containers/backup/crontab`, rebuild при изменении.
+- **Disk full на VPS**: `df -h`. Restic-cache в `/root/.cache/restic` внутри backup-контейнера может расти — `docker exec backup restic cache --cleanup`.
 
 ## Gitea-runner offline
 

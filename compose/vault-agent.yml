@@ -16,11 +16,12 @@ services:
         chmod 0400 /secrets-bootstrap/role-id /secrets-bootstrap/secret-id
         exec vault agent -config=/etc/vault-agent/agent.hcl
     environment:
-      VAULT_ROLE_ID:   ${VAULT_ROLE_ID}
-      VAULT_SECRET_ID: ${VAULT_SECRET_ID}
-      VAULT_ADDR:      ${VAULT_ADDR}
-      PROJECT_NAME:    ${PROJECT_NAME}
-      DOMAIN:          ${DOMAIN}        # для consul-template `env "DOMAIN"` в backup.env.tpl
+      VAULT_ROLE_ID:      ${VAULT_ROLE_ID}
+      VAULT_SECRET_ID:    ${VAULT_SECRET_ID}
+      VAULT_ADDR:         ${VAULT_ADDR}
+      PROJECT_NAME:       ${PROJECT_NAME}
+      DOMAIN:             ${DOMAIN}              # для consul-template `env "DOMAIN"`
+      RESTIC_REPOSITORY:  ${RESTIC_REPOSITORY}   # endpoint для restic backup, см. backup.env.tpl
     volumes:
       - ./configs/vault-agent/agent.hcl:/etc/vault-agent/agent.hcl:ro
       - ./configs/vault-agent/templates:/etc/vault-agent/templates:ro

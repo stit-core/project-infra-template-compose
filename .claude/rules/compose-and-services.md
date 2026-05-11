@@ -99,7 +99,7 @@ labels:
 
 ## Volumes → backup
 
-`scripts/backup.sh` берёт всё `<project>_*` volumes + `pg_dumpall` для postgres. Если добавляешь новый Postgres — добавь его в `pg_dumps=()` массив в `backup.sh`. Если добавляешь app, который пишет в named volume — он попадёт в backup автоматически по префиксу.
+Backup-контейнер (`containers/backup/`) бэкапит **только** postgres через `pg_dumpall`. Named volumes (`<project>_*`) **не** попадают в backup автоматически. Если хочешь покрыть volume — расширь `containers/backup/backup-now` (tar + restic --stdin). Если добавляешь второй Postgres — там же добавь ещё один `pg_dumpall` блок.
 
 ## После любой правки compose
 

@@ -27,8 +27,8 @@ bash scripts/preflight-vault.sh || true
 
 # Создаём runtime-директории до того, как docker попытается их bind-mount'ить
 # (если их нет, docker создаст их сам как root c 0755 — но мы хотим 0700
-# для secrets и контролируемое создание для backup-cache).
-mkdir -p .runtime/secrets .runtime/secrets-bootstrap .runtime/backup-cache/dumps
+# для secrets).
+mkdir -p .runtime/secrets .runtime/secrets-bootstrap
 chmod 0700 .runtime/secrets .runtime/secrets-bootstrap
 
 # Touch пустых env_file'ов: compose валидирует их EXISTENCE до старта

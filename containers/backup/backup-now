@@ -1,0 +1,37 @@
+#!/bin/sh
+# Self-contained backup: pg_dumpall → gzip → restic backup --stdin → S3.
+# Запускается supercronic'ом по расписанию (см. /etc/crontab) или вручную:
+#   docker exec backup /usr/local/bin/backup-now
+#
+# Все настройки приходят через env_file (.runtime/secrets/backup.env),
+# vault-agent рендерит из Vault. Список переменных см. backup.env.tpl.
+set -eu
+
+: "${POSTGRES_HOST:=postgres}"
+: "${POSTGRES_USER:?need POSTGRES_USER}"
+: "${POSTGRES_PASSWORD:?need POSTGRES_PASSWORD}"
+: "${RESTIC_REPOSITORY:?need RESTIC_REPOSITORY}"
+: "${RESTIC_PASSWORD:?need RESTIC_PASSWORD}"
+: "${PROJECT_NAME:=project}"
+
+export PGPASSWORD="$POSTGRES_PASSWORD"
+
+# Init restic repo на первом запуске. Идемпотентно — `restic snapshots`
+# успешен если репо валидно, иначе создаём.
+restic snapshots >/dev/null 2>&1 || restic init
+
+DUMP_NAME="pgdump-$(date -u +%Y%m%dT%H%M%SZ).sql.gz"
+
+# pg_dumpall → gzip → restic stdin. Никаких промежуточных файлов на диске,
+# никакого host-volume'а. Restic дедуплицирует stdin-snapshots между прогонами.
+pg_dumpall -h "$POSTGRES_HOST" -U "$POSTGRES_USER" \
+  | gzip \
+  | restic backup --stdin --stdin-filename "$DUMP_NAME" \
+      --tag auto --tag "$(date -u +%Y-%m-%d)" --host "$PROJECT_NAME"
+
+# Retention: 7 daily / 4 weekly / 3 monthly.
+restic forget --prune \
+  --keep-daily 7 --keep-weekly 4 --keep-monthly 3 \
+  --tag auto
+
+echo "✓ backup done: $DUMP_NAME"
