@@ -26,7 +26,7 @@ Backend / postgres / other consumer-сервисы читают **только**
 | `.env` | **нет** (gitignored, permissions.deny) | Реальные оператор-секреты на VPS |
 | `.runtime/secrets/*.env` | **нет** (gitignored, .runtime/ полностью) | Vault-agent output |
 | `.runtime/secrets-bootstrap/{role-id,secret-id}` | **нет** | Trampoline-файлы для AppRole login |
-| `configs/vault-agent/templates/*.env.tpl` | да | Vault-agent шаблоны (`{{ with secret "kv/projects/.../db" }}...{{ end }}`) |
+| `configs/vault-agent/templates/*.env.tpl` | да | Vault-agent шаблоны на consul-template (`{{ with secret (printf "kv/data/projects/%s/db" (env "PROJECT_NAME")) }}...{{ end }}`) |
 | `configs/vault-agent/agent.hcl.tpl` | да | Список template-блоков (один блок на render-target) |
 | `configs/<svc>/*.tpl` | да | Не-секретные шаблоны с bootstrap-vars (например, `${CROWDSEC_BOUNCER_API_KEY}` для traefik dynamic) |
 
@@ -46,13 +46,35 @@ Backend / postgres / other consumer-сервисы читают **только**
 - В backup НЕ попадает (rendered, восстанавливается из Vault).
 - Permissions: vault-agent пишет `0400`. Не лезь руками.
 
+### Vault KV path: CLI vs API (зачем `kv/data/...`)
+
+KV v2 даёт два разных view на один и тот же путь:
+
+| Где | Path | Пример |
+|---|---|---|
+| `vault kv put/get/patch` (CLI) | `kv/<path>` | `vault kv put kv/projects/roc/minio root_user=admin ...` |
+| HTTP API + consul-template `secret` | `kv/data/<path>` | `secret (printf "kv/data/projects/%s/minio" ...)` |
+
+CLI прячет сегмент `data/` для удобства. API/template — нет, там path буквальный.
+Если в `.tpl` написать `kv/projects/...` без `data/` — Vault вернёт 404, vault-agent залипнет в retry-loop'е.
+
+Аналогично у ответа: HTTP API оборачивает поля в `{ "data": { "data": { ... } } }`,
+поэтому в шаблонах двойной `.Data.data.<key>` (первый — envelope, второй — твои поля).
+
 ### vault-agent шаблоны
 
-`configs/vault-agent/templates/<svc>.env.tpl`:
+`configs/vault-agent/templates/<svc>.env.tpl` — это **consul-template** (внутри vault-agent),
+не shell-envsubst. Поэтому:
+
+- `(env "PROJECT_NAME")`, **не** `${PROJECT_NAME}` — переменные окружения тянутся через
+  template-function.
+- `kv/data/projects/...`, не `kv/projects/...` — см. блок выше.
+- Имена полей в `.Data.data.<key>` точно совпадают с ключами, которыми клали через
+  `vault kv put` (`user`, `password`, `database`, ...). Поправка имени в Vault → правка `.tpl`.
 
 ```
-{{ with secret "kv/projects/${PROJECT_NAME}/db" -}}
-PG_DSN=postgres://{{ .Data.data.user }}:{{ .Data.data.password }}@postgres:5432/{{ .Data.data.dbname }}
+{{ with secret (printf "kv/data/projects/%s/db" (env "PROJECT_NAME")) -}}
+PG_DSN=postgres://{{ .Data.data.user }}:{{ .Data.data.password }}@postgres:5432/{{ .Data.data.database }}
 {{- end }}
 ```
 

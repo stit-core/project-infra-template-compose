@@ -43,6 +43,19 @@ if [ -f ".env.example" ]; then
     sed -E 's/^([A-Z][A-Z0-9_]*)=$/\1=placeholder/' .env.example > "$TMP_ENV"
 fi
 
+# Compose валидирует существование env_file: путей до любого парсинга. На dev-машине
+# .runtime/secrets/*.env не существует (рендерится vault-agent'ом на VPS), поэтому
+# touch'им placeholder'ы. Это та же логика что в scripts/deploy.sh. Cleanup только
+# тех файлов которые мы сами создали — чтобы не маскировать реальное состояние на VPS.
+mkdir -p .runtime/secrets
+TOUCHED=()
+for f in backend postgres backup minio; do
+    if [ ! -e ".runtime/secrets/$f.env" ]; then
+        touch ".runtime/secrets/$f.env"
+        TOUCHED+=(".runtime/secrets/$f.env")
+    fi
+done
+
 args=(-f docker-compose.yml)
 for f in compose/*.yml; do
     args+=(-f "$f")
@@ -56,6 +69,9 @@ else
     OUT=$(docker compose "${args[@]}" config -q 2>&1)
     EXIT=$?
 fi
+
+# Cleanup placeholder'ов (только тех что сами создали).
+for f in "${TOUCHED[@]}"; do rm -f "$f"; done
 
 if [ "$EXIT" -eq 0 ]; then
     exit 0

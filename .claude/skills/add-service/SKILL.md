@@ -83,10 +83,13 @@ services:
 
 Если сервис читает секреты:
 
-1. Создать `configs/vault-agent/templates/<svc>.env.tpl`:
+1. Создать `configs/vault-agent/templates/<svc>.env.tpl`. Синтаксис — consul-template,
+   а не shell envsubst: `(env "PROJECT_NAME")`, не `${PROJECT_NAME}`. KV v2 API
+   требует префикс `kv/data/...` в path (в `vault kv put`-CLI префикс не нужен —
+   см. `.claude/rules/secrets-and-env.md`).
 
    ```
-   {{ with secret "kv/projects/${PROJECT_NAME}/<svc>" -}}
+   {{ with secret (printf "kv/data/projects/%s/<svc>" (env "PROJECT_NAME")) -}}
    KEY1={{ .Data.data.key1 }}
    KEY2={{ .Data.data.key2 }}
    {{- end }}
@@ -143,7 +146,7 @@ services:
 - [ ] Если public — `proxy` сеть + traefik labels с минимум `crowdsec@file`
 - [ ] Если читает секреты — `env_file` на `.runtime/secrets/<svc>.env` + `depends_on: vault-agent: service_healthy` + `<svc>.env.tpl` + блок в `agent.hcl.tpl`
 - [ ] Все `${VAR}` (bootstrap) есть в `.env.example`
-- [ ] Если новый Postgres — в `pg_dumps=()` в `backup.sh`
+- [ ] Если новый Postgres — добавлен ещё один `pg_dumpall` блок в `containers/backup/backup-now` (с другим `-h` host'ом и `--stdin-filename`)
 - [ ] `validate.sh` зелёный
 - [ ] (Если требует Vault KV seed) — указано оператору, что нужно сделать на корп-стороне
 

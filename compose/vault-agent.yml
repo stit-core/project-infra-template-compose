@@ -31,13 +31,22 @@ services:
       - proxy            # outbound к vault.stit.tech
       - backend-net      # consumer'ы читают rendered-файлы через bind-mount
     healthcheck:
-      # Healthy = ВСЕ rendered-секреты непустые. Просто `.ready` marker
-      # не годится: consul-template (внутри vault-agent) рендерит
-      # static-template (`.ready` с contents = "ready") раньше, чем
-      # template'ы, требующие запроса в Vault — postgres / backend
-      # стартовали с пустым env_file и падали.
-      # Если добавляешь новый render target в agent.hcl.tpl — добавь его
-      # сюда же.
+      # Healthy = blocker-секреты непустые (backend.env + postgres.env).
+      # Просто `.ready` marker не годится: consul-template рендерит
+      # static-template (`.ready` с contents="ready") раньше, чем те,
+      # что требуют запроса в Vault — postgres / backend стартовали с
+      # пустым env_file и падали.
+      #
+      # ВАЖНО — minio.env / backup.env здесь НЕ проверяем намеренно.
+      # Это позволяет стеку подняться частично, если корп ещё не засеял
+      # kv/projects/<p>/{minio,backup}: traefik / crowdsec / landing
+      # стартуют, оператор видит работающий https://${DOMAIN} (landing),
+      # а minio / backup явно красные в `make ps`. Если добавить их сюда —
+      # vault-agent застрянет в "starting" пока админ не засеет, и
+      # все consumer'ы вместе с ним.
+      #
+      # Добавляй сюда новый render target только если он blocker для
+      # core-стека (postgres / backend / traefik-зависимый).
       test: ["CMD-SHELL", "test -s /secrets/backend.env && test -s /secrets/postgres.env"]
       interval: 5s
       timeout: 2s
