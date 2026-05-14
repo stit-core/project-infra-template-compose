@@ -49,7 +49,7 @@ DEPLOY  ─── `make ship MSG="..."` локально: commit + push + (на 
 Триггер: «подними клиентский VPS», «новый сервер».
 
 1. Skill `bootstrap-vps` ведёт чек-листом.
-2. На корп-стороне (`stit/infra`) оператор уже выполнил `bash scripts/onboard-project.sh --name <p> --envs dev,prod` — получил per-env блок с `PROJECT_NAME`, `ENV`, `VAULT_ROLE_ID`, `VAULT_SECRET_ID`. Один VPS = одна среда.
+2. На корп-стороне (`stit/infra`) оператор уже выполнил `bash scripts/onboard-project.sh --name <p> --envs dev,prod --source-ip <env>=<vps-egress-ip>` — получил per-env блок с `PROJECT_NAME`, `ENV`, `VAULT_ROLE_ID`, `VAULT_SECRET_ID`. Один VPS = одна среда. `--source-ip` пишет IP проектной VPS в CrowdSec whitelist (otel-collector UA иначе банится).
 3. Локально: `ansible-playbook -i inventory.ini bootstrap.yml` → подготовка хоста.
 4. После того как playbook отдал deploy-key — оператор регистрирует его в Gitea (Settings → Deploy keys).
 5. `ansible-playbook ... --tags onboard` — клонирование репо.

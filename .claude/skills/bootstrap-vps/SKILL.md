@@ -52,9 +52,13 @@ make ship  # vault-agent перерендерит traefik.yml, traefik поды�
 
 1. **Корп-сторона онбоарднула проект и нужный ENV?** На `stit/infra`:
    ```bash
-   VAULT_TOKEN=<root> bash scripts/onboard-project.sh --name <p> --envs dev,prod
+   VAULT_TOKEN=<root> bash scripts/onboard-project.sh \
+     --name <p> --envs dev,prod \
+     --source-ip dev=<vps-egress-ip>,prod=<vps-egress-ip>
    ```
    Создаст per-env AppRole + засеит `kv/projects/<p>/<env>/{meta,otel}`. Вернёт блок `PROJECT_NAME / ENV / VAULT_ROLE_ID / VAULT_SECRET_ID` для каждого env. Без этого делать нечего.
+
+   `--source-ip` пишет egress-IP проектной VPS в корп CrowdSec whitelist. Без него otel-collector UA попадает под `crowdsecurity/http-bad-user-agent` и весь трафик с проектной VPS режется 403'ами (метрики/логи перестанут доходить до `otel.stit.tech`). Можно опустить флаг, если IP заранее неизвестен — добавляется потом `echo` в `configs/crowdsec/whitelists.yaml` + `docker compose restart crowdsec` на корп-VPS (см. `stit/infra/.claude/rules/crowdsec-whitelist.md`).
 
 2. **VPS provisioned**, у тебя есть IP и root-доступ по SSH ключу (минимум один ключ в `/root/.ssh/authorized_keys`).
 
@@ -89,7 +93,7 @@ Verify connectivity: `ansible -i ansible/inventory.ini project_vps -m ping`.
 ansible-playbook -i ansible/inventory.ini ansible/bootstrap.yml --skip-tags onboard
 ```
 
-Roles `base` → `ssh-hardening` → `docker`. По итогам — VPS с Docker engine, ssh-hardened, системные пакеты.
+Roles `base` → `ssh-hardening` → `docker` (skip'аем `stit-onboard` до регистрации deploy-key). По итогам — VPS с Docker engine, ssh-hardened, системные пакеты.
 
 ### 3. Onboard: deploy-key + clone
 

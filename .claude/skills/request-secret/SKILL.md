@@ -7,7 +7,7 @@ description: Сформировать `vault kv put` блок для корп-а
 
 Сформировать stdout-блок `vault kv put` для корп-админа: когда оператору нужен новый KV-объект в `kv/projects/<p>/<env>/<name>` (db, oidc, jwt, minio, backup, stripe-key, sendgrid-creds — что угодно).
 
-Skill не действует за оператора — он печатает готовую команду, которую оператор отдаёт корп-админу (out-of-band: Slack / тикет / PR в `stit/infra`). Засеивает корп-админ; vault-agent на VPS подхватит на следующем render-цикле.
+Skill не действует за оператора — он печатает готовую команду, которую оператор отдаёт корп-админу (out-of-band: Slack / тикет / PR в `stit/infra`). Засеивает корп-админ через `vault kv put` напрямую либо через `stit/infra/scripts/seed-project-secrets.sh` (env-like формат, идемпотентный patch). Vault-agent на проектной VPS подхватит на следующем render-цикле — на чистом дереве `make ship` без MSG триггерит force-recreate consumer'ов.
 
 ## Когда применять
 

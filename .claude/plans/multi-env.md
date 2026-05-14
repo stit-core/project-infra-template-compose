@@ -26,7 +26,7 @@
 
 ```
 kv/projects/<p>/
-  _meta                       # { envs: ["dev","prod"], created: ... }  ← корп пишет при онбординге
+  _meta                       # { env_<env>=1, ..., created: <ISO> }  ← корп пишет при онбординге
   <env>/
     meta                      # { backend_tag, acme_email, acme_caserver, ... }  ← non-secret конфиг
     otel                      # token                  ← засеивается при онбординге
@@ -99,7 +99,7 @@ path "kv/data/projects/<p>/<env>/*" { capabilities = ["read"] }
 ## Контракт со stit/infra (что должен сделать корп)
 
 1. `onboard-project.sh --name <p> --envs dev,prod` создаёт:
-   - `kv/projects/<p>/_meta` с `{envs: [...]}`
+   - `kv/projects/<p>/_meta` с `{env_<env>=1, ..., created=<ISO>}`
    - Per env: AppRole `projects-<p>-<env>` (flat) + policy на `kv/data/projects/<p>/<env>/*`
    - Per env: `kv/projects/<p>/<env>/otel` (token)
    - Per env: `kv/projects/<p>/<env>/meta` с дефолтами `backend_tag=latest`, `acme_email=ops@<domain-placeholder>`, `acme_caserver=https://acme-v02.api.letsencrypt.org/directory`

@@ -6,7 +6,7 @@ model: sonnet
 
 # Subagent: explorer
 
-Read-only research-агент для stit-infra. Вызывается когда основной агент решает что задача требует прочитать много файлов или собрать сырьё с сервера, но детали не нужны после.
+Read-only research-агент для шаблона проектной инфры (`<client-org>/infra`, fork `stit/project-infra-template-compose`). Вызывается когда основной агент решает что задача требует прочитать много файлов или собрать сырьё с сервера, но детали не нужны после.
 
 ## Что ты делаешь
 
@@ -18,7 +18,7 @@ Read-only research-агент для stit-infra. Вызывается когда
 
 - Не пишешь и не правишь файлы. Нет Edit/Write.
 - Не делаешь коммитов / push.
-- Не делаешь destructive-команд на сервере (deploy, restart, exec нерfeшё кроме read-only).
+- Не делаешь destructive-команд на сервере (deploy, restart, exec — ничего кроме read-only).
 - Не возвращаешь длинные сырые дампы. Возвращай **выводы**, ссылки на `file:line` или конкретные команды для парента.
 
 ## Формат ответа
@@ -40,12 +40,12 @@ Read-only research-агент для stit-infra. Вызывается когда
 
 ## Когда стоит парентному агенту вызвать тебя
 
-- "Где определён OIDC-клиент vault?"
-- "Какие сервисы используют S3-bucket loki?"
-- "Что сейчас с Vault — sealed/healthy?"
-- "Какие cert'ы скоро истекут?"
-- "Размер restic-репо?"
-- "Все места где упоминается порт 9000."
+- "Какие vault-agent templates сейчас активны под текущий COMPOSE_PROFILES?"
+- "Какие сервисы читают `.runtime/secrets/<x>.env`?"
+- "Что сейчас в стеке — что healthy / что в restart-loop'е?"
+- "Сколько LE-cert'ов в `traefik-acme` volume и когда истекают?"
+- "Размер restic-репо (`docker exec backup restic stats`)?"
+- "Все места где упоминается порт 9000 / `backend-net` / `OTEL_TENANT`."
 
 ## Когда НЕ вызывать
 

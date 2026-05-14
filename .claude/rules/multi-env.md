@@ -2,6 +2,8 @@
 
 Один проект может иметь несколько сред (`dev`, `prod`, опционально `staging`/etc). Каждая среда — **отдельный VPS** с одним и тем же compose-шаблоном, но со своим `ENV` в `.env` и своим набором AppRole-credentials. Шаблон агностичен к именам env'ов — это произвольные слаги.
 
+Этот документ описывает **проектную сторону** контракта: как vault-agent в этом шаблоне разрешает KV-paths, как оператор запрашивает seed'ы, как срабатывает profile-based opt-in. Общая карта контрактов tenant/AppRole/KV (что одинаково для всех 4 репо) — `stit/infra/docs/ecosystem.md`. Корп-side имплементация — `stit/infra/scripts/onboard-project.sh` + `stit/infra/scripts/seed-project-secrets.sh`.
+
 ## Принцип: max в Vault
 
 Vault — единственный источник правды по конфигу проекта. Корп-админ ротирует значения централизованно, vault-agent на VPS перерендерит. `.env` сжимается до identity + secret-zero для AppRole-login.
@@ -24,10 +26,10 @@ Vault — единственный источник правды по конфи
 
 ```
 kv/projects/<p>/
-  _meta                       # { envs: ["dev","prod"], created: <date> }
+  _meta                       # { env_<env1>=1, env_<env2>=1, ..., created=<ISO> } — corp-only
   <env>/
     meta                      # { backend_tag, acme_email, acme_caserver, ... }
-    otel                      # { token }
+    otel                      # { token, accountID }
     db                        # { user, password, database }
     oidc                      # { client_id, client_secret }
     jwt                       # { signing_key }
@@ -35,25 +37,27 @@ kv/projects/<p>/
     backup                    # { password, access_key, secret_key, repository }
 ```
 
-`_meta` нужен только корп-стороне для аудита/документации списка env'ов. Проектная сторона его не читает — AppRole не имеет прав на этот path. Невозможность залогиниться чужим ENV = валидация.
+`_meta` нужен только корп-стороне для аудита/документации (поле `env_<env>=1` на каждый онбоарденный env плюс `created`). Проектная сторона его не читает — AppRole не имеет прав на этот path. Невозможность залогиниться чужим ENV = валидация.
 
 ## Onboarding (что делает корп при создании проекта)
 
-`stit/infra` запускает `onboard-project.sh --name <p> --envs <env1>,<env2>,...`. Скрипт обязан:
+Корп-админ запускает `stit/infra/scripts/onboard-project.sh --name <p> --envs <env1>,<env2>,... [--source-ip <env>=<ip>]`. Скрипт:
 
-1. Создать `kv/projects/<p>/_meta` с `{envs: [...], created: <date>}`.
-2. Per env:
-   1. Создать AppRole `projects-<p>-<env>` (flat, дефис-разделитель — Vault не принимает слеши в `auth/approle/role/<name>`; KV-слой остаётся иерархическим) с policy:
+1. Создаёт/патчит `kv/projects/<p>/_meta` (поле `env_<env>=1` на каждый онбоарденный env плюс `created`). Идемпотентно: повторный вызов с расширенным `--envs` дописывает недостающие env'ы, существующие пропускает.
+2. Per env (если ещё не онбоарден):
+   1. AppRole `projects-<p>-<env>` (flat, дефис-разделитель — Vault не принимает слеши в `auth/approle/role/<name>`; KV-слой остаётся иерархическим) с policy `projects-<p>-<env>-read`:
       ```hcl
       path "kv/data/projects/<p>/<env>/*"     { capabilities = ["read"] }
       path "kv/metadata/projects/<p>/<env>/*" { capabilities = ["read", "list"] }
       ```
-   2. Засеять `kv/projects/<p>/<env>/otel` (OTEL-tenant token).
-   3. Засеять `kv/projects/<p>/<env>/meta` с дефолтами:
+      Token TTL 10m / max 30m, secret_id без срока.
+   2. `kv/projects/<p>/<env>/otel` — `{ token, accountID }` (accountID авто-инкрементируется корп-стороной).
+   3. `kv/projects/<p>/<env>/meta` с дефолтами:
       - `backend_tag=latest`
       - `acme_email=ops@<placeholder>`
       - `acme_caserver=https://acme-v02.api.letsencrypt.org/directory`
-3. Вывести per-env блок для оператора:
+3. Если передан `--source-ip <env>=<ip>` — egress IP проектной VPS дописывается в `configs/crowdsec/whitelists.yaml` корп-side и crowdsec рестартится. Без этого CrowdSec ловит otel-collector UA на `crowdsecurity/http-bad-user-agent` и режет метрики/логи 403'ами. См. `stit/infra/.claude/rules/crowdsec-whitelist.md`.
+4. Печатает per-env блок для оператора:
    ```
    === <p> / <env> ===
    PROJECT_NAME=<p>
@@ -62,7 +66,7 @@ kv/projects/<p>/
    VAULT_SECRET_ID=<...>
    ```
 
-Никаких db/minio/backup creds на этом шаге — оператор запросит по необходимости.
+Никаких db/minio/backup creds на этом шаге — оператор запросит по необходимости (см. ниже).
 
 ## Operator flow — bootstrap нового VPS
 
@@ -84,7 +88,7 @@ make ship                # минимальный стек: traefik + vault-agen
 
 Skill намеренно не имеет hardcoded enum'а имён — это позволяет одним механизмом seed'ить как стандартные секреты (`db`/`oidc`/`jwt`/`minio`/`backup`/`meta`/`otel`), так и project-specific (`stripe-key`, `sendgrid-creds`). Стандартные имена + их поля задокументированы в SKILL.md как cookbook.
 
-Оператор отправляет блок корп-админу (Slack/PR/ticket — внеконтрактно). Админ выполняет `vault kv put`. После seed'а:
+Оператор отправляет блок корп-админу (Slack/PR/ticket — внеконтрактно). Админ выполняет `vault kv put` (либо `stit/infra/scripts/seed-project-secrets.sh` с env-like файлом — он патчит существующие paths, не перезатирая). После seed'а:
 
 ```bash
 $EDITOR .env   # добавить нужный profile в COMPOSE_PROFILES
@@ -115,8 +119,8 @@ Default-стек поднимается **без** секретов (кроме 
 
 ## Контракт со `stit/infra` (что обязан гарантировать корп)
 
-1. `onboard-project.sh --name <p> --envs ...` — см. выше.
-2. Admin-tool для seed'а вторичных секретов — конкретное название и интерфейс на стороне `stit/infra`, главное — admin может выполнить произвольный `vault kv put kv/projects/<p>/<env>/<name> ...` за оператора по запросу. Имя — произвольный slug (стандартные: `db`, `oidc`, `jwt`, `minio`, `backup`; project-specific — что угодно).
+1. `stit/infra/scripts/onboard-project.sh --name <p> --envs ... [--source-ip <env>=<ip>]` — см. выше.
+2. `stit/infra/scripts/seed-project-secrets.sh` — admin-tool для seed/patch вторичных KV-объектов из env-like файла (формат `<group>.<field>=<value>`, в т.ч. вложенные `3rd-party.stripe.api_key=`). По запросу оператора (см. skill `/request-secret`) корп-админ либо засеивает через этот скрипт, либо выполняет напрямую `vault kv put kv/projects/<p>/<env>/<name> ...`. Имя — произвольный slug (стандартные: `db`, `oidc`, `jwt`, `minio`, `backup`; project-specific — что угодно).
 3. AppRole policy строго `kv/data/projects/<p>/<env>/*` read-only. Никаких write-прав у оператора.
 4. `_meta` объект для аудита — корп пишет, проектная сторона не трогает.
 5. Любая ротация — `vault kv patch`, без участия проектной стороны (кроме force-recreate на следующем deploy).

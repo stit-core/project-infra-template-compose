@@ -24,12 +24,7 @@ Consumer-сервисы (postgres, backend, minio, backup, otel-agent) чита�
 
 ## Multi-env
 
-Один проект имеет N сред (`dev`, `prod`, ...) — N **отдельных VPS**. Каждый VPS:
-- свой `.env` с `ENV=<env>` и AppRole-credentials для конкретного `(project, env)`.
-- читает свой scope в Vault: `kv/projects/<p>/<env>/*`.
-- свой restic-репо (endpoint в `kv/.../backup.repository`).
-
-AppRole policy строго ограничен `kv/data/projects/<p>/<env>/*` read-only. Невозможность залогиниться с чужим ENV = валидация. Подробнее — `.claude/rules/multi-env.md`.
+Один проект = N сред = N **отдельных VPS**, каждый со своим `ENV` в `.env` и своим AppRole для пары `(project, env)`. Контракт KV layout / AppRole / onboarding flow — `.claude/rules/multi-env.md` (плюс `stit/infra/docs/ecosystem.md` для общей карты). Этот документ — про **механику секретов на проектной стороне**: что в `.env` vs Vault, vault-agent template syntax, ротация через force-recreate.
 
 ## Что куда
 
