@@ -21,8 +21,8 @@ ssh root@stit-corp 'cd /opt/stit-infra && \
 ```
 
 Создаёт per-env:
-- AppRole `projects/acme/<env>` + policy на `kv/data/projects/acme/<env>/*` read-only.
-- `kv/projects/acme/<env>/otel` — bearer token для отправки телеметрии в `otel.stit.tech`.
+- AppRole `projects-acme-<env>` (flat — Vault не принимает слеши в `auth/approle/role/<name>`) + policy `projects-acme-<env>-read` на `kv/data/projects/acme/<env>/*` (read) и `kv/metadata/projects/acme/<env>/*` (read,list).
+- `kv/projects/acme/<env>/otel` — bearer token + accountID для отправки телеметрии в `otel.stit.tech`.
 - `kv/projects/acme/<env>/meta` — default'ы (`backend_tag=latest`, `acme_email=ops@<domain>`, `acme_caserver=<prod LE>`).
 
 Возвращает по одному блоку на env:

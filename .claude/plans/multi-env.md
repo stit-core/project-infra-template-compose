@@ -37,7 +37,7 @@ kv/projects/<p>/
     backup                    # restic password + AWS creds + repository
 ```
 
-AppRole `projects/<p>/<env>` имеет policy:
+AppRole `projects-<p>-<env>` (flat — Vault не принимает слеши в `auth/approle/role/<name>`) имеет policy:
 ```hcl
 path "kv/data/projects/<p>/<env>/*" { capabilities = ["read"] }
 ```
@@ -100,7 +100,7 @@ path "kv/data/projects/<p>/<env>/*" { capabilities = ["read"] }
 
 1. `onboard-project.sh --name <p> --envs dev,prod` создаёт:
    - `kv/projects/<p>/_meta` с `{envs: [...]}`
-   - Per env: AppRole `projects/<p>/<env>` + policy на `kv/data/projects/<p>/<env>/*`
+   - Per env: AppRole `projects-<p>-<env>` (flat) + policy на `kv/data/projects/<p>/<env>/*`
    - Per env: `kv/projects/<p>/<env>/otel` (token)
    - Per env: `kv/projects/<p>/<env>/meta` с дефолтами `backend_tag=latest`, `acme_email=ops@<domain-placeholder>`, `acme_caserver=https://acme-v02.api.letsencrypt.org/directory`
    - Возвращает оператору per-env блок: `PROJECT_NAME / ENV / VAULT_ROLE_ID / VAULT_SECRET_ID`.

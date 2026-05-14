@@ -4,6 +4,14 @@
 
 Этот файл — постоянный гайд для агента. Контекстные правила в `.claude/rules/` (если появляются), процедуры в `.claude/skills/`. Для обзорного human-описания — `README.md`.
 
+## Где это в экосистеме
+
+**Роль:** шаблон проектной VPS. Один форк (`<client-org>/infra`) — один проект, один VPS на env (dev/staging/prod). Хост: backend + postgres + minio + vault-agent + otel-agent + traefik + crowdsec + backup.
+**Зависит от:** `stit/infra` — выдаёт AppRole `projects-<p>-<env>` + KV `kv/projects/<p>/<env>/*` (через `scripts/onboard-project.sh`), принимает OTLP на `otel.stit.tech`, хостит registry `git.stit.tech`.
+**Используется:** `<client-org>/backend` (форк `stit/go-backend-template`) — runtime для его образа; через `vault kv patch kv/projects/<p>/<env>/meta backend_tag=<tag>` + `make ship` происходит deploy.
+
+Карта 4 репо и канонические контракты — `stit/infra/docs/ecosystem.md`. Локально: `.claude/rules/multi-env.md` (KV-layout, AppRole, lazy-seed) и `docs/architecture.md`.
+
 ## 1. Стек
 
 | Слой | Что | Где |
@@ -45,8 +53,8 @@ VAULT_TOKEN=<root> bash scripts/onboard-project.sh --name <p> --envs dev,prod
 ```
 
 Per env создаёт:
-- AppRole `projects/<p>/<env>` с policy read-only на `kv/data/projects/<p>/<env>/*`.
-- `kv/projects/<p>/<env>/otel` (OTEL token).
+- AppRole `projects-<p>-<env>` (flat — Vault не принимает слеши в `auth/approle/role/<name>`) + policy `projects-<p>-<env>-read` read-only на `kv/data/projects/<p>/<env>/*` и `kv/metadata/projects/<p>/<env>/*`.
+- `kv/projects/<p>/<env>/otel` (OTEL token + accountID).
 - `kv/projects/<p>/<env>/meta` (`backend_tag`, `acme_email`, `acme_caserver` — дефолты, ротируются `vault kv patch`).
 - Возвращает per-env блок: `PROJECT_NAME`, `ENV`, `VAULT_ROLE_ID`, `VAULT_SECRET_ID` для проектного `.env`.
 

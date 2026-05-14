@@ -2,6 +2,8 @@
 
 IaC шаблон проектной инфры для stit.tech: docker-compose стек одного VPS на проект. Копируется в новый репо `<client-org>/infra`, дорабатывается под клиентский домен и стек, разворачивается за день.
 
+Часть экосистемы из 4 репо: [`stit/infra`](https://git.stit.tech/stit/infra) (corp control plane) ──► **этот** (форкается в `<org>/infra`) ──► [`stit/go-backend-template`](https://git.stit.tech/stit/go-backend-template) (форкается в `<org>/backend`) → [`stit/golibinfra`](https://git.stit.tech/stit/golibinfra). Канон — [`stit/infra/docs/ecosystem.md`](https://git.stit.tech/stit/infra/src/branch/main/docs/ecosystem.md).
+
 ## Что внутри
 
 - **Edge:** Traefik v3 + CrowdSec (HTTP-01 LE, WAF, IP-bans).
