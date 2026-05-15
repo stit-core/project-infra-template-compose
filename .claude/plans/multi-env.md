@@ -50,12 +50,12 @@ path "kv/data/projects/<p>/<env>/*" { capabilities = ["read"] }
 
 - `.claude/plans/multi-env.md` ← здесь
 - `.claude/plans/roadmap.md` ← добавить в Активные
-- `.claude/rules/multi-env.md` ← контракт для проектной стороны И stit/infra
+- `.claude/rules/multi-env.md` ← контракт для проектной стороны И stit-infra/infra
   - KV layout
   - Onboard flow (`onboard-project --name <p> --envs dev,prod`)
   - Request-secret flow (оператор → корп-админ)
   - Profile-based opt-in flow
-  - Что обязан сделать `stit/infra` (контракт)
+  - Что обязан сделать `stit-infra/infra` (контракт)
 
 ### Phase 1: ENV dimension
 
@@ -67,7 +67,7 @@ path "kv/data/projects/<p>/<env>/*" { capabilities = ["read"] }
 - Добавить рендер `kv/projects/<p>/<env>/meta` в новый `.runtime/env/compose.env` (через vault-agent template), переключить compose на `--env-file .env --env-file .runtime/env/compose.env` (через Makefile).
 - `BACKEND_TAG`, `ACME_EMAIL`, `ACME_CASERVER` — переезжают в `meta` KV-объект.
 
-Блокер: требует синхронной правки `stit/infra/onboard-project.sh` (новые KV paths + meta-объект). Не катить пока корп-сторона не подравняется.
+Блокер: требует синхронной правки `stit-infra/infra/onboard-project.sh` (новые KV paths + meta-объект). Не катить пока корп-сторона не подравняется.
 
 ### Phase 2: Lazy stack (profiles + blocks)
 
@@ -96,7 +96,7 @@ path "kv/data/projects/<p>/<env>/*" { capabilities = ["read"] }
 - `.env.example` комменты.
 - `README.md` — короткое обновление флоу (если есть).
 
-## Контракт со stit/infra (что должен сделать корп)
+## Контракт со stit-infra/infra (что должен сделать корп)
 
 1. `onboard-project.sh --name <p> --envs dev,prod` создаёт:
    - `kv/projects/<p>/_meta` с `{env_<env>=1, ..., created=<ISO>}`

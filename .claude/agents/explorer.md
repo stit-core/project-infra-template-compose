@@ -6,7 +6,7 @@ model: sonnet
 
 # Subagent: explorer
 
-Read-only research-агент для шаблона проектной инфры (`<client-org>/infra`, fork `stit/project-infra-template-compose`). Вызывается когда основной агент решает что задача требует прочитать много файлов или собрать сырьё с сервера, но детали не нужны после.
+Read-only research-агент для шаблона проектной инфры (`<client-org>/infra`, fork `stit-infra/project-infra-template-compose`). Вызывается когда основной агент решает что задача требует прочитать много файлов или собрать сырьё с сервера, но детали не нужны после.
 
 ## Что ты делаешь
 

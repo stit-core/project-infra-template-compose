@@ -68,7 +68,7 @@ Single-VPS docker-compose стек одного проекта. Все серв�
 
 Backup может писать в любой restic-совместимый endpoint (`RESTIC_REPOSITORY` в Vault `kv/projects/<p>/<env>/backup.repository`). Local-default убран — на single-VPS он не даёт DR, host failure уносит и репо. Рекомендация: external managed S3 / corp Minio / bare-IP S3 на другом хосте. App-uploads bucket (`minio-data`) — **не** покрыт backup'ом; если нужен — настрой `mc mirror` job в external storage отдельно.
 
-Per-env AppRole + KV-scope (`kv/data/projects/<p>/<env>/*`) выдаёт `stit/infra/scripts/onboard-project.sh --name <p> --envs dev,prod [--source-ip <env>=<ip>]`. Один VPS = одна среда. Подробно — `.claude/rules/multi-env.md`. Общая карта контрактов между 4 репо — `stit/infra/docs/ecosystem.md`.
+Per-env AppRole + KV-scope (`kv/data/projects/<p>/<env>/*`) выдаёт `stit-infra/infra/scripts/onboard-project.sh --name <p> --envs dev,prod [--source-ip <env>=<ip>]`. Один VPS = одна среда. Подробно — `.claude/rules/multi-env.md`. Общая карта контрактов между 4 репо — `stit-infra/infra/docs/ecosystem.md`.
 
 ## Поток секретов
 

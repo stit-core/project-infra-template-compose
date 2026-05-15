@@ -45,12 +45,12 @@ make ship  # vault-agent перерендерит traefik.yml, traefik поды�
 ## Когда НЕ применять
 
 - Re-deploy на уже работающий хост — это `make deploy` / `make ship`.
-- Onboarding пользователя в Gitea — корп-задача (skill `onboard-user` в `stit/infra`).
+- Onboarding пользователя в Gitea — корп-задача (skill `onboard-user` в `stit-infra/infra`).
 - Bug на проде — диагностика, не bootstrap.
 
 ## Предусловия (СПРОСИ юзера)
 
-1. **Корп-сторона онбоарднула проект и нужный ENV?** На `stit/infra`:
+1. **Корп-сторона онбоарднула проект и нужный ENV?** На `stit-infra/infra`:
    ```bash
    VAULT_TOKEN=<root> bash scripts/onboard-project.sh \
      --name <p> --envs dev,prod \
@@ -58,7 +58,7 @@ make ship  # vault-agent перерендерит traefik.yml, traefik поды�
    ```
    Создаст per-env AppRole + засеит `kv/projects/<p>/<env>/{meta,otel}`. Вернёт блок `PROJECT_NAME / ENV / VAULT_ROLE_ID / VAULT_SECRET_ID` для каждого env. Без этого делать нечего.
 
-   `--source-ip` пишет egress-IP проектной VPS в корп CrowdSec whitelist. Без него otel-collector UA попадает под `crowdsecurity/http-bad-user-agent` и весь трафик с проектной VPS режется 403'ами (метрики/логи перестанут доходить до `otel.stit.tech`). Можно опустить флаг, если IP заранее неизвестен — добавляется потом `echo` в `configs/crowdsec/whitelists.yaml` + `docker compose restart crowdsec` на корп-VPS (см. `stit/infra/.claude/rules/crowdsec-whitelist.md`).
+   `--source-ip` пишет egress-IP проектной VPS в корп CrowdSec whitelist. Без него otel-collector UA попадает под `crowdsecurity/http-bad-user-agent` и весь трафик с проектной VPS режется 403'ами (метрики/логи перестанут доходить до `otel.stit.tech`). Можно опустить флаг, если IP заранее неизвестен — добавляется потом `echo` в `configs/crowdsec/whitelists.yaml` + `docker compose restart crowdsec` на корп-VPS (см. `stit-infra/infra/.claude/rules/crowdsec-whitelist.md`).
 
 2. **VPS provisioned**, у тебя есть IP и root-доступ по SSH ключу (минимум один ключ в `/root/.ssh/authorized_keys`).
 

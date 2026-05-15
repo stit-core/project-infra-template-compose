@@ -2,7 +2,7 @@
 
 IaC шаблон проектной инфры для stit.tech: docker-compose стек одного VPS на проект. Копируется в новый репо `<client-org>/infra`, дорабатывается под клиентский домен и стек, разворачивается за день.
 
-Часть экосистемы из 4 репо: [`stit/infra`](https://git.stit.tech/stit/infra) (corp control plane) ──► **этот** (форкается в `<org>/infra`) ──► [`stit/go-backend-template`](https://git.stit.tech/stit/go-backend-template) (форкается в `<org>/backend`) → [`stit/golibinfra`](https://git.stit.tech/stit/golibinfra). Канон — [`stit/infra/docs/ecosystem.md`](https://git.stit.tech/stit/infra/src/branch/main/docs/ecosystem.md).
+Часть экосистемы из 4 репо: [`stit-infra/infra`](https://git.stit.tech/stit-infra/infra) (corp control plane) ──► **этот** (форкается в `<org>/infra`) ──► [`stit-infra/go-backend-template`](https://git.stit.tech/stit-infra/go-backend-template) (форкается в `<org>/backend`) → [`stit-infra/golibinfra`](https://git.stit.tech/stit-infra/golibinfra). Канон — [`stit-infra/infra/docs/ecosystem.md`](https://git.stit.tech/stit-infra/infra/src/branch/main/docs/ecosystem.md).
 
 ## Что внутри
 
@@ -19,7 +19,7 @@ IaC шаблон проектной инфры для stit.tech: docker-compose 
 
 В Gitea этот репо помечен `template: true`. Старт нового проекта:
 
-1. Открыть https://git.stit.tech/stit/project-infra-template-compose → **Use this template** → создать `<client-org>/infra`.
+1. Открыть https://git.stit.tech/stit-infra/project-infra-template-compose → **Use this template** → создать `<client-org>/infra`.
 2. Дальше идти по Day-0 quickstart ниже — шаг 2 уже выполнен (репо создан, история чистая).
 
 Альтернатива через Gitea API:
@@ -32,9 +32,9 @@ curl -X POST -H "Authorization: token $GITEA_TOKEN" -H "Content-Type: applicatio
 
 ## Day-0 quickstart
 
-Один проект = N сред (dev/prod/...) = N VPS, по одному на ENV. См. `.claude/rules/multi-env.md` для контракта со `stit/infra`.
+Один проект = N сред (dev/prod/...) = N VPS, по одному на ENV. См. `.claude/rules/multi-env.md` для контракта со `stit-infra/infra`.
 
-1. На корп-стороне (`stit/infra`):
+1. На корп-стороне (`stit-infra/infra`):
    ```bash
    VAULT_TOKEN=<root> bash scripts/onboard-project.sh --name acme --envs dev,prod
    ```

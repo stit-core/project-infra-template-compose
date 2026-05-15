@@ -40,8 +40,8 @@ VAULT_SECRET_ID=<id>
 
 Через UI (`https://git.stit.tech`) или API:
 
-- `<org>/infra` — копия `stit/project-infra-template-compose`.
-- `<org>/backend` — копия `stit/go-backend-template` (когда backend нужен).
+- `<org>/infra` — копия `stit-infra/project-infra-template-compose`.
+- `<org>/backend` — копия `stit-infra/go-backend-template` (когда backend нужен).
 - (опц) `<org>/frontend` / `<org>/worker`.
 
 ## Day-1: Проектная сторона (каждый VPS отдельно)

@@ -24,8 +24,8 @@ Production env (всё что попадает в проектный VPS `.env` 
 
 ## Consequences
 
-- `stit/go-backend-template/.env.example` урезан до local-dev minimum.
-- Production-контракт документирован в `stit/infra/docs/project-secrets.md` (KV-layout + lazy-seed + AppRole), `stit/infra/docs/ecosystem.md` (карта 4 репо), и в этом шаблоне (`AGENTS.md` §3 + `.env.example` + `.claude/rules/multi-env.md`).
+- `stit-infra/go-backend-template/.env.example` урезан до local-dev minimum.
+- Production-контракт документирован в `stit-infra/infra/docs/project-secrets.md` (KV-layout + lazy-seed + AppRole), `stit-infra/infra/docs/ecosystem.md` (карта 4 репо), и в этом шаблоне (`AGENTS.md` §3 + `.env.example` + `.claude/rules/multi-env.md`).
 - Если проекту нужны новые production env — правишь шаблон/копию `<project>/infra`, не сервис-репо.
 
 ## Когда пересмотреть

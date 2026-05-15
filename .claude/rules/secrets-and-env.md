@@ -24,7 +24,7 @@ Consumer-сервисы (postgres, backend, minio, backup, otel-agent) чита�
 
 ## Multi-env
 
-Один проект = N сред = N **отдельных VPS**, каждый со своим `ENV` в `.env` и своим AppRole для пары `(project, env)`. Контракт KV layout / AppRole / onboarding flow — `.claude/rules/multi-env.md` (плюс `stit/infra/docs/ecosystem.md` для общей карты). Этот документ — про **механику секретов на проектной стороне**: что в `.env` vs Vault, vault-agent template syntax, ротация через force-recreate.
+Один проект = N сред = N **отдельных VPS**, каждый со своим `ENV` в `.env` и своим AppRole для пары `(project, env)`. Контракт KV layout / AppRole / onboarding flow — `.claude/rules/multi-env.md` (плюс `stit-infra/infra/docs/ecosystem.md` для общей карты). Этот документ — про **механику секретов на проектной стороне**: что в `.env` vs Vault, vault-agent template syntax, ротация через force-recreate.
 
 ## Что куда
 
@@ -100,7 +100,7 @@ docker compose <args> up -d --no-deps --force-recreate <consumer>
 Источник истины — Vault на корп-стороне:
 
 ```bash
-# на корп-VPS (stit/infra)
+# на корп-VPS (stit-infra/infra)
 vault kv patch kv/projects/<p>/<env>/db password=<new>
 ```
 

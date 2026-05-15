@@ -7,10 +7,10 @@
 ## Где это в экосистеме
 
 **Роль:** шаблон проектной VPS. Один форк (`<client-org>/infra`) — один проект, один VPS на env (dev/staging/prod). Хост: backend + postgres + minio + vault-agent + otel-agent + traefik + crowdsec + backup.
-**Зависит от:** `stit/infra` — выдаёт AppRole `projects-<p>-<env>` + KV `kv/projects/<p>/<env>/*` (через `scripts/onboard-project.sh`), принимает OTLP на `otel.stit.tech`, хостит registry `git.stit.tech`.
-**Используется:** `<client-org>/backend` (форк `stit/go-backend-template`) — runtime для его образа; через `vault kv patch kv/projects/<p>/<env>/meta backend_tag=<tag>` + `make ship` происходит deploy.
+**Зависит от:** `stit-infra/infra` — выдаёт AppRole `projects-<p>-<env>` + KV `kv/projects/<p>/<env>/*` (через `scripts/onboard-project.sh`), принимает OTLP на `otel.stit.tech`, хостит registry `git.stit.tech`.
+**Используется:** `<client-org>/backend` (форк `stit-infra/go-backend-template`) — runtime для его образа; через `vault kv patch kv/projects/<p>/<env>/meta backend_tag=<tag>` + `make ship` происходит deploy.
 
-Карта 4 репо и канонические контракты — `stit/infra/docs/ecosystem.md`. Локально: `.claude/rules/multi-env.md` (KV-layout, AppRole, lazy-seed) и `docs/architecture.md`.
+Карта 4 репо и канонические контракты — `stit-infra/infra/docs/ecosystem.md`. Локально: `.claude/rules/multi-env.md` (KV-layout, AppRole, lazy-seed) и `docs/architecture.md`.
 
 ## 1. Стек
 
@@ -48,7 +48,7 @@ make hooks-install    # поставить commit-msg hook
 Этот шаблон требует, чтобы проект был онбоарден на корп-стороне для каждой среды (`dev`, `prod`, ...). Один VPS = одна среда.
 
 ```bash
-# stit/infra (корп-VPS), оператор с root-токеном Vault.
+# stit-infra/infra (корп-VPS), оператор с root-токеном Vault.
 VAULT_TOKEN=<root> bash scripts/onboard-project.sh --name <p> --envs dev,prod
 ```
 
