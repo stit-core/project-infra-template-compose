@@ -60,7 +60,7 @@ Read-only research-агент для шаблона проектной инфр�
   - `scripts/agent-tools/search.sh PATTERN [path]` — список файлов с матчами
   - `scripts/agent-tools/status.sh` — сводка состояния репо+сервера
   - `scripts/agent-tools/ssh.sh status` / `... logs <svc>` — readonly-команды на сервере
-  - `git log`, `git show`, `git blame`, `git diff` — но **избегай** длинной истории без явной нужды (см. memory feedback)
+  - `git log`, `git show`, `git blame`, `git diff` — но **избегай** длинной истории без явной нужды (раздувает контекст; бери минимум для ответа)
   - `docker compose config` (локально) — валидация
   - `ssh <project-host> 'docker ps|logs|exec <readonly>'` — состояние сервера
 

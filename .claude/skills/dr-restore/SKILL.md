@@ -31,7 +31,7 @@ Snapshot содержит **один файл** — `/pgdump-<UTC>.sql.gz`, не
 
 **Volumes (minio-data, app-uploads etc.) НЕ бэкапятся** по дефолту — только postgres. Если нужны volume-снапшоты, расширь `containers/backup/backup-now`.
 
-Restic-репо: значение `RESTIC_REPOSITORY` приходит из Vault `kv/projects/<p>/<env>/backup.repository` (НЕ из `.env`) — vault-agent рендерит его в `.runtime/secrets/backup.env` рядом с `RESTIC_PASSWORD` и `AWS_*`. **Local default убран намеренно**: на single-VPS host failure уносит и postgres-data, и репо. Корп-сторона при seed'е `backup` KV-объекта обязана задать external endpoint (managed S3 / bare-IP S3 / corp Minio). Дисциплина — на стороне корп-админа при `vault kv put kv/projects/<p>/<env>/backup repository=...`.
+Restic-репо: значение `RESTIC_REPOSITORY` приходит из Vault `kv/projects/<p>/<env>/backup.repository` (НЕ из `.env`) — vault-agent рендерит его в `.runtime/secrets/backup.env` рядом с `RESTIC_PASSWORD` и `AWS_*`. **Local-default нет by design**: на single-VPS host failure уносит и postgres-data, и репо. Корп-сторона при seed'е `backup` KV-объекта обязана задать external endpoint (managed S3 / bare-IP S3 / corp Minio). Дисциплина — на стороне корп-админа при `vault kv put kv/projects/<p>/<env>/backup repository=...`.
 
 Retention в `containers/backup/backup-now`: 7 daily / 4 weekly / 3 monthly.
 
@@ -116,7 +116,7 @@ make restore-pg SNAPSHOT=latest                  # либо SNAPSHOT=<id>
 
 ## Что делать если restic-репо тоже потерян
 
-Local-default `s3:http://minio:9000/backups` убран намеренно — на single-VPS он не даёт DR. Если в `kv/.../backup.repository` всё-таки local minio и хост умер — снапшоты потеряны вместе с базой. Recovery невозможен.
+Local-default `s3:http://minio:9000/backups` отсутствует by design — на single-VPS он не даёт DR. Если в `kv/.../backup.repository` всё-таки local minio и хост умер — снапшоты потеряны вместе с базой. Recovery невозможен.
 
 Для prod — `repository` в `kv/projects/<p>/<env>/backup` должен указывать на external endpoint. От local minio защищает только дисциплина корп-админа при seed'е этого KV-объекта.
 
