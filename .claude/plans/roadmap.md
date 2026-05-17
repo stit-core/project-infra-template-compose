@@ -2,19 +2,18 @@
 
 Индекс активных и плановых задач шаблона. Per-task детальный план — `<slug>.md` в этой же директории.
 
+По завершении задачи её план удаляется сразу, история остаётся в `git log`. Roadmap не держит секцию завершённого. Незакрытый follow-up из закрытой задачи переезжает строкой в `## Активные`, а не остаётся хвостом в удаляемом плане.
+
 ## Активные
 
-(none)
+- [planning] `DOMAIN` в Vault — перенести из `.env` в `kv/projects/<p>/<env>/meta`; требует рендера `compose.env` через vault-agent и перестройки порядка в `scripts/deploy.sh`.
+- [planning] `CROWDSEC_BOUNCER_API_KEY` auto-register с post-seed в Vault — требует write-token у оператора.
+- [planning] Webhook от vault-agent при KV-change → авто-deploy без ручного `make ship` (корп-side).
 
 ## Планируется
 
 (none)
 
-## Выполненные (последние)
-
-- [done] [multi-env](multi-env.md) — multi-environment модель (dev/prod через VPS-per-env), max в Vault (kv/projects/<p>/<env>/*), profile-based lazy stack, request-secret флоу.
-- [done] initial scaffold — P-1 базового скелета (Makefile, .env.example, AGENTS.md, README.md, commit-msg hook, agent-tools status/validate, .claude/settings.json).
-
 ---
 
-**Формат:** `- [<status>] <slug> — <одна строка>`. Status: `planning`, `in-progress`, `blocked`, `done`.
+**Формат:** `- [<status>] <slug> — <одна строка>`. Status: `planning`, `in-progress`, `blocked`.
