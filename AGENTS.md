@@ -12,6 +12,8 @@
 
 Карта 4 репо и канонические контракты — `stit-infra/infra/docs/ecosystem.md`. Локально: `.claude/rules/multi-env.md` (KV-layout, AppRole, lazy-seed) и `docs/architecture.md`.
 
+**Принцип:** forward-only документация. Любой текст (docs, skills, rules, plans, этот файл, README) описывает **только текущее состояние/намерение** — без «было X, стало Y, потому что». История живёт в `git log`. Единственное исключение — `docs/adrs/**` (ADR by design фиксируют датированное обоснование решения). Детали и примеры — `.claude/rules/forward-only.md`.
+
 ## 1. Стек
 
 | Слой | Что | Где |
