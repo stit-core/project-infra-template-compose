@@ -148,7 +148,7 @@ explorer/reviewer subagents; `ship.sh` как единый путь). Отста
 
 ### Phase 3 — Скилы plan / triage / corp-handoff
 
-- [ ] **A11:** Скил `plan` (тонкий, infra-flavored)
+- [x] **A11:** Скил `plan` (тонкий, infra-flavored)
   - Что делаем: `.claude/skills/plan/SKILL.md` по образцу backend, но блоки вопросов
     переписаны под инфру (Скоуп / Env+секреты / Топология сервисов+networking /
     Vault-KV-зависимости / Rollout+downtime / Откат). Lifecycle PLANNING→IN-PROGRESS→
@@ -157,6 +157,7 @@ explorer/reviewer subagents; `ship.sh` как единый путь). Отста
   - Файлы: `.claude/skills/plan/SKILL.md`
   - Verify: skill ссылается на `make plan-check` и `roadmap.md`; нет backend-специфики (sqlc/depguard)
   - Зависит от: —
+  - **Done:** `.claude/skills/plan/SKILL.md` — lifecycle PLANNING→IN-PROGRESS→CHECKPOINT→DONE, infra-вопросы (Скоуп/Env+секреты/Топология/Vault-KV/Rollout/Откат), шаблон с `## Corp impact`, roadmap-формат репо (`## Активные`, `[planning]`). Багфикс→triage. backend-специфики 0. В реестре скилов.
 
 - [ ] **A12:** `make plan-check` — валидатор структуры планов
   - Что делаем: `scripts/tools/validate-plan.sh` — каждый атом имеет `Verify:`
