@@ -57,7 +57,7 @@ explorer/reviewer subagents; `ship.sh` как единый путь). Отста
   - Зависит от: —
   - **Done:** `git mv` (R/RM — история сохранена) + sed по 11 файлам; ссылок `agent-tools` в коде/конфиге нет (остаток только в self-описании плана); `make validate` → `OK` exit 0; `settings.json` валиден.
 
-- [ ] **A2:** Makefile — grouped `##@` help + vocabulary-шапка + `.PHONY` sync
+- [x] **A2:** Makefile — grouped `##@` help + vocabulary-шапка + `.PHONY` sync
   - Что делаем: grouped `##@`-awk help (как backend Makefile:12-15); шапка-комментарий
     с правилом `make <verb>` + passthrough-конвенцией (A=/SVC=/SNAPSHOT=/Q=,P=/ENV=);
     rename `hooks-install`→`setup`; стаб-таргеты `doctor`/`check`/`search`/`new-env`/
@@ -66,6 +66,7 @@ explorer/reviewer subagents; `ship.sh` как единый путь). Отста
   - Файлы: `Makefile`
   - Verify: `make help` → секции с заголовками; `make` без аргумента не падает
   - Зависит от: A1
+  - **Done:** `make help` рендерит 7 групп (LOOP/SHIP/OPS/INTEL/PROVISION/SETUP/META); `make`→help exit 0; стабы doctor/check/search/new-env/plan-check печатают «not yet implemented (AN)»; `hooks-install`→`setup`. NB: `make hooks-install` в доках — чинит A9.
 
 - [ ] **A3:** `make doctor` — live fail-fast preflight
   - Что делаем: `scripts/tools/doctor.sh`: `docker compose config -q`, vault-agent

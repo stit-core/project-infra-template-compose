@@ -1,7 +1,12 @@
-.PHONY: help deploy render validate ps logs restart hooks-install status backup ship
+.PHONY: help validate doctor check ship deploy render ps logs restart backup restore-pg status search new-env setup plan-check
 
 SHELL := /usr/bin/env bash
 
+# Один словарь для агента: make <verb>. Concise-by-default; FORMAT=detailed —
+# полный разбор (validate). Passthrough-аргументы: SVC= (restart/logs) /
+# SNAPSHOT= (restore-pg) / Q=,P= (search) / ENV= (new-env) / A= (status) /
+# MSG= (ship).
+#
 # compose интерполирует ${...} из --env-file. compose.env рендерится
 # vault-agent'ом из kv/projects/<p>/<env>/meta (BACKEND_TAG etc.). Поздние
 # --env-file перекрывают ранние; .env остаётся источником для identity и
@@ -9,26 +14,37 @@ SHELL := /usr/bin/env bash
 COMPOSE_ARGS := --env-file .env --env-file .runtime/env/compose.env \
                 -f docker-compose.yml $(addprefix -f ,$(wildcard compose/*.yml))
 
-help:
-	@awk 'BEGIN{FS=":.*##"; printf "Targets:\n"} /^[a-zA-Z_-]+:.*?##/ {printf "  %-15s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+help: ## сгруппированный список команд
+	@awk 'BEGIN {FS = ":.*## "} \
+		/^##@ / {printf "\n\033[1m%s\033[0m\n", substr($$0, 5); next} \
+		/^[a-zA-Z0-9_-]+:.*## / {printf "  \033[36m%-13s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+
+##@ LOOP
+validate: ## Compose syntax + yamllint + .tpl + .env coverage (FORMAT=detailed)
+	@bash scripts/tools/validate.sh $(if $(filter detailed,$(FORMAT)),--format=detailed)
+
+doctor: ## Live fail-fast preflight: compose/vault-agent/dns/vault/env (тело — A3)
+	@test -x scripts/tools/doctor.sh && bash scripts/tools/doctor.sh $(A) || echo "doctor: not yet implemented (A3)"
+
+check: ## Каноничный pre-ship gate: validate + doctor (тело — A4)
+	@echo "check: not yet implemented (A4)"
+
+##@ SHIP
+ship: ## commit + push + (если main) ssh-deploy. usage: make ship MSG="feat(foo): bar"
+	bash scripts/ship.sh "$(MSG)"
 
 deploy: ## на VPS: git pull + render + compose up --wait
 	bash scripts/deploy.sh
 
-ship: ## commit + push + (если main) ssh-deploy. usage: make ship MSG="feat(foo): bar"
-	bash scripts/ship.sh "$(MSG)"
-
-render: ## envsubst для *.tpl
+render: ## envsubst для *.tpl + сборка agent.hcl из parts
 	bash scripts/render-configs.sh
 
-validate: ## compose syntax + .env.example coverage
-	bash scripts/tools/validate.sh
-
+##@ OPS
 ps: ## docker compose ps
 	docker compose $(COMPOSE_ARGS) ps
 
-logs: ## docker compose logs -f --tail=100
-	docker compose $(COMPOSE_ARGS) logs -f --tail=100
+logs: ## docker compose logs -f --tail=100 (SVC= один сервис)
+	docker compose $(COMPOSE_ARGS) logs -f --tail=100 $(SVC)
 
 restart: ## рестарт одного сервиса: make restart SVC=backend
 	@if [ -z "$(SVC)" ]; then echo "usage: make restart SVC=<name>"; exit 2; fi
@@ -41,8 +57,21 @@ restore-pg: ## restore postgres из restic-снапшота. usage: make restor
 	@if [ -z "$(SNAPSHOT)" ]; then echo "usage: make restore-pg SNAPSHOT=<id|latest>"; exit 2; fi
 	bash scripts/restore-pg.sh "$(SNAPSHOT)"
 
-status: ## сводка состояния репо (для /smartdev)
-	bash scripts/tools/status.sh
+##@ INTEL
+status: ## Сводка состояния репо для smartdev (A= "--full")
+	@bash scripts/tools/status.sh $(A)
 
-hooks-install: ## симлинк scripts/git-hooks/* → .git/hooks/
+search: ## Поиск по compose/configs/scripts (Q=pattern [P=path]) — тело A7
+	@echo "search: not yet implemented (A7)"
+
+##@ PROVISION
+new-env: ## Bootstrap .env на чистом VPS (ENV-driven / interactive) — тело A7
+	@echo "new-env: not yet implemented (A7)"
+
+##@ SETUP
+setup: ## симлинк scripts/git-hooks/* → .git/hooks/
 	bash scripts/hooks-install.sh
+
+##@ META
+plan-check: ## Валидатор структуры планов (.claude/plans/*.md) — тело A12
+	@test -x scripts/tools/validate-plan.sh && bash scripts/tools/validate-plan.sh $(A) || echo "plan-check: not yet implemented (A12)"

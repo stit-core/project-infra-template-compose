@@ -6,7 +6,7 @@
 
 ## Активные
 
-- [in-progress] [`agent-workflow-rebuild`](./agent-workflow-rebuild.md) — перенос ребилда workflow из go-backend df59179c40 (make-словарь, cockpit smartdev, plan/triage/corp-handoff). 3 фазы, 15 атомов, 1/15 (A1 ✓).
+- [in-progress] [`agent-workflow-rebuild`](./agent-workflow-rebuild.md) — перенос ребилда workflow из go-backend df59179c40 (make-словарь, cockpit smartdev, plan/triage/corp-handoff). 3 фазы, 15 атомов, 2/15 (A1-A2 ✓).
 - [planning] `DOMAIN` в Vault — перенести из `.env` в `kv/projects/<p>/<env>/meta`; требует рендера `compose.env` через vault-agent и перестройки порядка в `scripts/deploy.sh`.
 - [planning] `CROWDSEC_BOUNCER_API_KEY` auto-register с post-seed в Vault — требует write-token у оператора.
 - [planning] Webhook от vault-agent при KV-change → авто-deploy без ручного `make ship` (корп-side).
