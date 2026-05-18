@@ -142,7 +142,8 @@ AppRole policy строго `kv/data/projects/<p>/<env>/*`. Невозможно
 | Reference на внешние системы | `docs/architecture.md`, `docs/onboarding.md`, `docs/runbook.md` |
 | Креды и где они используются | вне репо (Vaultwarden, оператор-only заметка) |
 
-Технически:
-- `permissions.deny` в `.claude/settings.json` блокирует Write/Edit/MultiEdit/NotebookEdit к memory-директории Claude Code (`~/.claude/projects/**/memory/**`).
+Технически (defense-in-depth):
+- `autoMemoryEnabled: false` в `.claude/settings.json` — авторитетный переключатель: харнесс не читает и не пишет авто-память для этого проекта.
+- `permissions.deny` в `.claude/settings.json` блокирует Write/Edit/MultiEdit/NotebookEdit по `**/.claude/projects/**/memory/**` (любой home, любая глубина).
 - `scripts/claude-hooks/pre-write-no-memory.sh` (PreToolUse) — страховка с понятным сообщением.
 - Если правила «забываются» между сессиями — значит они недо-зафиксированы в репо. Перенеси в `AGENTS.md` / `.claude/rules/`.
