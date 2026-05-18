@@ -1,11 +1,17 @@
 #!/usr/bin/env bash
-# Сводка состояния репо для /smartdev. Без SSH; серверные проверки —
-# через scripts/tools/ssh.sh status.
-set -eo pipefail
+# Сводка состояния репо для cockpit-skill smartdev. Секции парсятся им
+# детерминированно для чейнинга:
+#   == Critical ==     ATTENTION: <…>  → чейн в triage   (none = чисто)
+#   == Infra-touch ==  список corp-классов → чейн в corp-handoff (none = чисто)
+#   == Plan ==         активный план из roadmap → продолжить атомы
+# Без SSH; серверные проверки — через scripts/tools/ssh.sh status.
+# Сам всегда exit 0 (информационный); сигналы — в тексте секций.
+set -o pipefail
 cd "$(dirname "$0")/../.."
 
 echo "== Branch =="
 branch=$(git symbolic-ref --short HEAD 2>/dev/null || echo '(detached)')
+behind=0
 if git rev-parse --verify HEAD >/dev/null 2>&1; then
   upstream=$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || true)
   if [ -n "$upstream" ]; then
@@ -26,6 +32,56 @@ mod=$(git status --short | grep -c '^ M' || true)
 sta=$(git status --short | grep -c '^M ' || true)
 unt=$(git status --short | grep -c '^??' || true)
 echo "modified: $mod, staged: $sta, untracked: $unt"
+
+echo
+echo "== Critical =="
+# ATTENTION:-строки парсит smartdev → чейн в triage. none = чисто.
+crit=0
+if [ "${behind:-0}" -gt 0 ] 2>/dev/null; then
+  echo "ATTENTION: upstream разошлась ($behind behind) — git pull --ff-only / deploy упадёт"
+  crit=1
+fi
+if command -v docker >/dev/null 2>&1; then
+  unhealthy=$(docker ps --filter health=unhealthy --format '{{.Names}}' 2>/dev/null | paste -sd' ' -)
+  exited=$(docker ps -a --filter status=exited --filter label=com.docker.compose.project \
+             --format '{{.Names}}' 2>/dev/null | paste -sd' ' -)
+  [ -n "$unhealthy" ] && { echo "ATTENTION: unhealthy: $unhealthy — make logs SVC=<svc> / skill triage"; crit=1; }
+  [ -n "$exited" ]    && { echo "ATTENTION: exited: $exited — make ps / skill triage"; crit=1; }
+fi
+[ "$crit" -eq 0 ] && echo "none"
+
+echo
+echo "== Infra-touch =="
+# Working tree задел corp-поверхность? → smartdev чейнит в corp-handoff.
+paths=$(git status --porcelain 2>/dev/null | cut -c4-)
+declare -a hits=()
+grep -qE '^configs/vault-agent/'              <<<"$paths" && hits+=("vault-agent-config")
+grep -qE '^compose/.*\.ya?ml'                 <<<"$paths" && hits+=("compose-topology/profiles")
+grep -qE '(^|[ >])\.env\.example'             <<<"$paths" && hits+=("env-contract")
+grep -qE 'configs/crowdsec/whitelists\.yaml'  <<<"$paths" && hits+=("crowdsec-whitelist")
+grep -qE '^ansible/'                          <<<"$paths" && hits+=("ansible-bootstrap")
+if [ ${#hits[@]} -eq 0 ]; then
+  echo "none"
+else
+  printf '%s\n' "${hits[*]}"
+  echo "(тронута corp-поверхность — оформи CORP-HANDOFF до claim «готово», skill corp-handoff)"
+fi
+
+echo
+echo "== Plan =="
+# Активные планы из roadmap (in-progress/planning со ссылкой на <slug>.md).
+roadmap=.claude/plans/roadmap.md
+if [ -f "$roadmap" ]; then
+  active=$(grep -nE '^- \[(in-progress|planning|blocked)\] \[`' "$roadmap" | sed 's/^[0-9]*://; s/^/  /')
+  [ -z "$active" ] && active=$(grep -E '^- \[(in-progress|planning|blocked)\]' "$roadmap" | sed 's/^/  /')
+  if [ -n "$active" ]; then
+    printf '%s\n' "$active"
+  else
+    echo "none"
+  fi
+else
+  echo "none (roadmap отсутствует)"
+fi
 
 echo
 echo "== Compose =="

@@ -95,7 +95,7 @@ explorer/reviewer subagents; `ship.sh` как единый путь). Отста
   - Зависит от: A1
   - **Done:** `validate.sh` переписан: `rec()` копит per-check статус; concise — строка на проверку + `OK`/`FAIL: <чеки>` exit 1; `--format=detailed` — полный per-item разбор. docker-daemon-down → SKIP (как doctor). `make check` остался зелёным.
 
-- [ ] **A6:** `status.sh` — детерминированные сигналы для cockpit-чейнинга
+- [x] **A6:** `status.sh` — детерминированные сигналы для cockpit-чейнинга
   - Что делаем: добавить `== Critical ==` (`ATTENTION:` из unhealthy `docker compose
     ps` / ff-drift / on-server-drift hint), `== Infra-touch ==` (working tree задел
     corp-поверхность — globs из corp-handoff: `configs/vault-agent/**`, `compose/*.yml`,
@@ -104,6 +104,7 @@ explorer/reviewer subagents; `ship.sh` как единый путь). Отста
   - Файлы: `scripts/tools/status.sh`
   - Verify: `make status` показывает 3 новые секции; на чистом → `Critical: none`, `Infra-touch: none`
   - Зависит от: A1
+  - **Done:** `status.sh` + `== Critical ==` (behind-drift + docker unhealthy/exited → `ATTENTION:`), `== Infra-touch ==` (5 corp-классов из git porcelain → none/список), `== Plan ==` (активные из roadmap). `set -e` снят (паритет с doctor/validate). Позитив проверен (untracked compose → `compose-topology/profiles`); чистый → `none`/`none`; `OK` exit 0 сохранён.
 
 - [ ] **A7:** `make search` + `make new-env` верб'ами (Q3)
   - Что делаем: wire `scripts/tools/search.sh` как `make search Q= [P=]`;
