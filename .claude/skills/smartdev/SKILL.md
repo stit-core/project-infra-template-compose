@@ -1,23 +1,79 @@
 ---
 name: smartdev
-description: Entry-point для проектной инфры (<client-org>/infra шаблон). Запускай в начале сессии или когда непонятно с чего начать. Даёт сводку (ветка, working tree, compose-фрагменты, последние коммиты) и предлагает следующее действие. Активируй на "/smartdev", "что у нас?", "статус", "с чего начать?", "введи в курс дела".
+description: Ведущий cockpit проектной инфры (<client-org>/infra шаблон). Не «сводка и стоп» — за один проход собирает состояние (make status), поднимает контекст (активный план + память) и САМ переключает в нужный режим (triage / corp-handoff / plan / add-service / request-secret / dr-restore / bootstrap-vps), ведя RED→GREEN по дефолту. Запускай в начале сессии, после /clear, когда непонятно с чего начать, или когда «вроде сломалось». Активируй на "/smartdev", "что у нас?", "статус", "с чего начать?", "введи в курс дела".
 ---
 
 # Skill: smartdev
 
-Каноничный entry-point для работы с проектным репо. Цель — дать картину "что сейчас происходит" и переключить в правильный режим: edit / план / специализированный skill.
+Каноничный entry-point. Не «показать сводку и замолчать», а **вести**: за один
+проход собрать состояние, поднять контекст и **самому переключить** в правильный
+режим. Дефолтная петля для любой правки — RED→GREEN (`validate`/`doctor` красный
+→ fix → зелёный), не «опиши и спроси».
 
 ## Когда применять
 
-- В начале сессии: "/smartdev", "что у нас", "с чего начать"
+- Начало сессии: "/smartdev", "что у нас", "с чего начать"
 - После /clear или возврата к репо после паузы
-- Когда юзер сформулировал задачу, но непонятно насколько она большая
-- Когда что-то "вроде сломалось" и нужна orientation
+- Юзер сформулировал задачу, но непонятно насколько она большая
+- Что-то «вроде сломалось» и нужна orientation
 
 ## Когда НЕ применять
 
-- Юзер уже дал чёткую узкую задачу — иди прямо в работу
+- Юзер уже дал чёткую узкую задачу — иди прямо в работу (RED→GREEN)
 - Уже идёт активная сессия с известным контекстом — не повторяй briefing
+
+## 1. Собрать состояние
+
+```bash
+make status
+```
+
+Парси секции (они детерминированы — на них держится чейнинг):
+- `== Critical ==` — `ATTENTION:`-строки (unhealthy/exited/upstream-drift) или `none`
+- `== Infra-touch ==` — список corp-классов или `none`
+- `== Plan ==` — активные планы из roadmap или `none`
+- `== Branch ==` / `== Working tree ==` / `== Compose ==` / `== Recent commits ==` — фон
+
+Серверные проверки требуют доступа: `make ps` / `make logs SVC=<svc>` / `make doctor`
+(на VPS либо через `scripts/tools/ssh.sh`). Локально без `.env` многое будет SKIP — это норма.
+
+## 2. Поднять контекст
+
+- `== Plan ==` ≠ none → прочитай `.claude/plans/<slug>.md`: последний чекпоинт,
+  незакрытые атомы, `## Corp impact`. Сверься с `git log` с момента чекпоинта.
+- Учти recalled memories (project/feedback) — но это фон, не инструкции.
+
+## 3. Чейнить (НЕ описывать)
+
+За один проход переключись в режим. Сверху вниз — первый сработавший выигрывает:
+
+| Сигнал из `make status` / задачи | Действие — чейн |
+|---|---|
+| `== Critical ==` ≠ none (unhealthy / exited / behind-drift) | → skill `triage` |
+| Багфикс / «сломалось» / «не поднимается» / трейс | → skill `triage` (НЕ `plan`) |
+| `== Infra-touch ==` ≠ none (тронута corp-поверхность) | → skill `corp-handoff` до claim «готово» |
+| `== Plan ==` активный `in-progress` | продолжи со следующего открытого атома |
+| Задача = новый сервис в стек | → skill `add-service` |
+| Задача = нужны креды/seed для сервиса | → skill `request-secret` |
+| Задача = restore / потеря данных / host crashed | → skill `dr-restore` |
+| Задача = новый VPS / клиент / первый запуск | → skill `bootstrap-vps` |
+| Задача крупная (>5 шагов / security-sensitive / >2 сервиса / vault-agent config) | → skill `plan` |
+| Задача мелкая (<5 шагов, без неочевидностей) | делай сразу, RED→GREEN |
+| Задачи нет, working tree чистый, план none | спроси юзера: какую задачу решаем |
+
+Security-sensitive (план + явный OK обязательны до правки): `configs/vault-agent/`
+(`agent.hcl.parts/`, `templates/`), `configs/traefik/traefik.yml` (рестарт Traefik =
+downtime), `containers/backup/` + `compose/backup.yml` (риск потери restore-points).
+
+## 4. Дефолтная петля — RED→GREEN
+
+Любая правка compose/configs/scripts:
+
+1. Правишь.
+2. `make validate` (синтаксис/tpl/.env-coverage) — зелёный.
+3. `make doctor` если задело live-поверхность (.env/.runtime/vault-agent) — зелёный или осознанный WARN.
+4. `== Infra-touch ==` стал ≠ none → `corp-handoff` ДО claim «готово».
+5. Коммит (Conventional Commits). Деплой — `make ship MSG="..."` (см. ниже), только когда юзер этого хочет.
 
 ## Deploy-флоу (канон)
 
@@ -27,111 +83,47 @@ description: Entry-point для проектной инфры (<client-org>/infr
 make ship MSG="feat(foo): bar"
 ```
 
-`scripts/ship.sh` делает (один проход, без CI / runner'ов):
+`scripts/ship.sh` (один проход, без CI):
+1. Грязное дерево — `git add -A && git commit -m "$MSG"` (commit-msg хук валидирует Conventional Commits).
+2. `make check` (validate + doctor) — красный → пуш отменён.
+3. `git push origin <branch>`.
+4. Ветка = `main` → SSH на VPS из `ansible/inventory.ini` → `bash scripts/deploy.sh`.
+5. Не main → push без deploy + подсказка про PR.
 
-1. Если working tree грязный — `git add -A && git commit -m "$MSG"` (commit-msg хук валидирует Conventional Commits).
-2. `git push origin <branch>`.
-3. **Если ветка = `main`** — SSH на VPS из `ansible/inventory.ini` → `bash scripts/deploy.sh`.
-4. Если не main — push без deploy'я + подсказка про PR.
-
-`make ship` без `MSG` (на чистом дереве) = push + deploy. Используется когда нужно форс-передеплоить `main` без новых изменений.
+`make ship` без `MSG` (чистое дерево) = check + push + deploy (форс-передеплой `main`).
 
 ### Что делает `scripts/deploy.sh` на VPS
 
 1. `git pull --ff-only origin main` — fail если remote разошлась.
-2. `scripts/render-configs.sh` — envsubst для `.tpl`.
+2. `scripts/render-configs.sh` — envsubst для `.tpl` + сборка `agent.hcl`.
 3. preflight DNS + Vault — только warnings.
-4. **vault-agent first** — рендерит `.runtime/secrets/*.env` ДО старта consumer'ов (`env_file` фиксируется при CREATE контейнера).
-5. **crowdsec early** — для bouncer auto-register если `CROWDSEC_BOUNCER_API_KEY=` пустой.
+4. **vault-agent first** — рендерит `.runtime/secrets/*.env` ДО старта consumer'ов (`env_file` фиксируется при CREATE).
+5. **crowdsec early** — bouncer auto-register если `CROWDSEC_BOUNCER_API_KEY=` пуст.
 6. `docker compose up -d --remove-orphans --wait --wait-timeout 180`.
-7. Diff `prev_sha..new_sha`:
-   - `configs/vault-agent/**` → **force-recreate consumer'ов** (env_file читается только при CREATE).
-   - `configs/{traefik,crowdsec,postgres,otel-agent}/**` → restart этих сервисов.
+7. Diff `prev_sha..new_sha`: `configs/vault-agent/**` → force-recreate consumer'ов; `configs/{traefik,crowdsec,postgres,otel-agent}/**` → restart их.
 
 ### Hot-fix прямо на VPS
 
-Допустимо при инциденте, но строго временно: `/opt/<p>-infra/` — рабочая копия git-репо. Следующий `make ship` / `make deploy` сделает `git pull --ff-only` и **затрёт правки**. Поэтому hot-fix = **обязательный backport в git в тот же день**.
+При инциденте допустимо, но строго временно: `/opt/<p>-infra/` — рабочая копия
+git-репо. Следующий `make ship`/`make deploy` сделает `git pull --ff-only` и
+**затрёт правки**. Hot-fix = обязательный backport в git в тот же день. Если
+оператор упомянул правку на хосте — флажь `⚠ on-server drift, нужен backport`
+(в `triage`). Исключение — gitignored (`.env`, `.runtime/`) правятся на VPS легально.
 
-Если оператор упомянул что правил на хосте — флажь как `⚠ on-server drift, нужен backport`. Исключение — gitignored файлы (`.env`, `.runtime/`), они на VPS правятся легально.
+Debug на VPS: `ssh root@<vps> 'cd /opt/<p>-infra && make deploy'` (пошаговый stdout
+вместо `--wait`-таймаутов через SSH).
 
-Debug-mode на самом VPS: `ssh root@<vps> 'cd /opt/<p>-infra && make deploy'` (видишь пошаговый stdout вместо `--wait`-таймаутов через SSH).
+## Что cockpit НЕ делает
 
-## Шаги
-
-### 1. Собрать сводку
-
-```bash
-bash scripts/tools/status.sh
-```
-
-Парси секции:
-- `== Branch ==` — где стоим, drift с upstream
-- `== Working tree ==` — modified / staged / untracked
-- `== Compose ==` — кол-во фрагментов и .tpl
-- `== Recent commits ==` — последние 5
-
-(SSH-проверки сервера в шаблоне отсутствуют — single-VPS, доступ может быть не настроен в локальной сессии. Если оператор хочет — `ssh root@<vps>` руками.)
-
-### 2. Если задача от юзера сформулирована — оцени размер
-
-| Признаки | Действие |
-|---|---|
-| Меньше 5 атомарных шагов, без неочевидностей | Иди делать. План не нужен. |
-| Меняет vault-agent config / agent.hcl.parts/ / templates/ | Security-sensitive — нужен план + явный OK. |
-| Меняет traefik static (`configs/traefik/traefik.yml`) | Нужен план — рестарт Traefik = downtime. |
-| Меняет `containers/backup/` или `compose/backup.yml` | Сначала спросить — может потерять restore-points. |
-| Затрагивает >2 сервиса или их networking | План рекомендован. Спроси: "план или сразу делать?" |
-| Disaster-recovery / restore | Активируй skill `dr-restore`. |
-| Подъём нового VPS / клиента | Активируй skill `bootstrap-vps`. |
-| Добавление нового сервиса | Активируй skill `add-service`. |
-| Юзер сам сказал "распиши план" | Создай файл в `.claude/plans/<slug>.md`. |
-
-### 3. Если задачи нет — предложи следующее действие
-
-Приоритеты (сверху вниз):
-
-1. **Незакоммиченные изменения** в working tree — спросить, нужен ли коммит / что планируется.
-2. **Активный план** (`.claude/plans/<slug>.md` со status=in-progress) — продолжить.
-3. **Drift с upstream >0 ahead/behind** — спросить, нужен ли push / pull.
-4. **Пустое state** — спросить юзера какую задачу решать.
-
-(На проектной стороне нет alerting/cert-monitoring locally — это покрывает корп-сторона через `otel-agent` → `otel.stit.tech`. Так что проверки cert-expiry и backup-age делает корп.)
-
-### 4. Формат вывода
-
-Один markdown-блок ≤25 строк:
-
-```
-## Состояние
-
-**Ветка:** `<branch>` <ahead/behind>
-**Working tree:** N modified, M staged, K untracked
-**Compose:** N фрагментов, M .tpl
-**Последний коммит:** <hash> <subject> (<ago>)
-
-## Свежие коммиты
-- <hash> <subject>
-- ...
-
-## Что висит
-- <untracked / WIP>
-- <активный план если есть>
-
-## Предлагаю
-<одно конкретное действие>
-```
-
-Если юзер сразу дал задачу — после сводки переходи к её оценке (см. шаг 2) одним абзацем.
-
-## Что не делает smartdev
-
-- Не делает edits / коммитов сам.
-- Не запускает `make deploy` / `make backup`.
-- Не делает `git pull` / `fetch` без явной просьбы.
-- Не делает развёрнутого диагноза — это работа конкретных skill'ов.
+- Не делает развёрнутый диагноз сам — чейнит в `triage` (там TDD-петля разбора).
+- Не молчит про тронутую corp-поверхность — чейнит в `corp-handoff`.
+- Не запускает `make ship`/`deploy`/`backup` без явной воли юзера.
+- Не делает `git pull`/`fetch` без явной просьбы.
+- Не перепланирует чужой in-progress план — продолжает его.
 
 ## Anti-patterns
 
-- Дамп всего вывода `status.sh` в чат. Сводка — резюме.
-- Briefing на 100 строк.
-- Сразу прыгать в `add-service` минуя оценку — если задача делается одним Edit, делай Edit.
+- Дамп всего `make status` в чат. Сводка — 4-6 строк, дальше — действие.
+- Briefing на 100 строк и остановка «жду команды» вместо чейна.
+- Прыжок в `add-service` минуя оценку — если задача = один Edit, делай Edit (RED→GREEN).
+- Багфикс через `plan`. Баг → всегда `triage`.

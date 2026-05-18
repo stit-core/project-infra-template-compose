@@ -116,7 +116,7 @@ explorer/reviewer subagents; `ship.sh` как единый путь). Отста
 
 ### Phase 2 — Cockpit + sync доков
 
-- [ ] **A8:** Переписать `smartdev` в ведущий cockpit
+- [x] **A8:** Переписать `smartdev` в ведущий cockpit
   - Что делаем: парс `status.sh`-сигналов → чейн-таблица: `Critical≠none`/unhealthy →
     `triage`; `Infra-touch≠none` → `corp-handoff`; активный план in-progress →
     продолжить со следующего атома; крупная задача → `plan`; новый сервис →
@@ -126,6 +126,7 @@ explorer/reviewer subagents; `ship.sh` как единый путь). Отста
   - Файлы: `.claude/skills/smartdev/SKILL.md`
   - Verify: skill описывает чейнинг + RED→GREEN; нет «не делает развёрнутого диагноза» как финала
   - Зависит от: A6
+  - **Done:** smartdev переписан: §3 чейн-таблица (Critical→triage, Infra-touch→corp-handoff, Plan→continue, задачи→add-service/request-secret/dr-restore/bootstrap-vps/plan), §4 RED→GREEN дефолт через `make validate/doctor`. Терминальный «≤25 строк и стоп» убран. `make status`-верб (make-first). Forward-ссылки на triage/corp-handoff/plan (Phase 3) — ок mid-plan. Реестр скилов обновлён.
 
 - [ ] **A9:** Sync `AGENTS.md` + `.claude/WORKFLOW.md` + `README.md` под новый словарь
   - Что делаем: make-верб-таблица = фактический Makefile; cockpit как entry-point;
