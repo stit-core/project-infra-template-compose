@@ -137,13 +137,14 @@ explorer/reviewer subagents; `ship.sh` как единый путь). Отста
   - Зависит от: A2, A8
   - **Done:** AGENTS.md §intro cockpit-вход + §2 grouped verb-table (16 верб'ов), §5 `setup`/check, §6 corp-handoff. WORKFLOW.md цикл (GATHER/COCKPIT/VERIFY) + enforces (cockpit-чейнинг + soft CORP-HANDOFF) + troubleshooting. README Day-0 `make check`/`make help`/cockpit. Stale `hooks-install|agent-tools` = 0; все 16 верб'ов в AGENTS.md. Forward-only (без было/стало).
 
-- [ ] **A10:** Sync `.claude/settings.json`
+- [x] **A10:** Sync `.claude/settings.json`
   - Что делаем: убедиться `Bash(make *)` покрывает новые верб'ы; явный allow для
     новых скриптов (`scripts/tools/doctor.sh`, `validate-plan.sh`) если нужен;
     Q2 — pre-skill gate НЕ добавляем.
   - Файлы: `.claude/settings.json`
   - Verify: `python3 -m json.tool .claude/settings.json` валиден; `make doctor` не требует prompt
   - Зависит от: A3
+  - **Done:** `Bash(make *)` + `Bash(bash scripts/tools/*)` (globы) уже покрывают 16 верб'ов + doctor.sh/validate-plan.sh — A1-rename достаточен. Убраны избыточные прямые `Bash(scripts/hooks-install.sh)`×2 (канон = `make setup`; ansible-путь не agent-gated) — консистентно с make-first. Q2: hook-gpre-skill НЕ добавлен. JSON валиден, регрессии нет.
 
 ### Phase 3 — Скилы plan / triage / corp-handoff
 
@@ -213,3 +214,10 @@ corp-поверхность — записать CORP-HANDOFF-айтем сюд�
 - Обнаружено: `set -e` несовместим с диагностич.-оркестраторами (doctor/validate/status гоняют ожидаемо-падающие команды) → во всех трёх снят, статус копится в `$fail`. Зафиксировано как паттерн для будущих tool-скриптов.
 - Не переоценивал: зависимости Phase 2/3 в силе. A8 (cockpit smartdev) зависит от A6-сигналов — готовы.
 - Следующий шаг: Phase 2 A8 — переписать smartdev в ведущий cockpit.
+
+### 2026-05-18 — Phase 2 завершена (граница фазы)
+- Закрыто: A8-A10 ✓ (cockpit + sync доков). 10/15. Коммиты `bf9a59f`(A8) `b4656c8`(A9) + A10.
+- smartdev = ведущий cockpit; AGENTS/WORKFLOW/README/settings.json под единый словарь, forward-only.
+- Обнаружено: settings.json уже был синхронен через globы (A1-rename сделал основную работу) — A10 свёлся к консистентной чистке + верификации, не к расширению allow.
+- Не переоценивал: Phase 3 (A11-A15) — скилы plan/triage/corp-handoff + plan-check + ship-агрегация. A11 без зависимостей, можно начинать.
+- Следующий шаг: Phase 3 A11 — скил `plan` (тонкий, infra-flavored).
