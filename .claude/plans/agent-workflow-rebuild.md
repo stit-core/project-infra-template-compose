@@ -179,7 +179,7 @@ explorer/reviewer subagents; `ship.sh` как единый путь). Отста
   - Зависит от: A8
   - **Done:** `.claude/skills/triage/SKILL.md` — 7 категорий (compose/healthcheck/vault-agent retry/cert/render/deploy.sh/on-server drift), петля воспроизвести→прочитать→гипотеза→fix→re-verify зелёный (`make doctor`/`ps`/`validate`, без TDD), corp-причина → corp-handoff, on-server → backport. Чейн из smartdev (стр.52-53). В реестре.
 
-- [ ] **A14:** Rule + skill `corp-handoff`
+- [x] **A14:** Rule + skill `corp-handoff`
   - Что делаем: `.claude/rules/corp-handoff.md` (globs: `configs/vault-agent/**`,
     `compose/*.yml`, `.env.example`, `configs/crowdsec/whitelists.yaml`,
     `ansible/roles/stit-onboard/**`) — железобетонное правило + классификация
@@ -191,6 +191,7 @@ explorer/reviewer subagents; `ship.sh` как единый путь). Отста
     `.claude/skills/request-secret/SKILL.md`
   - Verify: globs валидны; `rg -l corp-handoff .claude/skills/smartdev` непусто (чейн из A8)
   - Зависит от: A8
+  - **Done:** `.claude/rules/corp-handoff.md` (paths: vault-agent/compose/.env.example/crowdsec/ansible-onboard) — железобетонное правило + 4 класса (Vault KV / env-онбординг / crowdsec-whitelist / DNS) + CORP-HANDOFF-формат. Skill `corp-handoff` — процедура + делегирование в request-secret. request-secret помечен частным случаем (кросс-ссылка ↔). smartdev чейнит (стр.54/75/119). Оба в реестре.
 
 - [ ] **A15:** ship.sh агрегирует `## Corp impact` + закрытие плана
   - Что делаем: `scripts/ship.sh` перед push печатает агрегированный `## Corp impact`

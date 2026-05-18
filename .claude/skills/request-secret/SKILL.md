@@ -9,6 +9,8 @@ description: Сформировать `vault kv put` блок для корп-а
 
 Skill не действует за оператора — он печатает готовую команду, которую оператор отдаёт корп-админу (out-of-band: Slack / тикет / PR в `stit-infra/infra`). Засеивает корп-админ через `vault kv put` напрямую либо через `stit-infra/infra/scripts/seed-project-secrets.sh` (env-like формат, идемпотентный patch). Vault-agent на проектной VPS подхватит на следующем render-цикле — на чистом дереве `make ship` без MSG триггерит force-recreate consumer'ов.
 
+**Это частный случай `corp-handoff`** (seed/patch KV). Общий механизм передачи на корп-сторону (онбординг env, CrowdSec-whitelist, DNS) и железобетонное правило «тронул corp-поверхность → блок до claim готово» — skill `corp-handoff` + `.claude/rules/corp-handoff.md`. Если пришёл из `corp-handoff` с ACTION = создать/пропатчить `kv/...` — этот skill и есть твой следующий шаг.
+
 ## Когда применять
 
 - "Выпиши креды для postgres / minio / stripe / ..."
