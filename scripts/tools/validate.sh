@@ -1,87 +1,106 @@
 #!/usr/bin/env bash
-# Pre-deploy gate: compose syntax + .env.example coverage + .tpl render.
-set -eo pipefail
+# Pre-deploy gate: compose syntax + yamllint + .tpl render + .env.example
+# coverage. Concise-by-default (строка на проверку + каноничный хвост):
+#   OK              — все проверки прошли/skip
+#   FAIL: <чеки>    — список упавших, exit 1
+# --format=detailed — полный per-item разбор (как раньше).
+set -o pipefail
 cd "$(dirname "$0")/../.."
 
-fail=0
+DETAILED=0
+[ "${1:-}" = "--format=detailed" ] && DETAILED=1
 
-echo "== compose syntax =="
+fail=0
+declare -a failed=()
+
+# rec <name> <PASS|SKIP|FAIL> <note> <detail-block>
+rec() {
+  local name="$1" status="$2" note="$3" detail="$4"
+  [ "$status" = "FAIL" ] && { fail=1; failed+=("$name"); }
+  if [ "$DETAILED" = "1" ]; then
+    echo "== $name =="
+    [ -n "$detail" ] && printf '%s\n' "$detail" | sed 's/^/  /'
+    echo
+  else
+    printf "  %-16s %s%s\n" "$name" "$status" "${note:+ ($note)}"
+  fi
+}
+
+# 1. compose syntax
 if ! command -v docker >/dev/null; then
-  echo "  docker не установлен локально — пропускаем"
+  rec "compose syntax" SKIP "docker не установлен" "docker не установлен — пропускаем"
+elif [ ! -f .env ]; then
+  rec "compose syntax" SKIP "нет .env" ".env отсутствует — для подстановок нужен реальный .env"
 else
   args=(-f docker-compose.yml)
   for f in compose/*.yml; do [ -f "$f" ] && args+=(-f "$f"); done
-  if [ -f .env ]; then
-    if docker compose "${args[@]}" --env-file .env config -q 2>/tmp/compose-validate.err; then
-      echo "  OK"
-    else
-      echo "  FAIL"
-      sed 's/^/    /' /tmp/compose-validate.err
-      fail=1
-    fi
+  if cap=$(docker compose "${args[@]}" --env-file .env config -q 2>&1); then
+    rec "compose syntax" PASS "" "OK"
+  elif echo "$cap" | grep -qi 'cannot connect to the docker daemon\|is the docker daemon running'; then
+    rec "compose syntax" SKIP "docker daemon недоступен" "$cap"
   else
-    echo "  .env отсутствует — пропускаем (для подстановок нужен реальный .env)"
+    rec "compose syntax" FAIL "" "$cap"
   fi
 fi
 
-echo
-echo "== yamllint configs/ =="
+# 2. yamllint configs/ compose/
 if ! command -v yamllint >/dev/null; then
-  echo "  yamllint не установлен — пропускаем (установка: pip install yamllint)"
+  rec "yamllint" SKIP "не установлен" "yamllint не установлен (pip install yamllint)"
 else
-  if yamllint -d "{extends: relaxed, rules: {line-length: disable}}" configs/ compose/ docker-compose.yml 2>&1 | sed 's/^/  /'; then
-    echo "  OK"
+  if cap=$(yamllint -d "{extends: relaxed, rules: {line-length: disable}}" \
+             configs/ compose/ docker-compose.yml 2>&1); then
+    rec "yamllint" PASS "" "OK"
   else
-    fail=1
+    rec "yamllint" FAIL "" "$cap"
   fi
 fi
 
-echo
-echo "== .tpl rendering =="
+# 3. .tpl rendering
 shopt -s globstar nullglob
 tpls=(configs/**/*.tpl)
 if [ ${#tpls[@]} -eq 0 ]; then
-  echo "  .tpl-файлов нет"
+  rec ".tpl render" SKIP "нет .tpl" ".tpl-файлов нет"
 else
-  set -a
-  [ -f .env ] && . ./.env
-  set +a
+  set -a; [ -f .env ] && . ./.env; set +a
+  bad=(); lines=""
   for tpl in "${tpls[@]}"; do
     if envsubst < "$tpl" >/dev/null 2>&1; then
-      echo "  $tpl: OK"
+      lines+="$tpl: OK"$'\n'
     else
-      echo "  $tpl: FAIL"
-      fail=1
+      lines+="$tpl: FAIL"$'\n'; bad+=("$tpl")
     fi
   done
+  lines="${lines%$'\n'}"
+  if [ ${#bad[@]} -eq 0 ]; then
+    rec ".tpl render" PASS "${#tpls[@]}" "$lines"
+  else
+    rec ".tpl render" FAIL "${bad[*]}" "$lines"
+  fi
 fi
+shopt -u globstar nullglob
 
-echo
-echo "== .env.example coverage =="
-# Ищем ${VAR} в compose + configs, проверяем наличие в .env.example.
+# 4. .env.example coverage
 if [ ! -f .env.example ]; then
-  echo "  .env.example отсутствует"
-  fail=1
+  rec ".env coverage" FAIL ".env.example отсутствует" ".env.example отсутствует"
 else
-  # PCRE с negative lookbehind: ${VAR} ловим, $${VAR} (escape для shell внутри
-  # entrypoint heredoc, не compose-substitution) — пропускаем.
   used=$(grep -rhoP '(?<!\$)\$\{[A-Z_][A-Z0-9_]*' compose/ configs/ docker-compose.yml 2>/dev/null \
           | sed 's/${//' | sort -u)
   missing=()
   while read -r var; do
     [ -z "$var" ] && continue
-    if ! grep -qE "^#?\s*$var=" .env.example; then
-      missing+=("$var")
-    fi
+    grep -qE "^#?\s*$var=" .env.example || missing+=("$var")
   done <<<"$used"
   if [ ${#missing[@]} -eq 0 ]; then
-    echo "  OK — все used vars в .env.example"
+    rec ".env coverage" PASS "" "OK — все used vars в .env.example"
   else
-    echo "  FAIL — missing in .env.example:"
-    printf '    %s\n' "${missing[@]}"
-    fail=1
+    rec ".env coverage" FAIL "${missing[*]}" "missing in .env.example: ${missing[*]}"
   fi
 fi
 
-echo
-if [ $fail -eq 0 ]; then echo "OK"; else echo "FAIL"; exit 1; fi
+[ "$DETAILED" = "0" ] && echo
+if [ "$fail" -eq 0 ]; then
+  echo "OK"
+else
+  echo "FAIL: ${failed[*]}"
+  exit 1
+fi

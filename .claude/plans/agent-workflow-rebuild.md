@@ -86,13 +86,14 @@ explorer/reviewer subagents; `ship.sh` как единый путь). Отста
   - Зависит от: A3
   - **Done:** Makefile `check` = `$(MAKE) -s validate` + `$(MAKE) -s doctor` + `✓ check clean` (fail-fast: stop на первом красном). ship.sh: `if ! make check` гейт между commit и `git push` (стр.34, push стр.41) — friendly-abort, коммит локально остаётся. clean → exit 0; broken .env → check exit≠0.
 
-- [ ] **A5:** `validate.sh` — concise-by-default + каноничная OK/FAIL + FORMAT=detailed
+- [x] **A5:** `validate.sh` — concise-by-default + каноничная OK/FAIL + FORMAT=detailed
   - Что делаем: `scripts/tools/validate.sh` сжатый вывод + финальная
     `OK` / `FAIL: <reason>`; `FORMAT=detailed` — полный разбор (паттерн backend
     `scripts/tools/*.sh --format=detailed`).
   - Файлы: `scripts/tools/validate.sh`, `Makefile`
   - Verify: `make validate` → одна каноничная строка; `make validate FORMAT=detailed` — verbose
   - Зависит от: A1
+  - **Done:** `validate.sh` переписан: `rec()` копит per-check статус; concise — строка на проверку + `OK`/`FAIL: <чеки>` exit 1; `--format=detailed` — полный per-item разбор. docker-daemon-down → SKIP (как doctor). `make check` остался зелёным.
 
 - [ ] **A6:** `status.sh` — детерминированные сигналы для cockpit-чейнинга
   - Что делаем: добавить `== Critical ==` (`ATTENTION:` из unhealthy `docker compose
