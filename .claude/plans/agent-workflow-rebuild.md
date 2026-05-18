@@ -68,7 +68,7 @@ explorer/reviewer subagents; `ship.sh` как единый путь). Отста
   - Зависит от: A1
   - **Done:** `make help` рендерит 7 групп (LOOP/SHIP/OPS/INTEL/PROVISION/SETUP/META); `make`→help exit 0; стабы doctor/check/search/new-env/plan-check печатают «not yet implemented (AN)»; `hooks-install`→`setup`. NB: `make hooks-install` в доках — чинит A9.
 
-- [ ] **A3:** `make doctor` — live fail-fast preflight
+- [x] **A3:** `make doctor` — live fail-fast preflight
   - Что делаем: `scripts/tools/doctor.sh`: `docker compose config -q`, vault-agent
     unix-socket reachable, `.runtime/{secrets,env}` отрендерены, `preflight-dns.sh`,
     `preflight-vault.sh`, `.env`↔`.env.example` coverage. Каноничная строка
@@ -76,6 +76,7 @@ explorer/reviewer subagents; `ship.sh` как единый путь). Отста
   - Файлы: `scripts/tools/doctor.sh`, `Makefile`
   - Verify: `make doctor` → `OK` на здоровом / `FAIL: <reason>` при сорванном preflight
   - Зависит от: A2
+  - **Done:** `scripts/tools/doctor.sh` (+x) — 7 проверок с классификацией PASS/SKIP/WARN/FAIL; `set -e` намеренно снят (диагностич. оркестратор); docker-daemon-down → SKIP не FAIL. clean checkout → `OK` exit 0 (всё SKIP — `make check` зелёный на лаптопе); `.env` без identity → `FAIL: compose config .env identity` exit 1; `A=--full` печатает captured detail. Makefile: прямой `bash` вызов (как validate/status).
 
 - [ ] **A4:** `make check` — каноничный pre-ship gate + ship.sh hookup
   - Что делаем: `check = validate + doctor`; `scripts/ship.sh` гонит `make check`

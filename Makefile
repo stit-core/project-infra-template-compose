@@ -23,8 +23,8 @@ help: ## сгруппированный список команд
 validate: ## Compose syntax + yamllint + .tpl + .env coverage (FORMAT=detailed)
 	@bash scripts/tools/validate.sh $(if $(filter detailed,$(FORMAT)),--format=detailed)
 
-doctor: ## Live fail-fast preflight: compose/vault-agent/dns/vault/env (тело — A3)
-	@test -x scripts/tools/doctor.sh && bash scripts/tools/doctor.sh $(A) || echo "doctor: not yet implemented (A3)"
+doctor: ## Live fail-fast preflight: compose/vault-agent/dns/vault/env (A= --full)
+	@bash scripts/tools/doctor.sh $(A)
 
 check: ## Каноничный pre-ship gate: validate + doctor (тело — A4)
 	@echo "check: not yet implemented (A4)"
