@@ -106,12 +106,13 @@ explorer/reviewer subagents; `ship.sh` как единый путь). Отста
   - Зависит от: A1
   - **Done:** `status.sh` + `== Critical ==` (behind-drift + docker unhealthy/exited → `ATTENTION:`), `== Infra-touch ==` (5 corp-классов из git porcelain → none/список), `== Plan ==` (активные из roadmap). `set -e` снят (паритет с doctor/validate). Позитив проверен (untracked compose → `compose-topology/profiles`); чистый → `none`/`none`; `OK` exit 0 сохранён.
 
-- [ ] **A7:** `make search` + `make new-env` верб'ами (Q3)
+- [x] **A7:** `make search` + `make new-env` верб'ами (Q3)
   - Что делаем: wire `scripts/tools/search.sh` как `make search Q= [P=]`;
     wire `scripts/new-env.sh` как `make new-env` (ENV-driven passthrough). Убрать стабы.
   - Файлы: `Makefile`
   - Verify: `make search Q=traefik` → хиты; `make new-env` (dry/prompt) не падает
   - Зависит от: A2
+  - **Done:** `search` с Q=/P= + guard (usage exit 2 без Q) — хиты по traefik; `new-env` → `bash scripts/new-env.sh` (`make -n` подтвердил wiring, env-driven через инхеритнутый env). `make check` зелёный.
 
 ### Phase 2 — Cockpit + sync доков
 
@@ -203,4 +204,10 @@ corp-поверхность — записать CORP-HANDOFF-айтем сюд�
 
 ## Чекпоинты
 
-—
+### 2026-05-18 — Phase 1 завершена (граница фазы)
+- Закрыто: A1-A7 ✓ (хребет — словарь + tooling + сигналы). 7/15.
+- Коммиты: `050834b`(A1) `c006e24`(A2) `d150d12`(A3) `efda2c9`(A4) `77c765f`(A5) `d48041c`(A6) + A7.
+- Решения по развилкам исполнены: scripts/tools rename (Q1), без hook-gate (Q2), new-env верб (Q3).
+- Обнаружено: `set -e` несовместим с диагностич.-оркестраторами (doctor/validate/status гоняют ожидаемо-падающие команды) → во всех трёх снят, статус копится в `$fail`. Зафиксировано как паттерн для будущих tool-скриптов.
+- Не переоценивал: зависимости Phase 2/3 в силе. A8 (cockpit smartdev) зависит от A6-сигналов — готовы.
+- Следующий шаг: Phase 2 A8 — переписать smartdev в ведущий cockpit.

@@ -65,12 +65,13 @@ restore-pg: ## restore postgres из restic-снапшота. usage: make restor
 status: ## Сводка состояния репо для smartdev (A= "--full")
 	@bash scripts/tools/status.sh $(A)
 
-search: ## Поиск по compose/configs/scripts (Q=pattern [P=path]) — тело A7
-	@echo "search: not yet implemented (A7)"
+search: ## Поиск по compose/configs/scripts/docs: make search Q=pattern [P=path]
+	@if [ -z "$(Q)" ]; then echo "usage: make search Q=<pattern> [P=<path>]"; exit 2; fi
+	@bash scripts/tools/search.sh "$(Q)" $(P)
 
 ##@ PROVISION
-new-env: ## Bootstrap .env на чистом VPS (ENV-driven / interactive) — тело A7
-	@echo "new-env: not yet implemented (A7)"
+new-env: ## Bootstrap .env на чистом VPS (interactive; либо PROJECT_NAME=.. ENV=.. make new-env)
+	@bash scripts/new-env.sh
 
 ##@ SETUP
 setup: ## симлинк scripts/git-hooks/* → .git/hooks/
