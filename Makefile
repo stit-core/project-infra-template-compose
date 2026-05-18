@@ -78,5 +78,5 @@ setup: ## симлинк scripts/git-hooks/* → .git/hooks/
 	bash scripts/hooks-install.sh
 
 ##@ META
-plan-check: ## Валидатор структуры планов (.claude/plans/*.md) — тело A12
-	@test -x scripts/tools/validate-plan.sh && bash scripts/tools/validate-plan.sh $(A) || echo "plan-check: not yet implemented (A12)"
+plan-check: ## Валидатор структуры планов .claude/plans/*.md (A= конкретный план)
+	@bash scripts/tools/validate-plan.sh $(A)

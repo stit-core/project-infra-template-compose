@@ -159,12 +159,13 @@ explorer/reviewer subagents; `ship.sh` как единый путь). Отста
   - Зависит от: —
   - **Done:** `.claude/skills/plan/SKILL.md` — lifecycle PLANNING→IN-PROGRESS→CHECKPOINT→DONE, infra-вопросы (Скоуп/Env+секреты/Топология/Vault-KV/Rollout/Откат), шаблон с `## Corp impact`, roadmap-формат репо (`## Активные`, `[planning]`). Багфикс→triage. backend-специфики 0. В реестре скилов.
 
-- [ ] **A12:** `make plan-check` — валидатор структуры планов
+- [x] **A12:** `make plan-check` — валидатор структуры планов
   - Что делаем: `scripts/tools/validate-plan.sh` — каждый атом имеет `Verify:`
     и `Зависит от:`, ≤15 атомов, фазы при >~8. Wire `make plan-check` (убрать стаб).
   - Файлы: `scripts/tools/validate-plan.sh`, `Makefile`
   - Verify: `make plan-check` на этом файле (`agent-workflow-rebuild.md`) → PASS
   - Зависит от: A2, A11
+  - **Done:** `scripts/tools/validate-plan.sh` (+x, awk per-atom scan): обязательные секции/поля + Verify:/Зависит от: на атом + ≤15 + ADVISORY фазы>8. `make plan-check` direct-bash. Дог-фудинг: rebuild-план → `OK` exit 0; негатив (атом без Verify) → `FAIL` exit 1.
 
 - [ ] **A13:** Скил `triage` (тонкий, infra-failure)
   - Что делаем: `.claude/skills/triage/SKILL.md`. Таблица категорий: compose не
