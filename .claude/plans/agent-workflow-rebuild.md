@@ -128,13 +128,14 @@ explorer/reviewer subagents; `ship.sh` как единый путь). Отста
   - Зависит от: A6
   - **Done:** smartdev переписан: §3 чейн-таблица (Critical→triage, Infra-touch→corp-handoff, Plan→continue, задачи→add-service/request-secret/dr-restore/bootstrap-vps/plan), §4 RED→GREEN дефолт через `make validate/doctor`. Терминальный «≤25 строк и стоп» убран. `make status`-верб (make-first). Forward-ссылки на triage/corp-handoff/plan (Phase 3) — ок mid-plan. Реестр скилов обновлён.
 
-- [ ] **A9:** Sync `AGENTS.md` + `.claude/WORKFLOW.md` + `README.md` под новый словарь
+- [x] **A9:** Sync `AGENTS.md` + `.claude/WORKFLOW.md` + `README.md` под новый словарь
   - Что делаем: make-верб-таблица = фактический Makefile; cockpit как entry-point;
     цикл GATHER→PLAN→ACT→VERIFY→COMMIT→SHIP; corp-handoff в «что enforces».
     Forward-only (описываем NOW, без migration-прозы / «было/стало»).
   - Файлы: `AGENTS.md`, `.claude/WORKFLOW.md`, `README.md`
   - Verify: `rg -n 'hooks-install|agent-tools' AGENTS.md .claude/WORKFLOW.md README.md` пусто; каждый верб из `make help` есть в AGENTS.md
   - Зависит от: A2, A8
+  - **Done:** AGENTS.md §intro cockpit-вход + §2 grouped verb-table (16 верб'ов), §5 `setup`/check, §6 corp-handoff. WORKFLOW.md цикл (GATHER/COCKPIT/VERIFY) + enforces (cockpit-чейнинг + soft CORP-HANDOFF) + troubleshooting. README Day-0 `make check`/`make help`/cockpit. Stale `hooks-install|agent-tools` = 0; все 16 верб'ов в AGENTS.md. Forward-only (без было/стало).
 
 - [ ] **A10:** Sync `.claude/settings.json`
   - Что делаем: убедиться `Bash(make *)` покрывает новые верб'ы; явный allow для

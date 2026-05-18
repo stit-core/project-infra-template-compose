@@ -71,9 +71,11 @@ curl -X POST -H "Authorization: token $GITEA_TOKEN" -H "Content-Type: applicatio
 
 7. Первый деплой — с laptop'а оператора:
    ```bash
-   make ship          # commit + push + (на main) ssh-deploy. На чистом дереве MSG не нужен.
+   make ship          # check (validate+doctor) + push + (на main) ssh-deploy. На чистом дереве MSG не нужен.
    ```
-   Минимальный стек (traefik / vault-agent / crowdsec / otel / metrics / landing) поднимается сразу.
+   `ship` сам гонит `make check` — красный отменяет пуш. Минимальный стек
+   (traefik / vault-agent / crowdsec / otel / metrics / landing) поднимается сразу.
+   Полный словарь команд — `make help`; вход для агента — cockpit `/smartdev`.
 
 8. По мере дозревания — запрашивать seed'ы (Claude skill `/request-secret`) и активировать profile'ы:
    - `/request-secret` → Claude формирует блок `vault kv put kv/projects/<p>/<env>/<name>` для корп-админа.

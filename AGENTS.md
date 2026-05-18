@@ -2,7 +2,9 @@
 
 Шаблон проектной инфры stit.tech: docker-compose стек одного VPS на клиентский проект. Копируется в `<client-org>/infra`, адаптируется под домен/стек.
 
-Этот файл — постоянный гайд для агента. Контекстные правила в `.claude/rules/` (если появляются), процедуры в `.claude/skills/`. Для обзорного human-описания — `README.md`.
+Этот файл — постоянный гайд для агента. Контекстные правила в `.claude/rules/`, процедуры в `.claude/skills/`. Для обзорного human-описания — `README.md`.
+
+**Точка входа — ведущий cockpit `/smartdev`:** за один проход гонит `make status`, поднимает активный план и **сам переключает** в нужный режим (triage / corp-handoff / plan / add-service / request-secret / dr-restore / bootstrap-vps). Дефолтная петля любой правки — RED→GREEN (`make validate`/`make doctor` красный → fix → зелёный). Все действия — через `make <verb>` (полный список — `make help`); скрипты за make напрямую не дёргаем.
 
 ## Где это в экосистеме
 
@@ -33,17 +35,26 @@ Always-on (traefik / vault-agent / crowdsec / otel-agent / node-exporter / cadvi
 
 ## 2. Команды
 
-```
-make ship MSG="..."   # с laptop'а: commit + push + (если main) ssh-deploy. Канон.
-make deploy           # на VPS: git pull → render → compose up --wait. Server-side.
-make render           # envsubst для .tpl-конфигов
-make validate         # compose syntax + .env.example coverage
-make ps / logs        # статус / логи
-make restart SVC=...  # рестарт одного сервиса
-make backup           # one-shot backup внутри backup-контейнера
-make status           # сводка состояния репо для /smartdev
-make hooks-install    # поставить commit-msg hook
-```
+Единый словарь `make <verb>`, сгруппирован в `make help`. Concise-by-default;
+`FORMAT=detailed` — полный разбор (validate).
+
+| Группа | Верб | Что |
+|---|---|---|
+| LOOP | `validate` | compose syntax + yamllint + .tpl + .env coverage (`FORMAT=detailed`) |
+| | `doctor` | live fail-fast preflight: compose/vault-agent/dns/vault/env (`A=--full`) |
+| | `check` | каноничный pre-ship gate = validate + doctor |
+| SHIP | `ship MSG="..."` | с laptop'а: commit + check + push + (если main) ssh-deploy. Канон |
+| | `deploy` | на VPS: git pull → render → compose up --wait. Server-side |
+| | `render` | envsubst для .tpl + сборка agent.hcl из parts |
+| OPS | `ps` / `logs SVC=` | статус / логи |
+| | `restart SVC=` | рестарт одного сервиса |
+| | `backup` | one-shot backup внутри backup-контейнера |
+| | `restore-pg SNAPSHOT=` | restore postgres из restic-снапшота |
+| INTEL | `status` | cockpit-сводка с сигналами Critical/Infra-touch/Plan |
+| | `search Q= [P=]` | поиск по compose/configs/scripts/docs |
+| PROVISION | `new-env` | bootstrap `.env` на чистом VPS (interactive / env-driven) |
+| SETUP | `setup` | поставить git-хуки (commit-msg и пр.) |
+| META | `plan-check` | валидатор структуры планов `.claude/plans/*.md` |
 
 ## 3. Корп-контракт
 
@@ -77,14 +88,15 @@ AppRole policy строго `kv/data/projects/<p>/<env>/*`. Невозможно
 
 - **Conventional Commits** — `commit-msg` хук блокирует невалидные. Типы: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `meta`.
 - Линейная история, push в main напрямую (solo-flow) — или в ветку → PR в Gitea → merge.
-- `make ship MSG="..."` — единственный канон: commit + push + (на main) ssh-deploy. На чистом дереве MSG необязателен — просто push + deploy.
-- Хуки ставятся `make hooks-install`.
+- `make ship MSG="..."` — единственный канон: commit + `make check` (красный → пуш отменён) + push + (на main) ssh-deploy. На чистом дереве MSG необязателен — просто check + push + deploy.
+- Хуки ставятся `make setup`.
 
 ## 6. Границы
 
 ### Делать всегда
 
-- Перед claim "готово" — `validate.sh` локально, после деплоя — `make ps` для healthchecks.
+- Перед claim "готово" — `make check` локально (validate + doctor), после деплоя — `make ps` для healthchecks.
+- Тронул corp-поверхность (`configs/vault-agent/`, `compose/*.yml` профили, `.env.example`, `configs/crowdsec/whitelists.yaml`, `ansible/`) — оформи `CORP-HANDOFF`-блок до claim «готово» (skill `corp-handoff`; `make status → == Infra-touch ==` это ловит).
 - Любая новая `${VAR}` в compose/configs — в `.env.example` сразу.
 - Bumps версий — отдельным коммитом после явного OK от пользователя.
 

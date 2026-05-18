@@ -19,25 +19,27 @@
 ```
 [твой prompt]
      ↓
-GATHER  ─── Read compose/configs (path-scoped правила автогрузятся)
-            explorer subagent — для широкого поиска
-            scripts/tools/status.sh — сводка репо
+GATHER  ─── make status — cockpit-сводка (Critical / Infra-touch / Plan)
+            Read compose/configs (path-scoped правила автогрузятся)
+            explorer subagent / make search Q= — широкий поиск
      ↓
-PLAN    ─── smartdev → решает: edit / план / переключение в skill
-            Skip-able для тривиальных правок
+COCKPIT ─── /smartdev ведёт: парс сигналов → САМ чейнит в режим
+            (triage / corp-handoff / plan / add-service / …). Skip-able
+            для тривиальной правки — иди сразу в RED→GREEN.
      ↓
 ACT     ─── Edit/Write
             PostToolUse: docker compose config -q после правки compose
             PreToolUse: блок image-bump'ов без SKIP_IMAGE_HOOK=1
      ↓
-VERIFY  ─── scripts/tools/validate.sh
+VERIFY  ─── make validate (→ make check перед ship: validate + doctor)
+            == Infra-touch == ≠ none → corp-handoff ДО claim «готово»
             git diff — нет ли .env / .runtime/ утечек
      ↓
 COMMIT  ─── conventional prefix (commit-msg хук валидирует)
             push в main напрямую (solo-flow) — или в ветку → PR в Gitea → merge
      ↓
-DEPLOY  ─── `make ship MSG="..."` локально: commit + push + (на main) ssh-deploy.
-            На чистом дереве — `make ship` без MSG (push + deploy).
+DEPLOY  ─── `make ship MSG="..."` локально: commit + check + push + (на main) ssh-deploy.
+            На чистом дереве — `make ship` без MSG (check + push + deploy).
             Debug: на VPS `make deploy` (видишь пошаговый stdout).
             Verify: `make ps` + healthchecks.
 ```
@@ -62,7 +64,7 @@ DEPLOY  ─── `make ship MSG="..."` локально: commit + push + (на 
 
 1. Skill `add-service` — чек-лист: `compose/<svc>.yml` (pinned image, healthcheck, networks), traefik labels с `crowdsec@file`, при необходимости `configs/vault-agent/templates/<svc>.env.tpl` + блок в `configs/vault-agent/agent.hcl.parts/<profile>.hcl` (или `head.hcl` если always-on).
 2. `${VAR}` в `.env.example`.
-3. `validate.sh` зелёный → `feat(<svc>): add <Service>` → push → deploy.
+3. `make check` зелёный → `feat(<svc>): add <Service>` → ship. Если задело corp-поверхность (vault-agent template / новый KV) — `corp-handoff` блок до claim «готово».
 
 ### В. Bump образа
 
@@ -104,6 +106,8 @@ DEPLOY  ─── `make ship MSG="..."` локально: commit + push + (на 
 
 Критичные инварианты (no `--no-verify`, no image-bumps без OK, no `:latest`) — в хуках. Стиль и conventions — в AGENTS.md и rules.
 
+**Cockpit-чейнинг:** `/smartdev` парсит `make status`-сигналы и сам переключает в `triage` (Critical ≠ none / багфикс), `corp-handoff` (Infra-touch ≠ none), `plan` (крупная задача), `add-service`/`request-secret`/`dr-restore`/`bootstrap-vps` (по задаче). **CORP-HANDOFF** — soft-механизм (`.claude/rules/corp-handoff.md` + skill, не хук): единственная гарантия — что агент его исполняет; тронул corp-поверхность → блок до claim «готово».
+
 ## 5. Course correction
 
 | Что | Как |
@@ -130,8 +134,9 @@ DEPLOY  ─── `make ship MSG="..."` локально: commit + push + (на 
 | Skill не активируется | `description` в frontmatter — переписать конкретнее |
 | Path-rule не подгружается | `paths:` glob в frontmatter |
 | Коммит reject'нут | `scripts/git-hooks/commit-msg` — type ∈ {feat, fix, refactor, docs, test, chore, meta} |
-| `validate.sh` падает | Первая красная секция обычно главная |
-| `make deploy` падает | `docker compose logs <svc>` на сервере |
+| `make validate` / `make check` красный | Первая `FAIL`-проверка обычно главная; `FORMAT=detailed` — разбор |
+| `make doctor` FAIL | Строка `FAIL: <чек>` называет проверку; `A=--full` — captured detail |
+| `make deploy` падает | `docker compose logs <svc>` на сервере; skill `triage` ведёт разбор |
 | vault-agent не healthy | `docker logs vault-agent` — обычно AppRole expired или Vault unreachable |
 | backend в `.env` не видит секреты | `ls -la .runtime/secrets/` — должны быть `*.env` файлы; если нет — vault-agent ещё не отрендерил |
 | LE certs не renew | HTTP-01 challenge: `docker logs traefik | grep acme` |
