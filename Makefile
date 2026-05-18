@@ -22,7 +22,7 @@ render: ## envsubst для *.tpl
 	bash scripts/render-configs.sh
 
 validate: ## compose syntax + .env.example coverage
-	bash scripts/agent-tools/validate.sh
+	bash scripts/tools/validate.sh
 
 ps: ## docker compose ps
 	docker compose $(COMPOSE_ARGS) ps
@@ -42,7 +42,7 @@ restore-pg: ## restore postgres из restic-снапшота. usage: make restor
 	bash scripts/restore-pg.sh "$(SNAPSHOT)"
 
 status: ## сводка состояния репо (для /smartdev)
-	bash scripts/agent-tools/status.sh
+	bash scripts/tools/status.sh
 
 hooks-install: ## симлинк scripts/git-hooks/* → .git/hooks/
 	bash scripts/hooks-install.sh

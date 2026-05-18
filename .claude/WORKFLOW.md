@@ -21,7 +21,7 @@
      ↓
 GATHER  ─── Read compose/configs (path-scoped правила автогрузятся)
             explorer subagent — для широкого поиска
-            scripts/agent-tools/status.sh — сводка репо
+            scripts/tools/status.sh — сводка репо
      ↓
 PLAN    ─── smartdev → решает: edit / план / переключение в skill
             Skip-able для тривиальных правок
@@ -30,7 +30,7 @@ ACT     ─── Edit/Write
             PostToolUse: docker compose config -q после правки compose
             PreToolUse: блок image-bump'ов без SKIP_IMAGE_HOOK=1
      ↓
-VERIFY  ─── scripts/agent-tools/validate.sh
+VERIFY  ─── scripts/tools/validate.sh
             git diff — нет ли .env / .runtime/ утечек
      ↓
 COMMIT  ─── conventional prefix (commit-msg хук валидирует)

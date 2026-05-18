@@ -38,7 +38,7 @@ SSH="ssh -p $SSH_PORT $SSH_USER@$SSH_HOST"
 
 case "${1:-}" in
   status)
-    $SSH "cd $REMOTE_DIR && make ps && bash scripts/agent-tools/status.sh"
+    $SSH "cd $REMOTE_DIR && make ps && bash scripts/tools/status.sh"
     ;;
   deploy)
     $SSH "cd $REMOTE_DIR && make deploy"

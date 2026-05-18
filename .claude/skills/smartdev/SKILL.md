@@ -61,7 +61,7 @@ Debug-mode на самом VPS: `ssh root@<vps> 'cd /opt/<p>-infra && make deplo
 ### 1. Собрать сводку
 
 ```bash
-bash scripts/agent-tools/status.sh
+bash scripts/tools/status.sh
 ```
 
 Парси секции:

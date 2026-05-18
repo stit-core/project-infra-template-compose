@@ -144,4 +144,4 @@ Hook `permissions.deny` страхует, но привычка проверят
 
 - В `.env.example` нет реальных значений (только placeholder / пусто)?
 - Любой новый `${VAR}` в compose/configs — добавлен в `.env.example` (как declared / закомментированный, если Vault-managed) или в vault-agent template + соответствующий `agent.hcl.parts/<profile>.hcl`?
-- `scripts/agent-tools/validate.sh` зелёный (он ловит missing vars в `.env.example`)?
+- `scripts/tools/validate.sh` зелёный (он ловит missing vars в `.env.example`)?

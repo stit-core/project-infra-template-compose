@@ -100,7 +100,7 @@ fi
     echo
     echo "$OUT" | head -15
     echo
-    echo "Запусти 'scripts/agent-tools/validate.sh' для полного отчёта."
+    echo "Запусти 'scripts/tools/validate.sh' для полного отчёта."
 } >&2
 
 exit 2

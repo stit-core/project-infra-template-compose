@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Сводка состояния репо для /smartdev. Без SSH; серверные проверки —
-# через scripts/agent-tools/ssh.sh status.
+# через scripts/tools/ssh.sh status.
 set -eo pipefail
 cd "$(dirname "$0")/../.."
 

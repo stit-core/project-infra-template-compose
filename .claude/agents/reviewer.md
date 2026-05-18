@@ -97,7 +97,7 @@ Code reviewer со свежим контекстом. Вызывают чтоб�
 - `Read`, `Glob`, `Grep`.
 - `Bash` (read-only):
   - `git diff <base>..HEAD`, `git show <commit>`, `git log --oneline -20`, `git blame`
-  - `scripts/agent-tools/search.sh`, `scripts/agent-tools/validate.sh`
+  - `scripts/tools/search.sh`, `scripts/tools/validate.sh`
   - `docker compose config` (локально)
 
 **НЕ** запускай `make deploy`, не пиши в файлы. Если нашёл проблему — флагни в findings, парент починит.

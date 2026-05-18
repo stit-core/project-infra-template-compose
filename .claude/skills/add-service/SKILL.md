@@ -136,7 +136,7 @@ services:
 
 ### 6. Validate + deploy
 
-1. Локально: `bash scripts/agent-tools/validate.sh` — compose-syntax, yamllint, .env coverage.
+1. Локально: `bash scripts/tools/validate.sh` — compose-syntax, yamllint, .env coverage.
 2. Коммит: `feat(<svc>): add <Service>`.
 3. Push в main.
 4. На сервере: `make deploy`.
