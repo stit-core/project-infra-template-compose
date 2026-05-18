@@ -37,6 +37,47 @@ if ! make check; then
   exit 1
 fi
 
+# --- Corp-handoff агрегация (.claude/rules/corp-handoff.md) ---
+# Печатает агрегированный ## Corp impact из активных планов; если corp-
+# поверхность тронута в неотправленных коммитах, а блока нет — warn.
+# Advisory: пуш не блокирует (передача корп-админу — out-of-band).
+corp_impact=""
+for p in .claude/plans/*.md; do
+  [ -e "$p" ] || continue
+  [ "$(basename "$p")" = "roadmap.md" ] && continue
+  # f — внутри секции; skip — внутри <...>-placeholder (возможно многострочного,
+  # как в шаблоне skill plan). Реальный CORP-HANDOFF-блок угловых скобок не имеет.
+  body=$(awk '
+    /^## Corp impact/{f=1;next}
+    /^## /{f=0}
+    f{
+      if ($0 ~ /</) skip=1
+      if (!skip) print
+      if ($0 ~ />/) skip=0
+    }' "$p" | grep -vE '^[[:space:]]*$|^[[:space:]]*—[[:space:]]*$' || true)
+  [ -n "$body" ] && corp_impact+="--- $p ---"$'\n'"$body"$'\n'
+done
+
+range=""
+if up=$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null); then
+  range="$up..HEAD"
+fi
+touched=""
+[ -n "$range" ] && touched=$(git diff --name-only "$range" 2>/dev/null \
+  | grep -E '^configs/vault-agent/|^compose/[^/]+\.ya?ml$|^\.env\.example$|^configs/crowdsec/whitelists\.yaml$|^ansible/roles/stit-onboard/' || true)
+
+if [ -n "$corp_impact" ]; then
+  echo
+  echo "=== CORP HANDOFF · агрегировано из активных планов · передай корп-админу ==="
+  printf '%s' "$corp_impact"
+  echo "=== (out-of-band: Slack / тикет / PR в stit-infra/infra) ==="
+elif [ -n "$touched" ]; then
+  echo
+  echo "⚠ corp-поверхность тронута в этом push, но ## Corp impact пуст:" >&2
+  printf '    %s\n' $touched >&2
+  echo "  Оформи CORP-HANDOFF (skill corp-handoff) и передай корп-админу до claim «готово»." >&2
+fi
+
 echo "→ push origin $branch"
 git push origin "$branch"
 

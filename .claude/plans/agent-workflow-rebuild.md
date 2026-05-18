@@ -193,13 +193,14 @@ explorer/reviewer subagents; `ship.sh` как единый путь). Отста
   - Зависит от: A8
   - **Done:** `.claude/rules/corp-handoff.md` (paths: vault-agent/compose/.env.example/crowdsec/ansible-onboard) — железобетонное правило + 4 класса (Vault KV / env-онбординг / crowdsec-whitelist / DNS) + CORP-HANDOFF-формат. Skill `corp-handoff` — процедура + делегирование в request-secret. request-secret помечен частным случаем (кросс-ссылка ↔). smartdev чейнит (стр.54/75/119). Оба в реестре.
 
-- [ ] **A15:** ship.sh агрегирует `## Corp impact` + закрытие плана
+- [x] **A15:** ship.sh агрегирует `## Corp impact` + закрытие плана
   - Что делаем: `scripts/ship.sh` перед push печатает агрегированный `## Corp impact`
     из активного плана; warn если corp-поверхность тронута, но handoff-блока нет.
     Обновить roadmap-строку; чекпоинт; при DONE — удалить этот план (forward-only).
   - Файлы: `scripts/ship.sh`, `.claude/plans/roadmap.md`
   - Verify: `make ship` (dry) с планом, где есть `## Corp impact`, печатает агрегат
   - Зависит от: A4, A14
+  - **Done:** ship.sh между `make check` и push: агрегирует `## Corp impact` из активных планов (awk вырезает многострочный `<...>`-placeholder → ребилд-план корректно даёт пусто), warn если corp-поверхность в неотправленных коммитах тронута без блока. Advisory (push не блокирует). Проверено: placeholder→пусто, реальный блок→захват, ребилд (workflow-only) → ни агрегата, ни warn.
 
 ## Corp impact
 
@@ -225,3 +226,9 @@ corp-поверхность — записать CORP-HANDOFF-айтем сюд�
 - Обнаружено: settings.json уже был синхронен через globы (A1-rename сделал основную работу) — A10 свёлся к консистентной чистке + верификации, не к расширению allow.
 - Не переоценивал: Phase 3 (A11-A15) — скилы plan/triage/corp-handoff + plan-check + ship-агрегация. A11 без зависимостей, можно начинать.
 - Следующий шаг: Phase 3 A11 — скил `plan` (тонкий, infra-flavored).
+
+### 2026-05-18 — Phase 3 завершена · план DONE (15/15)
+- Закрыто: A11-A15 ✓. Коммиты `28d8528`(A11) `387e8fc`(A12) `4a51e62`(A13) `cfa0417`(A14) + A15.
+- Все 15 атомов зелёные. `## Corp impact` пуст (ребилд = workflow-only, не трогает compose/Vault-контракт) — сдавать корп-стороне нечего.
+- Незакрытых follow-up нет. Ни один другой план не был `(after agent-workflow-rebuild)`.
+- Forward-only DONE: этот файл удаляется, история — в `git log` (`050834b`..HEAD), строка убирается из `roadmap.md`.
