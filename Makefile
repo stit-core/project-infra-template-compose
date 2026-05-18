@@ -26,8 +26,12 @@ validate: ## Compose syntax + yamllint + .tpl + .env coverage (FORMAT=detailed)
 doctor: ## Live fail-fast preflight: compose/vault-agent/dns/vault/env (A= --full)
 	@bash scripts/tools/doctor.sh $(A)
 
-check: ## Каноничный pre-ship gate: validate + doctor (тело — A4)
-	@echo "check: not yet implemented (A4)"
+check: ## Каноничный pre-ship gate: validate + doctor
+	@echo "→ make validate"
+	@$(MAKE) -s validate
+	@echo "→ make doctor"
+	@$(MAKE) -s doctor
+	@echo "✓ check clean"
 
 ##@ SHIP
 ship: ## commit + push + (если main) ssh-deploy. usage: make ship MSG="feat(foo): bar"

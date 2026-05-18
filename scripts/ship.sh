@@ -30,6 +30,13 @@ if [ "$dirty" -eq 1 ]; then
   git commit -m "$msg"
 fi
 
+echo "→ make check (pre-ship gate)"
+if ! make check; then
+  echo "ERR: make check красный — пуш отменён. Почини и повтори ship." >&2
+  echo "     (коммит уже локально создан — amend после фикса либо новый коммит)" >&2
+  exit 1
+fi
+
 echo "→ push origin $branch"
 git push origin "$branch"
 

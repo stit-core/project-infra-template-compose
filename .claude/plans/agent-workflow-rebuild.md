@@ -78,12 +78,13 @@ explorer/reviewer subagents; `ship.sh` как единый путь). Отста
   - Зависит от: A2
   - **Done:** `scripts/tools/doctor.sh` (+x) — 7 проверок с классификацией PASS/SKIP/WARN/FAIL; `set -e` намеренно снят (диагностич. оркестратор); docker-daemon-down → SKIP не FAIL. clean checkout → `OK` exit 0 (всё SKIP — `make check` зелёный на лаптопе); `.env` без identity → `FAIL: compose config .env identity` exit 1; `A=--full` печатает captured detail. Makefile: прямой `bash` вызов (как validate/status).
 
-- [ ] **A4:** `make check` — каноничный pre-ship gate + ship.sh hookup
+- [x] **A4:** `make check` — каноничный pre-ship gate + ship.sh hookup
   - Что делаем: `check = validate + doctor`; `scripts/ship.sh` гонит `make check`
     до push, abort на красном (fail-fast как backend `release-preflight`).
   - Файлы: `Makefile`, `scripts/ship.sh`
   - Verify: `make check` зелёный на чистом дереве; искусственный красный doctor → ship abort
   - Зависит от: A3
+  - **Done:** Makefile `check` = `$(MAKE) -s validate` + `$(MAKE) -s doctor` + `✓ check clean` (fail-fast: stop на первом красном). ship.sh: `if ! make check` гейт между commit и `git push` (стр.34, push стр.41) — friendly-abort, коммит локально остаётся. clean → exit 0; broken .env → check exit≠0.
 
 - [ ] **A5:** `validate.sh` — concise-by-default + каноничная OK/FAIL + FORMAT=detailed
   - Что делаем: `scripts/tools/validate.sh` сжатый вывод + финальная
