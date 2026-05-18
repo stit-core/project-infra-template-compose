@@ -167,7 +167,7 @@ explorer/reviewer subagents; `ship.sh` как единый путь). Отста
   - Зависит от: A2, A11
   - **Done:** `scripts/tools/validate-plan.sh` (+x, awk per-atom scan): обязательные секции/поля + Verify:/Зависит от: на атом + ≤15 + ADVISORY фазы>8. `make plan-check` direct-bash. Дог-фудинг: rebuild-план → `OK` exit 0; негатив (атом без Verify) → `FAIL` exit 1.
 
-- [ ] **A13:** Скил `triage` (тонкий, infra-failure)
+- [x] **A13:** Скил `triage` (тонкий, infra-failure)
   - Что делаем: `.claude/skills/triage/SKILL.md`. Таблица категорий: compose не
     стартует / healthcheck red / vault-agent retry-loop / cert не выписан / render
     fail / `deploy.sh` fail / on-server drift. Петля: воспроизвести минимально
@@ -177,6 +177,7 @@ explorer/reviewer subagents; `ship.sh` как единый путь). Отста
   - Файлы: `.claude/skills/triage/SKILL.md`
   - Verify: skill present; категории покрывают vault-agent/cert/healthcheck; ссылка из smartdev (A8)
   - Зависит от: A8
+  - **Done:** `.claude/skills/triage/SKILL.md` — 7 категорий (compose/healthcheck/vault-agent retry/cert/render/deploy.sh/on-server drift), петля воспроизвести→прочитать→гипотеза→fix→re-verify зелёный (`make doctor`/`ps`/`validate`, без TDD), corp-причина → corp-handoff, on-server → backport. Чейн из smartdev (стр.52-53). В реестре.
 
 - [ ] **A14:** Rule + skill `corp-handoff`
   - Что делаем: `.claude/rules/corp-handoff.md` (globs: `configs/vault-agent/**`,
