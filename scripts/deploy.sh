@@ -146,6 +146,15 @@ if [ "$template_changed" -eq 1 ] || [ "$profile_changed" -eq 1 ] || [ "$composee
   [ "$profile_changed" -eq 1 ]    && reason="${reason:+$reason + }profile set change"
   [ "$composeenv_changed" -eq 1 ] && reason="${reason:+$reason + }compose.env change (Vault meta tag-rollout)"
   echo "$reason → restart vault-agent + force-recreate consumers"
+  # Инвалидируем rendered-секреты ДО рестарта vault-agent. Иначе vault-health.sh
+  # (test -s) проходит МГНОВЕННО по непустым файлам с ПРОШЛОГО деплоя: up --wait
+  # рапортует healthy ещё до того, как consul-template отрисовал новые значения,
+  # и force-recreate ниже фиксирует в consumer'ах СТАРЫЙ env (падение на
+  # ротированных кредах / старом backend_tag — «vault не успел переренжерить»).
+  # Пустой файл → test -s красный → --wait реально ждёт свежий рендер; vault-agent
+  # перепишет файлы атомарно при restart. compose.env/traefik.yml не трогаем —
+  # они тоже перерендерятся, а healthcheck и так блокируется на пустых secrets.
+  for f in .runtime/secrets/*.env; do [ -e "$f" ] && : > "$f"; done
   docker compose "${args[@]}" restart vault-agent
   docker compose "${args[@]}" up -d --wait --wait-timeout 60 vault-agent
   consumers=$(docker compose "${args[@]}" config 2>/dev/null \

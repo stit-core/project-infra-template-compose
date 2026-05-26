@@ -47,7 +47,9 @@ depends_on:
     condition: service_healthy
 ```
 
-Vault-agent healthy = `.runtime/secrets/.ready` существует = шаблоны отрендерены. Без этого consumer стартует с пустым `env_file` и падает.
+Vault-agent healthy = `.runtime/configs/vault-health.sh` зелёный = **все** expected output'ы под активный `COMPOSE_PROFILES` непусты (`test -s`; `.runtime/secrets/.ready` — лишь liveness-marker, рендерится статически, healthcheck им не гейтит). Без `depends_on: service_healthy` consumer стартует с пустым `env_file` и падает.
+
+**Редеплой со сменой значения** (ротация креды / `backend_tag`-rollout): `scripts/deploy.sh` обнуляет старые `.runtime/secrets/*.env` **перед** `restart vault-agent`. Иначе `test -s` прошёл бы мгновенно по непустым файлам с прошлого деплоя, `up --wait` рапортовал бы healthy до свежего рендера, и `--force-recreate` зафиксировал бы в consumer'е старый env (падение на новых кредах).
 
 ## `internal: true` сеть и `ports:` несовместимы
 
