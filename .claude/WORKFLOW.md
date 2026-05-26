@@ -12,7 +12,7 @@
 | Path-scoped правила | `.claude/rules/*.md` с `paths:` frontmatter | Когда matching-файл в контексте | Advisory |
 | Skills | `.claude/skills/<name>/SKILL.md` | По description-match или явному `/<name>` | Procedural |
 | Subagents | `.claude/agents/*.md` | При делегировании | Role-specific |
-| Hooks | `.claude/settings.json` + `scripts/claude-hooks/*.sh` | На события (PreToolUse/PostToolUse) | **Детерминированно** |
+| Permissions | `.claude/settings.json` `permissions.deny` | Всегда | **Детерминированно** |
 
 ## 2. Цикл одной задачи
 
@@ -27,9 +27,7 @@ COCKPIT ─── /smartdev ведёт: парс сигналов → САМ ч�
             (triage / corp-handoff / plan / add-service / …). Skip-able
             для тривиальной правки — иди сразу в RED→GREEN.
      ↓
-ACT     ─── Edit/Write
-            PostToolUse: docker compose config -q после правки compose
-            PreToolUse: блок image-bump'ов без SKIP_IMAGE_HOOK=1
+ACT     ─── Edit/Write (после правки compose — `make validate`)
      ↓
 VERIFY  ─── make validate (→ make check перед ship: validate + doctor)
             == Infra-touch == ≠ none → corp-handoff ДО claim «готово»
@@ -70,11 +68,10 @@ DEPLOY  ─── `make ship MSG="..."` локально: commit + check + push 
 
 Триггер: «подними backend до 1.2.3».
 
-1. Edit на `image:` строке блокируется PreToolUse-хуком.
-2. Показать diff + release notes, получить OK.
-3. `SKIP_IMAGE_HOOK=1` в окружении Edit.
-4. Отдельный коммит `chore(<svc>): bump <name> to <ver>`.
-5. Push → deploy → verify healthcheck.
+1. Показать diff + release notes, получить явный OK (image-bump — не молча).
+2. Edit на `image:` строке; тег закреплён конкретной версией, не `:latest`.
+3. Отдельный коммит `chore(<svc>): bump <name> to <ver>`.
+4. Push → deploy → verify healthcheck.
 
 ### Г. Ротация секрета
 
@@ -98,13 +95,14 @@ DEPLOY  ─── `make ship MSG="..."` локально: commit + check + push 
 
 | Механизм | Где | Сила |
 |---|---|---|
-| Hooks | `.claude/settings.json` + `scripts/claude-hooks/*.sh` | **Детерминированно** |
+| `permissions.deny` | `.claude/settings.json` | **Детерминированно** |
+| git-хуки | `scripts/git-hooks/*` (commit-msg) | **Детерминированно** (на commit) |
 | Skills | `.claude/skills/<name>/SKILL.md` | Procedure |
 | Path-scoped rules | `.claude/rules/*.md` | Контекстная подсказка |
 | AGENTS.md | repo root | Always-on advisory |
 | Subagent prompts | `.claude/agents/*.md` | Role-specific |
 
-Критичные инварианты (no `--no-verify`, no image-bumps без OK, no `:latest`) — в хуках. Стиль и conventions — в AGENTS.md и rules.
+Жёсткие запреты (no `--no-verify`, no `git push --force`, no `docker volume rm` / `down -v`, no запись в auto-memory) — `permissions.deny` в `.claude/settings.json`. Conventional Commits — git-хук `commit-msg`. Стиль и conventions (включая no `:latest`, image-bump только с OK) — advisory в AGENTS.md и rules, проверяются `make validate`.
 
 **Cockpit-чейнинг:** `/smartdev` парсит `make status`-сигналы и сам переключает в `triage` (Critical ≠ none / багфикс), `corp-handoff` (Infra-touch ≠ none), `plan` (крупная задача), `add-service`/`request-secret`/`dr-restore`/`bootstrap-vps` (по задаче). **CORP-HANDOFF** — soft-механизм (`.claude/rules/corp-handoff.md` + skill, не хук): единственная гарантия — что агент его исполняет; тронул corp-поверхность → блок до claim «готово».
 
@@ -130,7 +128,7 @@ DEPLOY  ─── `make ship MSG="..."` локально: commit + check + push 
 
 | Симптом | Куда |
 |---|---|
-| Хук блокирует не по делу | `scripts/claude-hooks/*.sh` + `.claude/settings.json` `hooks` |
+| `permissions.deny` блокирует не по делу | `.claude/settings.json` `permissions` (или `.claude/settings.local.json` для локальных override) |
 | Skill не активируется | `description` в frontmatter — переписать конкретнее |
 | Path-rule не подгружается | `paths:` glob в frontmatter |
 | Коммит reject'нут | `scripts/git-hooks/commit-msg` — type ∈ {feat, fix, refactor, docs, test, chore, meta} |

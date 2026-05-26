@@ -55,42 +55,5 @@
       "MultiEdit(**/.claude/projects/**/memory/**)",
       "NotebookEdit(**/.claude/projects/**/memory/**)"
     ]
-  },
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "scripts/claude-hooks/pre-bash-destructive.sh"
-          }
-        ]
-      },
-      {
-        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "scripts/claude-hooks/pre-edit-image-bump.sh"
-          },
-          {
-            "type": "command",
-            "command": "scripts/claude-hooks/pre-write-no-memory.sh"
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "Edit|Write|MultiEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "scripts/claude-hooks/post-compose-validate.sh"
-          }
-        ]
-      }
-    ]
   }
 }

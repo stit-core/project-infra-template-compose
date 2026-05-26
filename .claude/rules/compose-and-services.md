@@ -24,7 +24,7 @@ paths:
 
 ## Обязательные поля
 
-- `image` с **закреплённой версией** (никаких `:latest`). PreEdit-хук блокирует.
+- `image` с **закреплённой версией** (никаких `:latest`).
 - `container_name` совпадает с ключом сервиса.
 - `restart: unless-stopped`.
 - `healthcheck` (CMD на сам контейнер).
@@ -103,8 +103,8 @@ Backup-контейнер (`containers/backup/`) бэкапит **только**
 
 ## После любой правки compose
 
-`docker compose config -q` (PostToolUse-хук гонит автоматически). На сервере — `make deploy` → `git pull → render-configs → compose up -d --wait --wait-timeout 120`.
+`make validate` (compose syntax + yamllint + .tpl + .env coverage). На сервере — `make deploy` → `git pull → render-configs → compose up -d --wait --wait-timeout 120`.
 
 ## Bump образа
 
-**Никогда не меняй image-тег без явного OK.** Hook `pre-edit-image-bump.sh` блокирует. Bump = отдельный коммит `chore(<svc>): bump <name> to <version>` с release-notes в теле.
+**Никогда не меняй image-тег без явного OK.** Bump = отдельный коммит `chore(<svc>): bump <name> to <version>` с release-notes в теле.
