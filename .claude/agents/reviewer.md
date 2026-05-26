@@ -59,7 +59,7 @@ Code reviewer со свежим контекстом. Вызывают чтоб�
 
 ### Docs
 - Ссылки `docs/<x>.md#anchor` ведут куда надо?
-- ADR имеет Status / Context / Decision / Consequences?
+- «Почему/решения» — present-state inline (§Решения/Non-goals), без нарратива об изменении (rule `forward-only`)?
 
 ### Conventional Commits
 - subject ≤72?

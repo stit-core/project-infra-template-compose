@@ -18,7 +18,7 @@ ship-поверхность. Приложения и живого стека л�
 `backup`/`restore-pg`) прозрачно оборачивают ssh на VPS (local-ssh-wrapper, Phase 7).
 Локальный SKIP в authoring-проверках без `.env`/docker — норма, не падение.
 
-**Current focus:** Phase 4 · A13 (A8 отложен в самый конец — rules последними)
+**Current focus:** Phase 5 · A18 (A8 отложен в самый конец — rules последними)
 
 ## Active
 
@@ -106,7 +106,7 @@ vault-agent webhook) — вне этого плана.
   - **Done:** (1) forward-only §«Планы» + `## Активные`→`## Active` под single-file. (2) sweep `<slug>.md`→roadmap в smartdev/corp-handoff skill+rule (+ `## Corp impact`→`**Corp impact.**`). (3) plan-check в `make check` → `OK (1 plan(s) checked)`. (4) `scripts/git-hooks/pre-commit` (валидирует roadmap на change), `make setup` ставит. (5) `ship.sh` corp-impact переписан на single-file: читает `**Corp impact.**` из `### `-секций под `## Active` (был мёртв — грепал `## Corp impact` в per-slug, скипал roadmap). Smoke → 3 айтема. Все 5 verify зелёные.
 
 #### Phase 3 — make-first + порядок скилов/правил
-- [ ] **A7:** Rule `.claude/rules/make-first.md`
+- [x] **A7:** Rule `.claude/rules/make-first.md`
   - Что делаем: канон `make <verb>` (словарь из `Makefile`), список raw-docker исключений
     (`docker exec` под `restic`/`cscli`/`mc`/`ls`), local-vs-remote split (ops → ssh-wrapper).
   - Verify: `make validate` → OK; `grep -c '^name:' .claude/rules/make-first.md` → 1 · Зависит от: —
@@ -119,18 +119,18 @@ vault-agent webhook) — вне этого плана.
     `configs/vault-agent/**`, `compose/*.yml`, ansible onboard — по содержимому правила).
   - Verify: `make validate` → OK; во всех `.claude/rules/*.md` есть `name:`+`description:`+`paths:` · Зависит от: —
   - Ref: —
-- [ ] **A9:** Нормализовать `smartdev` + `triage`
+- [x] **A9:** Нормализовать `smartdev` + `triage`
   - Что делаем: секции под де-факто канон (`Когда применять`/`Когда НЕ применять`/`Шаги`/`Anti-patterns`);
     `docker logs` → `make logs SVC=`; внутренности `deploy.sh` пометить explanatory; local/remote из make-first.
   - Verify: `make validate` → OK; raw docker — только explanatory · Зависит от: A7
   - Ref: `stit-infra/go-backend-template/.claude/skills/smartdev/SKILL.md`
   - **Done:** smartdev — local/remote split делегирован в rule `make-first` (line 37), секция «Что делает deploy.sh» получила explanatory-маркер (не команды для ручного запуска). triage — исправлен устаревший «deny-хук»→`permissions.deny` (Claude-хук снесён), `docker compose config` помечен как make-first debug-исключение. `make validate` → OK; оставшийся raw-docker — explanatory (deploy.sh-внутренности) + anti-pattern-пример.
-- [ ] **A10:** Нормализовать `bootstrap-vps` + `dr-restore`
+- [x] **A10:** Нормализовать `bootstrap-vps` + `dr-restore`
   - Что делаем: raw `docker exec` под restic/cscli/mc — legit со ссылкой на make-first; остальное через make; секции под де-факто канон.
   - Verify: `make validate` → OK · Зависит от: A7
   - Ref: `stit-infra/go-backend-template/.claude/skills/triage-failure/SKILL.md`
   - **Done:** dr-restore — `docker logs`→`make logs SVC=` (диагностика, acme-проверка); restic-exec + throwaway-pg помечены make-first исключениями. bootstrap-vps — verify `docker logs`→`make logs SVC=`; cscli/mc/ls exec помечены исключениями; destructive `docker volume rm traefik-acme` помечен (deny-blocked для агента, ручной operator-шаг с явным OK). `make validate` → OK; оставшийся raw-docker — blessed-exec/throwaway/explanatory/destructive-manual.
-- [ ] **A11:** Нормализовать `add-service` + `corp-handoff` + `request-secret`
+- [x] **A11:** Нормализовать `add-service` + `corp-handoff` + `request-secret`
   - Что делаем: порядок секций под де-факто канон, ссылки на make-first; контент по сути не менять.
   - Verify: `make validate` → OK · Зависит от: A7
   - Ref: `stit-infra/go-backend-template/.claude/skills/scaffold/SKILL.md`
@@ -143,28 +143,64 @@ vault-agent webhook) — вне этого плана.
   - **Done:** CLAUDE.md §Стиль получил make-first-буллет (канон + raw-docker исключения → rule). Сверка скилов: весь raw-docker несёт explanatory/make-first маркер в прилегающей прозе (smartdev deploy-internals, dr-restore restic/throwaway, bootstrap-vps exec/destructive-manual/corp-side). `make validate` + `make plan-check` → OK. Прим.: raw-docker в ПРАВИЛАХ (secrets-and-env, traefik-routing, compose-and-services) — отложен к rules-работе (A8/конец, «пусть живут»); там вызовы explanatory/blessed-style, аннотирую при финальном касании правил.
 
 #### Phase 4 — docs: переразложить, снести adrs
-- [ ] **A13:** `docs/README.md` (роутер) + `docs/getting-started.md` (потребитель)
-  - Что делаем: роутер на 3 аудитории; getting-started — fork → bootstrap-vps → /init-project → own infra.
-  - Verify: `make validate` → OK · Зависит от: A2
+**Решения проработки (2026-05-26).** ecosystem.md — тонкий локальный (роль репо + контракты +
+указатель на корп-канон, зеркалит эталон). onboarding.md операционка — расписывается ЦЕЛИКОМ в
+getting-started.md (полный Day-0/Day-1, не лёгкий design-first). /init-project — forward-ссылка
+уже сейчас (journey описывает путь, не наличие; снять пометку в Phase 8/A32). ADR-«почему»
+(compose-only, env-centralized) — НЕ мигрируем нигде, очевидно из present-state доков.
+- [x] **A13:** `docs/README.md` (роутер) + `docs/getting-started.md` (потребитель)
+  - Что делаем: роутер на 3 аудитории + reference + design-source (Phase 8). getting-started `[META]` —
+    полный путь потребителя: fork → bootstrap-vps (Day-0 corp-онбординг + Day-1 ansible/deploy-key/
+    registry/.env) → первый деплой → активация профилей → /init-project (forward-ссылка) → own infra.
+    Впитывает операционку `onboarding.md` целиком (onboarding.md удаляется в A15 при переезде).
+  - Verify: `make validate` → OK; `test -e docs/README.md && test -e docs/getting-started.md` · Зависит от: A2
   - Ref: `stit-infra/go-backend-template/docs/{README,getting-started}.md`
-- [ ] **A14:** `docs/contributing.md` (как устроен `.claude`-слой)
+  - **Done:** `docs/README.md` (роутер на 3 аудитории + reference + design-source-плейсхолдер Phase 8),
+    `docs/getting-started.md` `[META]` (полный путь 0-8: форк → Day-0 corp-онбординг → Day-1 ansible/
+    deploy-key/registry → .env → первый деплой → активация профилей → /init-project forward-ссылка →
+    /de-template → own infra; впитал операционку onboarding.md). `make validate` → OK; оба файла есть.
+    Прим.: README ссылается на `reference/*` — создаются в A15 (один фазовый юнит, ссылки резолвятся до ship).
+- [x] **A14:** `docs/contributing.md` (как устроен `.claude`-слой)
   - Что делаем: матрица слоёв (rules/skills/agents/settings, где/когда грузятся/enforce), цикл, troubleshooting.
   - Verify: `make validate` → OK · Зависит от: A2
   - Ref: `stit-infra/go-backend-template/docs/contributing.md`
+  - **Done:** `docs/contributing.md` зеркалит эталон под факт-раскладку репо: матрица слоёв, 8 rules/
+    8 skills/2 agents, цикл задачи (ship вместо CI), «кто enforce'ит» (commit-msg + pre-commit на
+    roadmap + `make check`-gate в ship.sh; нет Claude-хуков, нет pre-push), course-correction,
+    «осознанно не делаем» (CI/Claude-хуки/per-plan-файлы/ADR-папка/bloat), troubleshooting под
+    make validate/doctor/plan-check. `make validate` → OK.
 - [ ] **A15:** Проработать `docs/reference/{architecture,ecosystem,runbook}.md`
-  - Что делаем: качественные артефакты; «почему» (compose-only, env-centralized) — present-state
-    inline (§Решения/Non-goals), БЕЗ ADR-номеров. Перенести суть из старых `architecture/onboarding/runbook`.
-  - Verify: `make validate` → OK · Зависит от: A13
+  - Что делаем: architecture ← `docs/architecture.md` (present-state, без ADR-«почему»; §«Что НЕ в
+    шаблоне» сохраняем). ecosystem ← тонкий локальный: роль проектной VPS + контракты с корпом +
+    указатель на канон `stit-infra/infra/docs/ecosystem.md`. runbook ← `docs/runbook.md`. Удалить
+    старые `docs/{architecture,onboarding,runbook}.md`. Sweep ссылок `docs/architecture.md`/
+    `docs/onboarding.md`/`docs/runbook.md` → новые пути в `CLAUDE.md` + `.claude/**`.
+  - Verify: `make validate` → OK; `test -e docs/reference/architecture.md -a -e docs/reference/ecosystem.md -a -e docs/reference/runbook.md`; `test ! -e docs/architecture.md -a ! -e docs/onboarding.md -a ! -e docs/runbook.md`; `grep -rn 'docs/\(architecture\|onboarding\|runbook\)\.md' CLAUDE.md .claude --include='*.md' | grep -v '\.claude/plans/'` → пусто · Зависит от: A13
   - Ref: `stit-infra/go-backend-template/docs/reference/{architecture,ecosystem}.md`
+  - **Done:** `git mv` architecture/runbook → `docs/reference/`; `docs/onboarding.md` снесён (операционка
+    в getting-started, A13). `docs/reference/ecosystem.md` создан тонким (роль проектной VPS + контракты
+    с корпом + указатель на канон `stit-infra/infra/docs/ecosystem.md`). Sweep путей в CLAUDE.md (карта +
+    auto-memory + Стек §), корневом README.md (×3), WORKFLOW.md (×4, удаляется в A19), dr-restore SKILL.md
+    (×3). ADR-«почему» НЕ мигрировал (решено). Все 4 verify зелёные; grep-gate CLEAN.
 - [ ] **A16:** Удалить `docs/adrs/**` + почистить ADR-следы
-  - Что делаем: снести `docs/adrs/`; `forward-only.md` убрать секцию «исключение — ADR»;
-    `reviewer.md` убрать ADR-чек.
+  - Что делаем: снести `docs/adrs/` целиком (0001/0002/template — «почему» НЕ мигрируем, решено);
+    `forward-only.md` убрать секцию «Единственное исключение — ADR» + упоминания ADR в §«Чего не
+    пишем»/§«Граница»; `.claude/agents/reviewer.md` убрать ADR-чек.
   - Verify: `test ! -e docs/adrs`; `grep -rn 'ADR\|adrs/' .claude docs CLAUDE.md | grep -v '/\.git/'` → нет стейл; `make validate` → OK · Зависит от: A15
   - Ref: `stit-infra/go-backend-template/docs/` (нет adrs/ — зеркалим отсутствие)
-- [ ] **A17:** Вшить env-framing в доки
+  - **Done:** `docs/adrs/` снесён целиком (0001/0002/template). forward-only.md — убрана секция
+    «Единственное исключение — ADR», ADR-примеры в §«Чего не пишем»/§«Как вместо этого»/§«Граница»
+    перефразированы на present-state (§Решения/Non-goals в reference-доке). reviewer.md — ADR-чек →
+    forward-only-чек. `docs/adrs` нет; `make validate` → OK. Остаточные «ADR» — present-state
+    утверждения об ОТСУТСТВИИ ADR (forward-only.md §34, contributing §71), не стейл-ссылки.
+- [x] **A17:** Вшить env-framing в доки
   - Что делаем: workstation-не-app-host + ssh-wrapper модель в getting-started + contributing.
   - Verify: `make validate` → OK · Зависит от: A13, A14
   - Ref: `stit-infra/go-backend-template/docs/reference/ecosystem.md`
+  - **Done:** getting-started — блок «Где ты работаешь» (workstation = authoring/validate/plan/ship,
+    живого стека нет, make ship → remote deploy.sh, ops через ssh.sh, local SKIP норма). contributing —
+    блок «Где это запускается» (validate без стека / doctor SKIP без `.env` / ops оборачивают SSH).
+    `make validate` + `make plan-check` → OK.
 
 #### Phase 5 — Раззнести и удалить WORKFLOW.md
 - [ ] **A18:** Раззнести `.claude/WORKFLOW.md` по homes

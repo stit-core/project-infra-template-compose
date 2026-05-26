@@ -2,7 +2,7 @@
 
 Этот документ — для человека. Описывает как работать с шаблоном `<client-org>/infra` через Claude Code.
 
-Контекст: `CLAUDE.md` (постоянный), `README.md` (human-обзор), `docs/architecture.md`, `docs/onboarding.md`, `docs/runbook.md`.
+Контекст: `CLAUDE.md` (постоянный), `README.md` (human-обзор), `docs/reference/architecture.md`, `docs/getting-started.md`, `docs/reference/runbook.md`.
 
 ## 1. Что лежит где
 
@@ -87,7 +87,7 @@ DEPLOY  ─── `make ship MSG="..."` локально: commit + check + push 
 
 Триггер: «postgres упал», «volume потерян», «host crashed».
 
-1. Skill `dr-restore` ведёт через runbook (`docs/runbook.md`).
+1. Skill `dr-restore` ведёт через runbook (`docs/reference/runbook.md`).
 2. Каждый destructive шаг — явный OK.
 3. После — записать в `docs/incidents/YYYY-MM-DD-<short>.md`.
 
@@ -120,7 +120,7 @@ DEPLOY  ─── `make ship MSG="..."` локально: commit + check + push 
 ## 6. Что осознанно не делаем
 
 - Auto-deploy через Gitea Actions для прод-веток — solo-flow, ручной шаг = sanity check. CI используется только для билда/тестов backend образа.
-- Per-service runbook'и сверх `docs/runbook.md` — `docs/runbook.md` единый; отдельный per-service runbook заводится только под конкретный повторяющийся инцидент.
+- Per-service runbook'и сверх `docs/reference/runbook.md` — `docs/reference/runbook.md` единый; отдельный per-service runbook заводится только под конкретный повторяющийся инцидент.
 - Vault как primary store с прямым SDK — backend не ходит в Vault, читает только `.runtime/secrets/*.env`. Это сознательно: vault-agent изолирует auth.
 - Multi-host / HA — single-VPS осознанный trade-off для проектного шаблона.
 

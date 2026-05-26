@@ -13,7 +13,7 @@ IaC шаблон проектной инфры для stit.tech: docker-compose 
 - **Backup:** self-contained контейнер (alpine + restic + pg_dumpall + busybox crond), daily в restic-репо. Endpoint + creds приходят из `kv/projects/<p>/<env>/backup` — корп-сторона выбирает (external managed S3 / bare-IP / local-minio rehearsal).
 - **Bootstrap:** ansible (apt + swap + journald + ssh-hardening + docker).
 
-См. `docs/architecture.md` для деталей.
+См. `docs/reference/architecture.md` для деталей.
 
 ## Использовать как шаблон
 
@@ -82,7 +82,7 @@ curl -X POST -H "Authorization: token $GITEA_TOKEN" -H "Content-Type: applicatio
    - После seed'а от админа — добавить нужный profile в `COMPOSE_PROFILES` в `.env` и `make ship`.
    - Стандартные имена: `db` / `minio` / `backup` / `oidc` / `jwt`. Project-specific (`stripe-key`, etc.) — что угодно.
 
-См. `docs/onboarding.md` для расширенной версии (DNS, restore-from-backup).
+См. `docs/getting-started.md` для полного пути (Day-0/Day-1, активация профилей, /init-project).
 
 ## Принципы
 
@@ -98,4 +98,4 @@ curl -X POST -H "Authorization: token $GITEA_TOKEN" -H "Content-Type: applicatio
 - `otel.stit.tech` — observability ingest. Tenant routing по `service.namespace=<project>-<env>` + Bearer-token из `kv/projects/<p>/<env>/otel`.
 - `git.stit.tech` — registry для backend/worker/frontend images.
 
-Restore из backup'а — `make restore-pg SNAPSHOT=latest`, см. `docs/runbook.md`.
+Restore из backup'а — `make restore-pg SNAPSHOT=latest`, см. `docs/reference/runbook.md`.

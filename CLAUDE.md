@@ -56,7 +56,7 @@ Always-on (traefik / vault-agent / crowdsec / otel-agent / node-exporter / cadvi
 поднимается на минимальном seed'е (`meta` + `otel` от корпа при онбординге). `postgres` /
 `storage` (minio + backup) / `backend` — opt-in через `COMPOSE_PROFILES`, активируются после
 seed'а соответствующих KV. Сети: `proxy` (наружу), `backend-net` (internal). См.
-`.claude/rules/multi-env.md` + `docs/architecture.md`.
+`.claude/rules/multi-env.md` + `docs/reference/architecture.md`.
 
 ## Команды
 
@@ -79,14 +79,14 @@ seed'а соответствующих KV. Сети: `proxy` (наружу), `ba
 
 | Тема | Где |
 |---|---|
-| Архитектура, сети, профили, non-goals | `docs/architecture.md` |
+| Архитектура, сети, профили, non-goals | `docs/reference/architecture.md` |
 | KV-layout, AppRole, multi-env, lazy-seed | `.claude/rules/multi-env.md` |
 | Compose-инварианты сервиса | `.claude/rules/compose-and-services.md` |
 | Секреты и `.env` | `.claude/rules/secrets-and-env.md` |
 | Корп-handoff (когда тронул corp-поверхность) | `.claude/rules/corp-handoff.md` + skill `/corp-handoff` |
-| Онбординг / чек-лист копирования | `docs/onboarding.md` |
-| Runbook / инциденты | `docs/runbook.md` |
-| Экосистема 4 репо, контракты | `stit-infra/infra/docs/ecosystem.md` |
+| Онбординг / путь потребителя | `docs/getting-started.md` |
+| Runbook / инциденты | `docs/reference/runbook.md` |
+| Экосистема 4 репо, контракты | `docs/reference/ecosystem.md` (→ канон `stit-infra/infra/docs/ecosystem.md`) |
 
 ## Корп-контракт
 
@@ -158,7 +158,7 @@ out-of-band. AppRole строго read-only на свой `<p>/<env>`. Подр�
 4. `configs/vault-agent/templates/backend.env.tpl` — project-specific env, если backend читает сверх контракта.
 5. `configs/traefik/dynamic/` — клиент-специфичные routers/middlewares (опц.).
 
-Полный чек-лист — `docs/onboarding.md`.
+Полный путь потребителя — `docs/getting-started.md`.
 
 ## Auto-memory
 
@@ -168,9 +168,9 @@ out-of-band. AppRole строго read-only на свой `<p>/<env>`. Подр�
 | Что | Куда |
 |---|---|
 | Постоянные правила/предпочтения для агента | `CLAUDE.md` или `.claude/rules/<topic>.md` |
-| Архитектурные решения / «почему» | `docs/architecture.md` (inline, present-state) |
+| Архитектурные решения / «почему» | `docs/reference/architecture.md` (inline, present-state) |
 | Активные задачи / план работ | `.claude/plans/roadmap.md` (single-file) |
-| Reference на внешние системы | `docs/architecture.md`, `docs/onboarding.md`, `docs/runbook.md` |
+| Reference на внешние системы | `docs/reference/{architecture,ecosystem,runbook}.md`, `docs/getting-started.md` |
 | Креды и где используются | вне репо (Vaultwarden, оператор-only заметка) |
 
 Технически: `autoMemoryEnabled: false` + `permissions.deny` на `Write`/`Edit`/`MultiEdit`/

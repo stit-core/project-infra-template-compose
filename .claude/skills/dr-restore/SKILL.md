@@ -7,7 +7,7 @@ description: Disaster recovery проектной инфры — восстан�
 
 Восстановление проектной инфры из restic-бэкапа. Главное: **destructive шаги требуют явного OK от пользователя**. Не спеши, спрашивай, верифицируй.
 
-Полный пошаговый runbook — `docs/runbook.md`. Этот skill — interactive-флоу.
+Полный пошаговый runbook — `docs/reference/runbook.md`. Этот skill — interactive-флоу.
 
 ## Когда применять
 
@@ -72,7 +72,7 @@ make restore-pg SNAPSHOT=latest                  # либо SNAPSHOT=<id>
 4. `restic dump | gunzip | psql -d template1` — pg_dumpall сам CREATE'ит DB + `\connect` + загружает.
 5. Start backend.
 
-**Не пиши свой restore руками** — скрипт стандартизирован. Если он не подходит (например, нужен restore в throwaway DB для drill) — см. блок «Quarterly DR drill» в `docs/runbook.md`.
+**Не пиши свой restore руками** — скрипт стандартизирован. Если он не подходит (например, нужен restore в throwaway DB для drill) — см. блок «Quarterly DR drill» в `docs/reference/runbook.md`.
 
 ### B. Single table / row recovery
 
@@ -120,4 +120,4 @@ Local-default `s3:http://minio:9000/backups` отсутствует by design �
 
 Для prod — `repository` в `kv/projects/<p>/<env>/backup` должен указывать на external endpoint. От local minio защищает только дисциплина корп-админа при seed'е этого KV-объекта.
 
-См. `docs/runbook.md` → «Полная замена VPS» при сохранившемся репо и «Quarterly DR drill» для регулярной проверки что backup восстанавливается.
+См. `docs/reference/runbook.md` → «Полная замена VPS» при сохранившемся репо и «Quarterly DR drill» для регулярной проверки что backup восстанавливается.
