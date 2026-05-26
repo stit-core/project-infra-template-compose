@@ -18,7 +18,7 @@ ship-поверхность. Приложения и живого стека л�
 `backup`/`restore-pg`) прозрачно оборачивают ssh на VPS (local-ssh-wrapper, Phase 7).
 Локальный SKIP в authoring-проверках без `.env`/docker — норма, не падение.
 
-**Current focus:** Phase 3 · A9 (A8 отложен в самый конец — rules последними)
+**Current focus:** Phase 4 · A13 (A8 отложен в самый конец — rules последними)
 
 ## Active
 
@@ -124,19 +124,23 @@ vault-agent webhook) — вне этого плана.
     `docker logs` → `make logs SVC=`; внутренности `deploy.sh` пометить explanatory; local/remote из make-first.
   - Verify: `make validate` → OK; raw docker — только explanatory · Зависит от: A7
   - Ref: `stit-infra/go-backend-template/.claude/skills/smartdev/SKILL.md`
+  - **Done:** smartdev — local/remote split делегирован в rule `make-first` (line 37), секция «Что делает deploy.sh» получила explanatory-маркер (не команды для ручного запуска). triage — исправлен устаревший «deny-хук»→`permissions.deny` (Claude-хук снесён), `docker compose config` помечен как make-first debug-исключение. `make validate` → OK; оставшийся raw-docker — explanatory (deploy.sh-внутренности) + anti-pattern-пример.
 - [ ] **A10:** Нормализовать `bootstrap-vps` + `dr-restore`
   - Что делаем: raw `docker exec` под restic/cscli/mc — legit со ссылкой на make-first; остальное через make; секции под де-факто канон.
   - Verify: `make validate` → OK · Зависит от: A7
   - Ref: `stit-infra/go-backend-template/.claude/skills/triage-failure/SKILL.md`
+  - **Done:** dr-restore — `docker logs`→`make logs SVC=` (диагностика, acme-проверка); restic-exec + throwaway-pg помечены make-first исключениями. bootstrap-vps — verify `docker logs`→`make logs SVC=`; cscli/mc/ls exec помечены исключениями; destructive `docker volume rm traefik-acme` помечен (deny-blocked для агента, ручной operator-шаг с явным OK). `make validate` → OK; оставшийся raw-docker — blessed-exec/throwaway/explanatory/destructive-manual.
 - [ ] **A11:** Нормализовать `add-service` + `corp-handoff` + `request-secret`
   - Что делаем: порядок секций под де-факто канон, ссылки на make-first; контент по сути не менять.
   - Verify: `make validate` → OK · Зависит от: A7
   - Ref: `stit-infra/go-backend-template/.claude/skills/scaffold/SKILL.md`
-- [ ] **A12:** Замок: сверка `grep docker` + `CLAUDE.md` §Стиль
+  - **Done:** add-service / corp-handoff уже канон-совместимы (секции `Когда применять`/`НЕ применять`/`Шаги`/`Anti-patterns`, команды через make, raw-docker только в explanatory YAML-комментарии) — правок не потребовали. request-secret — убран стейл «без хука» (отсылал к снесённым Claude-хукам) → «plain-текст для copy-paste». `make validate` → OK.
+- [x] **A12:** Замок: сверка `grep docker` + `CLAUDE.md` §Стиль
   - Что делаем: каждый raw-docker — explanatory или в исключениях make-first; в `CLAUDE.md`
     §Стиль ссылка на `make-first`.
   - Verify: `make validate` → OK; `make plan-check` → OK · Зависит от: A9, A10, A11
   - Ref: `stit-infra/go-backend-template/CLAUDE.md`
+  - **Done:** CLAUDE.md §Стиль получил make-first-буллет (канон + raw-docker исключения → rule). Сверка скилов: весь raw-docker несёт explanatory/make-first маркер в прилегающей прозе (smartdev deploy-internals, dr-restore restic/throwaway, bootstrap-vps exec/destructive-manual/corp-side). `make validate` + `make plan-check` → OK. Прим.: raw-docker в ПРАВИЛАХ (secrets-and-env, traefik-routing, compose-and-services) — отложен к rules-работе (A8/конец, «пусть живут»); там вызовы explanatory/blessed-style, аннотирую при финальном касании правил.
 
 #### Phase 4 — docs: переразложить, снести adrs
 - [ ] **A13:** `docs/README.md` (роутер) + `docs/getting-started.md` (потребитель)

@@ -108,6 +108,9 @@ out-of-band. AppRole строго read-only на свой `<p>/<env>`. Подр�
 
 ## Стиль
 
+- **make-first.** Все операции — через `make <verb>` (`make help`); скрипты за таргетами напрямую
+  не дёргаем. Raw-`docker` — только legit-исключения (restic/cscli/mc/ls через `docker exec`,
+  throwaway в DR, explanatory deploy.sh-внутренности). Канон и список исключений — rule `.claude/rules/make-first.md`.
 - **YAML 2-space indent**, без табов.
 - **Image закреплён конкретной версией.** `:latest` запрещён — конвенция, ловится `make validate`.
 - **Каждый сервис имеет** `restart`, `healthcheck`, `container_name`, явный `networks`.

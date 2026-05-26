@@ -19,7 +19,7 @@ description: Disaster recovery проектной инфры — восстан�
 ## Когда НЕ применять
 
 - Простой restart — `make restart SVC=<x>`.
-- Диагностика — сначала `docker logs <svc>`.
+- Диагностика — сначала `make logs SVC=<svc>`.
 - Откат изменений в репо — `git revert`.
 
 ## Базовый набор данных
@@ -48,7 +48,7 @@ Retention в `containers/backup/backup-now`: 7 daily / 4 weekly / 3 monthly.
 
 ### 1. Список снапшотов
 
-На VPS (backup-контейнер должен быть up; если стек down — поднять `vault-agent` + `postgres` + `backup` отдельно через compose up).
+На VPS (backup-контейнер должен быть up; если стек down — поднять `vault-agent` + `postgres` + `backup` отдельно через compose up). `restic` живёт внутри backup-контейнера и make-обёртки не имеет — `docker exec backup restic …` legit (make-first debug-исключение).
 
 ```bash
 docker exec backup restic snapshots --compact
@@ -76,7 +76,7 @@ make restore-pg SNAPSHOT=latest                  # либо SNAPSHOT=<id>
 
 ### B. Single table / row recovery
 
-Снапшоты — file-level (pg_dumpall.sql.gz), не PITR. Гранулярность — daily snapshots, не запись. Для одной таблицы:
+Снапшоты — file-level (pg_dumpall.sql.gz), не PITR. Гранулярность — daily snapshots, не запись. Для одной таблицы (throwaway-контейнер вне compose-стека — make-first исключение):
 
 1. Поднять throwaway postgres: `docker run --rm -d --name pg-tmp -e POSTGRES_PASSWORD=tmp postgres:17.9-alpine`.
 2. `restic dump <id> /pgdump-<UTC>.sql.gz | gunzip | docker exec -i pg-tmp psql -U postgres`.
@@ -101,7 +101,7 @@ make restore-pg SNAPSHOT=latest                  # либо SNAPSHOT=<id>
 После любого restore:
 - `make ps` — всё healthy?
 - В UI/API данные на месте?
-- LE-сертификаты не пере-выпускались впустую (проверь `docker logs traefik | grep acme`)?
+- LE-сертификаты не пере-выпускались впустую (`make logs SVC=traefik`, grep `acme`)?
 
 ### 4. Логировать восстановление
 

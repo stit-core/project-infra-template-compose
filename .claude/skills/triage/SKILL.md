@@ -29,7 +29,7 @@ description: Red-арм cockpit'а — структурированный раз
 
 | Тип | Признаки | Где смотреть |
 |---|---|---|
-| **compose не стартует** | `docker compose up` error, сервис не создаётся | `make validate` → `make doctor` → `docker compose config` |
+| **compose не стартует** | `docker compose up` error, сервис не создаётся | `make validate` → `make doctor` → `docker compose config` (raw — debug-исключение make-first) |
 | **healthcheck red** | `make ps` unhealthy / restarting | `make logs SVC=<svc>` — последние строки перед рестартом |
 | **vault-agent retry-loop** | logs спамят 403 / permission denied / missing path; `.runtime/secrets/*.env` пустые | `make logs SVC=vault-agent`; `make doctor` (vault KV) — AppRole expired / KV не засеян корпом |
 | **cert не выписан** | HTTPS не открывается, traefik спамит acme | `make logs SVC=traefik` + `grep -i acme` — DNS NXDOMAIN / LE rate-limit / HTTP-01 |
@@ -104,7 +104,7 @@ make logs SVC=<svc>      # подтверди, что ретраи прекра�
 
 - ❌ Рестарт «чтобы прошло» без понимания причины — вернётся.
 - ❌ Правка на хосте без backport в git в тот же день.
-- ❌ `docker compose down -v` / `docker volume rm` — теряет данные (deny-хук, и правильно).
+- ❌ `docker compose down -v` / `docker volume rm` — теряет данные (блокирует `permissions.deny`, и правильно).
 - ❌ Раздуть healthcheck-timeout вместо фикса причины unhealthy.
 - ❌ Workaround'ить отсутствующий KV / политику вместо `corp-handoff`.
 - ❌ «while we're at it» — расширение скоупа в багфиксе. Фикс = маленький коммит; большое — `plan`.

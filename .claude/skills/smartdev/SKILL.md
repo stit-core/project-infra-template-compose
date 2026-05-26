@@ -35,7 +35,8 @@ make status
 - `== Branch ==` / `== Working tree ==` / `== Compose ==` / `== Recent commits ==` — фон
 
 Серверные проверки требуют доступа: `make ps` / `make logs SVC=<svc>` / `make doctor`
-(на VPS либо через `scripts/tools/ssh.sh`). Локально без `.env` многое будет SKIP — это норма.
+(на VPS либо через `scripts/tools/ssh.sh`; local/remote split — rule `make-first`). Локально
+без `.env` многое будет SKIP — это норма.
 
 ## 2. Поднять контекст
 
@@ -93,6 +94,9 @@ make ship MSG="feat(foo): bar"
 `make ship` без `MSG` (чистое дерево) = check + push + deploy (форс-передеплой `main`).
 
 ### Что делает `scripts/deploy.sh` на VPS
+
+Перечисление внутренностей сервер-side скрипта — explanatory, не команды для ручного запуска
+(канон — `make deploy`; raw-docker исключения — rule `make-first`).
 
 1. `git pull --ff-only origin main` — fail если remote разошлась.
 2. `scripts/render-configs.sh` — envsubst для `.tpl` + сборка `agent.hcl`.

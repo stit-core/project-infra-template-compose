@@ -34,10 +34,12 @@ Provisioning нового VPS под клиентский проект — од�
 vault kv patch kv/projects/acme/dev/meta acme_caserver=https://acme-staging-v02.api.letsencrypt.org/directory
 ```
 
-**Migration prod ↔ staging на том же VPS:** acme.json привязан к CA-серверу:
+**Migration prod ↔ staging на том же VPS:** acme.json привязан к CA-серверу. Сброс acme-volume —
+**destructive**, требует явного OK; `docker volume rm` блокирует `permissions.deny` (агент его не
+выполнит) — это ручной шаг оператора на VPS:
 ```bash
 docker compose <args> down traefik
-docker volume rm <p>-infra_traefik-acme
+docker volume rm <p>-infra_traefik-acme   # destructive, оператор вручную
 # на корп-стороне: vault kv patch kv/projects/<p>/<env>/meta acme_caserver=<new>
 make ship  # vault-agent перерендерит traefik.yml, traefik подымется с новым CA
 ```
@@ -160,7 +162,7 @@ make deploy
 **Если что-то не поднимается:**
 - vault-agent не healthy / retry-loop на `kv/.../meta` или `kv/.../otel` → корп не онбоарднул env (см. предусловия). `bash scripts/preflight-vault.sh` покажет какие KV-paths отсутствуют.
 - LE cert не выпустился → DNS не указывает на VPS, или 80/443 закрыты файрволом.
-- crowdsec bouncer auto-register не сработал → fallback `docker exec crowdsec cscli bouncers add traefik`, прописать в `.env`, `make deploy`.
+- crowdsec bouncer auto-register не сработал → fallback `docker exec crowdsec cscli bouncers add traefik` (cscli внутри контейнера — make-first исключение), прописать в `.env`, `make deploy`.
 
 ### 7. Активация дополнительных профилей (по мере необходимости)
 
@@ -199,9 +201,9 @@ make ship MSG="feat(foo): bar"   # add -A + commit + push + (на main) ssh-depl
 
 - `make ps` — always-on сервисы healthy.
 - `https://${DOMAIN}/` — landing отдаётся через traefik + LE.
-- `docker exec vault-agent ls -la /secrets/ /env /configs` — rendered файлы.
-- `docker logs otel-agent | tail -5` — нет auth-ошибок при экспорте в `otel.stit.tech`.
-- `docker logs vault-agent | tail -10` — successful render, нет re-auth циклов.
+- `docker exec vault-agent ls -la /secrets/ /env /configs` — rendered файлы (`ls` внутри контейнера — make-first исключение).
+- `make logs SVC=otel-agent` — нет auth-ошибок при экспорте в `otel.stit.tech`.
+- `make logs SVC=vault-agent` — successful render, нет re-auth циклов.
 
 ### Backup smoke-test (после активации storage профиля)
 
@@ -211,7 +213,7 @@ Daily backup гоняется внутри backup-контейнера (busybox 
 make backup
 ```
 
-Должно завершиться успехом. Проверь в проектном Minio (или external endpoint):
+Должно завершиться успехом. Проверь в проектном Minio (или external endpoint) — `mc` внутри minio-контейнера (make-first исключение):
 ```bash
 docker exec minio mc ls local/backups/
 ```
