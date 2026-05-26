@@ -18,12 +18,12 @@ ship-поверхность. Приложения и живого стека л�
 `backup`/`restore-pg`) прозрачно оборачивают ssh на VPS (local-ssh-wrapper, Phase 7).
 Локальный SKIP в authoring-проверках без `.env`/docker — норма, не падение.
 
-**Current focus:** Phase 1 · A1
+**Current focus:** Phase 2 · A3
 
 ## Active
 
 ### gold-standard-alignment — Привести `.claude`/docs к эталону go-backend + слой /init-project
-**Создан:** 2026-05-26 · **Статус:** planning
+**Создан:** 2026-05-26 · **Статус:** in-progress
 
 **Контекст.** `go-backend-template` прошёл полный рефактор доков/скилов/правил и принят
 за gold standard. Этот репо подтягиваем к тем же конвенциям (единый `CLAUDE.md`,
@@ -54,17 +54,20 @@ vault-agent webhook) — вне этого плана.
 **Атомы.**
 
 #### Phase 1 — Единый CLAUDE.md (без AGENTS.md)
-- [ ] **A1:** `AGENTS.md` → `CLAUDE.md` (router-стиль)
+- [x] **A1:** `AGENTS.md` → `CLAUDE.md` (router-стиль)
   - Что делаем: собрать `CLAUDE.md` в router-стиле эталона (one-liner+стек, meta-layout,
     точка входа `/smartdev`, planning-first, команды `make`, карта где-что, стиль, git,
     границы, env-framing workstation+ssh-wrapper). Удалить `AGENTS.md`. `WORKFLOW.md` пока остаётся.
   - Verify: `make validate` → OK; `test ! -e AGENTS.md && test -e CLAUDE.md` · Зависит от: —
   - Ref: `stit-infra/go-backend-template/CLAUDE.md`
-- [ ] **A2:** Sweep ссылок `AGENTS.md` → `CLAUDE.md`
-  - Что делаем: скилы, правила (`forward-only` paths), `scripts/tools/status.sh`, `reviewer.md`,
-    `.claude/settings*.json` — заменить ссылки.
-  - Verify: `grep -rn 'AGENTS\.md' . --include='*.md' --include='*.sh' --include='*.json' | grep -v '/\.git/'` → пусто; `make validate` → OK · Зависит от: A1
+  - **Done:** CLAUDE.md (182 стр.) написан, AGENTS.md удалён. `make validate` → OK; `test ! -e AGENTS.md && test -e CLAUDE.md` → PASS. Решения: ADR убран сразу (зеркалит эталон; §forward-only → указатель на правило, auto-memory «архитектура» → docs/architecture.md), env-framing — честный present-state (workstation без живого стека, ops через ssh.sh как инструмент), без hook-ссылок.
+- [x] **A2:** Sweep ссылок `AGENTS.md` → `CLAUDE.md`
+  - Что делаем: заменить во всех живых файлах — `scripts/tools/search.sh` (список dirs),
+    `.claude/rules/forward-only.md` (frontmatter `description`+glob), `.claude/WORKFLOW.md` (удаляется в A19 — но держим grep чистым),
+    `docs/adrs/0002-*.md` (×1, удаляется в A16). Прим.: `scripts/claude-hooks/` снесён вместе с Claude-хуками вне плана.
+  - Verify: `grep -rn 'AGENTS\.md' . --include='*.md' --include='*.sh' --include='*.json' | grep -v '/\.git/' | grep -v '\.claude/plans/'` → пусто (исключаем plans/: текст плана легитимно обсуждает миграцию, секция удаляется при закрытии плана); `make validate` → OK · Зависит от: A1
   - Ref: `stit-infra/go-backend-template/CLAUDE.md`
+  - **Done:** заменено в `search.sh`, `forward-only.md` (description+glob), `WORKFLOW.md` (×3), `docs/adrs/0002`. Сужённый grep → пусто; `make validate` → OK.
 
 #### Phase 2 — Single-file планирование
 - [ ] **A3:** Порт `scripts/tools/validate-plan.sh` под single-file

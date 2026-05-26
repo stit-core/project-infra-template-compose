@@ -2,13 +2,13 @@
 
 Этот документ — для человека. Описывает как работать с шаблоном `<client-org>/infra` через Claude Code.
 
-Контекст: `AGENTS.md` (постоянный), `README.md` (human-обзор), `docs/architecture.md`, `docs/onboarding.md`, `docs/runbook.md`.
+Контекст: `CLAUDE.md` (постоянный), `README.md` (human-обзор), `docs/architecture.md`, `docs/onboarding.md`, `docs/runbook.md`.
 
 ## 1. Что лежит где
 
 | Слой | Где | Когда грузится | Сила |
 |---|---|---|---|
-| Корневые правила | `AGENTS.md` (CLAUDE.md → AGENTS.md) | Всегда | Advisory |
+| Корневые правила | `CLAUDE.md` | Всегда | Advisory |
 | Path-scoped правила | `.claude/rules/*.md` с `paths:` frontmatter | Когда matching-файл в контексте | Advisory |
 | Skills | `.claude/skills/<name>/SKILL.md` | По description-match или явному `/<name>` | Procedural |
 | Subagents | `.claude/agents/*.md` | При делегировании | Role-specific |
@@ -99,10 +99,10 @@ DEPLOY  ─── `make ship MSG="..."` локально: commit + check + push 
 | git-хуки | `scripts/git-hooks/*` (commit-msg) | **Детерминированно** (на commit) |
 | Skills | `.claude/skills/<name>/SKILL.md` | Procedure |
 | Path-scoped rules | `.claude/rules/*.md` | Контекстная подсказка |
-| AGENTS.md | repo root | Always-on advisory |
+| CLAUDE.md | repo root | Always-on advisory |
 | Subagent prompts | `.claude/agents/*.md` | Role-specific |
 
-Жёсткие запреты (no `--no-verify`, no `git push --force`, no `docker volume rm` / `down -v`, no запись в auto-memory) — `permissions.deny` в `.claude/settings.json`. Conventional Commits — git-хук `commit-msg`. Стиль и conventions (включая no `:latest`, image-bump только с OK) — advisory в AGENTS.md и rules, проверяются `make validate`.
+Жёсткие запреты (no `--no-verify`, no `git push --force`, no `docker volume rm` / `down -v`, no запись в auto-memory) — `permissions.deny` в `.claude/settings.json`. Conventional Commits — git-хук `commit-msg`. Стиль и conventions (включая no `:latest`, image-bump только с OK) — advisory в CLAUDE.md и rules, проверяются `make validate`.
 
 **Cockpit-чейнинг:** `/smartdev` парсит `make status`-сигналы и сам переключает в `triage` (Critical ≠ none / багфикс), `corp-handoff` (Infra-touch ≠ none), `plan` (крупная задача), `add-service`/`request-secret`/`dr-restore`/`bootstrap-vps` (по задаче). **CORP-HANDOFF** — soft-механизм (`.claude/rules/corp-handoff.md` + skill, не хук): единственная гарантия — что агент его исполняет; тронул corp-поверхность → блок до claim «готово».
 

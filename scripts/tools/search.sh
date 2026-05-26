@@ -16,7 +16,7 @@ scope=()
 if [ -n "$path" ]; then
   scope=("$path")
 else
-  for d in compose configs scripts docs ansible ci docker-compose.yml AGENTS.md README.md; do
+  for d in compose configs scripts docs ansible ci docker-compose.yml CLAUDE.md README.md; do
     [ -e "$d" ] && scope+=("$d")
   done
 fi
