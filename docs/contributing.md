@@ -36,7 +36,7 @@ Subagent'ы: `explorer` (read-many), `reviewer` (severity-graded review) — о�
 prompt → /smartdev (cockpit: make status, читает roadmap, чейнит режим)
        → plan (planning-first: изменение идёт через секцию в .claude/plans/roadmap.md)
        → act (RED→GREEN: make validate/doctor; тронул corp-поверхность → corp-handoff)
-       → verify (claim «готово» → make check = validate + doctor)
+       → verify (claim «готово» → make check = validate + doctor + plan-check + project-check)
        → ship (make ship MSG="…": commit + check + push + на main ssh-deploy)
 ```
 

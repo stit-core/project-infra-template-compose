@@ -134,13 +134,27 @@ services:
 - Если нужен — расширь `containers/backup/backup-now` (например `tar` volume → restic stdin).
 - Если добавляешь ещё один Postgres — обнови `backup-now` чтоб бэкапить и его (либо отдельным host'ом в restic, либо ещё один pg_dumpall с другим target'ом).
 
-### 6. Validate + deploy
+### 6. Smoke-проверка (если нужна bespoke-проверка на входе cockpit)
 
-1. Локально: `bash scripts/tools/validate.sh` — compose-syntax, yamllint, .env coverage.
-2. Коммит: `feat(<svc>): add <Service>`.
-3. Push в main.
-4. На сервере: `make deploy`.
-5. Verify: `make ps`, healthcheck зелёный, `https://<sub>.${DOMAIN}` доступен (если public).
+Серверный смок (`== Server ==` в `make status`, см. skill `smartdev`) **автодискаверит**
+здоровье всех compose-контейнеров из живого `docker ps` — обычному сервису с healthcheck
+ничего регистрировать не надо, он подхватится сам.
+
+Заводи drop-in только под **bespoke**-сигнал, которого нет в `docker ps` (глубина очереди,
+лаг репликации, размер спец-volume, внешний endpoint):
+
+1. `scripts/tools/smoke.d/90-<svc>.sh` — бежит **на хосте**, read-only, self exit 0; печатает
+   блок `-- <svc> --` + строки; на проблеме — `ATTENTION: <msg>` в колонке 0 (его ловит
+   smartdev → triage). Контракт — в шапке `scripts/tools/smoke-run.sh`; образец — `10-host.sh`.
+2. Префикс `90-` — после базовых `10-host`/`20-containers` (порядок лексикографический).
+
+Так смок «растёт по мере развития инфры»: каждый новый сервис со своим сигналом докладывает файл.
+
+### 7. Validate + ship
+
+1. Локально: `make validate` — compose-syntax, yamllint, .tpl, .env coverage.
+2. `make ship MSG="feat(<svc>): add <Service>"` — commit + `make check` (красный → пуш отменён) + push + (на main) ssh-deploy. Канон, не ручной push+deploy.
+3. Verify: `make ps`, healthcheck зелёный, `https://<sub>.${DOMAIN}` доступен (если public); `make status` → `== Server ==` видит сервис.
 
 ## Чек-лист
 
@@ -151,8 +165,9 @@ services:
 - [ ] Если читает секреты — `env_file` на `.runtime/secrets/<svc>.env` + `depends_on: vault-agent: service_healthy` + `<svc>.env.tpl` + блок в `agent.hcl.parts/<profile>.hcl` + seed KV-объекта через `/request-secret`
 - [ ] Все `${VAR}` (bootstrap) есть в `.env.example`
 - [ ] Если новый Postgres — добавлен ещё один `pg_dumpall` блок в `containers/backup/backup-now` (с другим `-h` host'ом и `--stdin-filename`)
-- [ ] `validate.sh` зелёный
+- [ ] `make validate` зелёный
 - [ ] (Если требует Vault KV seed) — указано оператору, что нужно сделать на корп-стороне
+- [ ] (Если bespoke-сигнал вне `docker ps`) — `scripts/tools/smoke.d/90-<svc>.sh` для `== Server ==`
 
 ## Anti-patterns
 

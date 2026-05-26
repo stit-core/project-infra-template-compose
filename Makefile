@@ -78,8 +78,17 @@ ssh: ## выполнить команду на VPS: make ssh CMD="docker ps"
 	@bash scripts/tools/ssh.sh exec $(CMD)
 
 ##@ INTEL
-status: ## Сводка состояния репо для smartdev (A= "--full")
+# Оркестратор cockpit-сводки: локальный status.sh (git/roadmap/fragments, pure-local)
+# + секция == Server == (серверный смок). Server по тому же .env-sentinel, что OPS:
+# есть .env (на VPS) → smoke-run.sh локально; нет → ssh.sh smoke на VPS (недоступен
+# → SKIP). status.sh docker/SSH не трогает — композит здесь. Финальный OK печатает таргет.
+status: ## Сводка состояния репо + серверный смок для smartdev (A= "--full")
 	@bash scripts/tools/status.sh $(A)
+	@printf '\n== Server ==\n'
+	@if [ -f .env ]; then bash scripts/tools/smoke-run.sh; \
+	elif [ -f .env.local ]; then bash scripts/tools/ssh.sh smoke 2>/dev/null || echo "  SKIP (VPS недоступен — проверь .env.local / сеть)"; \
+	else echo "  SKIP (нет .env.local — connection не задан, серверный смок пропущен)"; fi
+	@echo; echo "OK"
 
 search: ## Поиск по compose/configs/scripts/docs: make search Q=pattern [P=path]
 	@if [ -z "$(Q)" ]; then echo "usage: make search Q=<pattern> [P=<path>]"; exit 2; fi

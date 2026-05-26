@@ -106,6 +106,24 @@ laptop оператора                          VPS
 
 Никаких runner'ов, push-trigger'ов, gitea-CI. Backend-images собирает разработчик локально (`docker buildx build … && docker push git.stit.tech/<client-org>/backend:<tag>`), затем `vault kv patch kv/projects/<p>/<env>/meta backend_tag=<tag>` на корп-стороне + `make ship` (без MSG) для force-recreate. `BACKEND_TAG` в `.env` не лежит — приходит из Vault `meta` через `.runtime/env/compose.env`.
 
+## Cockpit-сводка и серверный смок
+
+`make status` — единая сводка для агента (skill `smartdev`), оркестратор из двух источников:
+
+- **Локально** (`scripts/tools/status.sh`, pure-local — без docker и SSH): git-состояние,
+  `== Critical ==` (upstream/deploy-drift), `== Infra-touch ==` (тронутая corp-поверхность),
+  активный план из `roadmap.md`.
+- **Серверный смок** (`== Server ==`): host-витали (load / RAM / swap / disk / OOM) + здоровье
+  контейнеров (unhealthy / exited / restart-loop, автодискавери из `docker ps`). Бежит **на хосте** —
+  `scripts/tools/smoke-run.sh` гоняет drop-in `scripts/tools/smoke.d/*.sh` по порядку
+  (`10-host`, `20-containers`, далее `90-<svc>` под bespoke-сигнал сервиса).
+
+`.env`-sentinel (как у ops-вербов): на VPS (есть `.env`) смок бежит локально; с workstation
+(`.env.local`) — через `scripts/tools/ssh.sh smoke`; нет connection / VPS недоступен → `== Server == SKIP`.
+Каждый смок-чек read-only и self-`exit 0`; проблема — строкой `ATTENTION:` в колонке 0 (её ловит
+smartdev → чейн в `triage`). Смок расширяется добавлением файла в `smoke.d/` — растёт вместе с инфрой
+(skill `add-service`).
+
 ## Что НЕ в шаблоне (overlay-services)
 
 Если проекту нужно — добавляешь fragment в `compose/`:

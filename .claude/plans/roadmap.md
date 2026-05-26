@@ -23,6 +23,10 @@ ship-поверхность. Приложения и живого стека л�
 ## Active
 
 ## Backlog
+- **smoke-пороги в `.env.local`.** Серверный смок (`smoke.d/10-host.sh`) уже читает env-override
+  `SMOKE_LOAD_FACTOR` / `SMOKE_RAM_MIN_PCT` / `SMOKE_DISK_PCT` (дефолты в коде). Если понадобится
+  per-VPS тюнинг — добавить их в `.env.local.example` + прокинуть через `ssh.sh smoke`. Опционально,
+  low-priority (дефолты годятся).
 - **Corp: ecosystem.md entry-point.** `stit-infra/infra/docs/ecosystem.md` зовёт entry-point
   этого репо как «AGENTS.md» → заменить на `CLAUDE.md` (строка про `project-infra-template-compose`).
   Косметика, следующий corp-PR.

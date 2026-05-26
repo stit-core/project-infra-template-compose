@@ -61,11 +61,11 @@ seed'а соответствующих KV. Сети: `proxy` (наружу), `ba
 ## Команды
 
 Единый словарь `make <verb>`, сгруппирован в `make help`. Concise-by-default; `FORMAT=detailed` —
-полный разбор. Канонический gate перед claim «готово» / push — **`make check`** (validate + doctor).
+полный разбор. Канонический gate перед claim «готово» / push — **`make check`** (validate + doctor + plan-check + project-check).
 
 | Группа | Верб | Что |
 |---|---|---|
-| LOOP | `validate` / `doctor` / `check` | syntax+tpl+.env coverage / live preflight / оба |
+| LOOP | `validate` / `doctor` / `check` | syntax+tpl+.env coverage / live preflight / validate+doctor+plan-check+project-check |
 | SHIP | `ship MSG="..."` | commit + check + push + (на main) ssh-deploy. Канон |
 | | `deploy` / `render` | server-side: git pull → render → compose up --wait / envsubst+agent.hcl |
 | OPS | `ps` / `logs SVC=` / `restart SVC=` | статус / логи / рестарт сервиса |
@@ -73,7 +73,7 @@ seed'а соответствующих KV. Сети: `proxy` (наружу), `ba
 | INTEL | `status` / `search Q= [P=]` | cockpit-сводка / поиск по compose+configs+scripts+docs |
 | PROVISION | `new-env` | bootstrap `.env` на чистом VPS |
 | SETUP | `setup` | поставить git-хуки (commit-msg) |
-| META | `plan-check` | валидатор структуры планов |
+| META | `plan-check` / `project-check` | структура планов / продуктовый слой `docs/project/` |
 
 ## Карта: где что
 
@@ -130,7 +130,7 @@ out-of-band. AppRole строго read-only на свой `<p>/<env>`. Подр�
 ## Границы
 
 ### Делать всегда
-- Перед claim «готово» — `make check` (validate + doctor); после деплоя — `make ps`.
+- Перед claim «готово» — `make check` (validate + doctor + plan-check + project-check); после деплоя — `make ps`.
 - **Изменение — через план** (planning-first; skill `/plan`). Отклонение — осознанное, проговаривается.
 - Тронул corp-поверхность (`configs/vault-agent/`, `compose/*.yml` профили, `.env.example`,
   `configs/crowdsec/whitelists.yaml`, `ansible/`) — оформи **CORP-HANDOFF**-блок до claim «готово»

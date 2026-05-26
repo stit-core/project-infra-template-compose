@@ -29,15 +29,21 @@ make status
 ```
 
 Парси секции (они детерминированы — на них держится чейнинг):
-- `== Critical ==` — `ATTENTION:`-строки (unhealthy/exited/upstream-drift) или `none`
+- `== Critical ==` — `ATTENTION:`-строки **git/deploy-drift** (upstream behind) или `none`. Это
+  pure-local (`status.sh`): docker тут НЕ дёргается.
+- `== Server ==` — **серверный смок VPS** (host-витали load/RAM/swap/disk/OOM + здоровье
+  контейнеров unhealthy/exited/restart-loop). Собирает таргет `make status` через смок
+  (`smoke-run.sh` на VPS / `ssh.sh smoke` с workstation). Свои `ATTENTION:`-строки — чейнить как
+  Critical (→ triage). `SKIP` — нет `.env.local` (connection не задан) или VPS недоступен; это норма,
+  не падение.
 - `== Infra-touch ==` — список corp-классов или `none`
 - `== Plan ==` — активные планы из roadmap или `none`
 - `== Branch ==` / `== Working tree ==` / `== Compose ==` / `== Recent commits ==` — фон
 
-Серверные проверки: ops-вербы сами проксируют на VPS — `make ps` / `make logs SVC=<svc>` /
-`make restart SVC=` / `make ssh CMD="…"` уходят через `scripts/tools/ssh.sh`, когда локально нет
-`.env` (sentinel; connection из `.env.local`). На VPS (есть `.env`) — локальный docker. Split и
-`.env.local` — rules `make-first`/`env-local`. `make doctor` без `.env` локально → SKIP, это норма.
+`make status` смокает VPS на **входе сессии** (`.env`-sentinel: на VPS — `smoke-run.sh` локально;
+с workstation — `ssh.sh smoke`; connection из `.env.local`). Mid-session не пере-смокай на каждый
+микро-вопрос — точечно `make ps` / `make logs SVC=<svc>` / `make ssh CMD="…"` (тот же ssh-split).
+Split и `.env.local` — rules `make-first`/`env-local`. `make doctor` без `.env` локально → SKIP, норма.
 
 ## 2. Поднять контекст
 
@@ -57,7 +63,8 @@ make status
 
 | Сигнал из `make status` / задачи | Действие — чейн |
 |---|---|
-| `== Critical ==` ≠ none (unhealthy / exited / behind-drift) | → skill `triage` |
+| `== Critical ==` ≠ none (upstream behind-drift) | → skill `triage` |
+| `== Server ==` ATTENTION (host-pressure: disk/RAM/load/OOM, или unhealthy/exited/restart на VPS) | → skill `triage` |
 | Багфикс / «сломалось» / «не поднимается» / трейс | → skill `triage` (НЕ `plan`) |
 | Проект не инициализирован (origin ещё template ИЛИ нет stable `docs/project/vision.md`) | → skill `init-project` (первым делом) |
 | `== Infra-touch ==` ≠ none (тронута corp-поверхность) | → skill `corp-handoff` до claim «готово» |
@@ -94,7 +101,7 @@ make ship MSG="feat(foo): bar"
 
 `scripts/ship.sh` (один проход, без CI):
 1. Грязное дерево — `git add -A && git commit -m "$MSG"` (commit-msg хук валидирует Conventional Commits).
-2. `make check` (validate + doctor) — красный → пуш отменён.
+2. `make check` (validate + doctor + plan-check + project-check) — красный → пуш отменён.
 3. `git push origin <branch>`.
 4. Ветка = `main` → SSH на VPS из `ansible/inventory.ini` → `bash scripts/deploy.sh`.
 5. Не main → push без deploy + подсказка про PR.
@@ -136,6 +143,7 @@ Debug на VPS: `ssh root@<vps> 'cd /opt/<p>-infra && make deploy'` (пошаг�
 ## Anti-patterns
 
 - Дамп всего `make status` в чат. Сводка — 4-6 строк, дальше — действие.
+- Пере-смок VPS (`make status` / `ssh.sh smoke`) на каждый микро-вопрос: смок — session-start, дальше точечно `make ps`/`make logs`.
 - Briefing на 100 строк и остановка «жду команды» вместо чейна.
 - Прыжок в `add-service` минуя оценку — если задача = один Edit, делай Edit (RED→GREEN).
 - Багфикс через `plan`. Баг → всегда `triage`.

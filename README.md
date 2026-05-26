@@ -71,7 +71,7 @@ curl -X POST -H "Authorization: token $GITEA_TOKEN" -H "Content-Type: applicatio
 
 7. Первый деплой — с laptop'а оператора:
    ```bash
-   make ship          # check (validate+doctor) + push + (на main) ssh-deploy. На чистом дереве MSG не нужен.
+   make ship          # check (validate+doctor+plan-check+project-check) + push + (на main) ssh-deploy. На чистом дереве MSG не нужен.
    ```
    `ship` сам гонит `make check` — красный отменяет пуш. Минимальный стек
    (traefik / vault-agent / crowdsec / otel / metrics / landing) поднимается сразу.

@@ -18,17 +18,17 @@ paths:
 
 | Группа | Верб | Что |
 |---|---|---|
-| LOOP | `validate` / `doctor` / `check` | compose syntax+tpl+.env / live preflight / оба + `plan-check` |
+| LOOP | `validate` / `doctor` / `check` | compose syntax+tpl+.env / live preflight / `validate`+`doctor`+`plan-check`+`project-check` |
 | SHIP | `ship MSG="…"` / `deploy` / `render` | commit+check+push+(main)ssh-deploy / server-side / envsubst+agent.hcl |
 | OPS | `ps` / `logs SVC=` / `restart SVC=` | статус / логи сервиса / рестарт сервиса (на VPS) |
 | | `backup` / `restore-pg SNAPSHOT=` | one-shot backup / restore postgres из restic |
 | | `ssh CMD="…"` | произвольная команда на VPS (через `ssh.sh`) |
-| INTEL | `status` / `search Q= [P=]` | cockpit-сводка / поиск по compose+configs+scripts+docs |
+| INTEL | `status` / `search Q= [P=]` | cockpit-сводка (локальный `status.sh` + серверный смок `== Server ==` по SSH при `.env.local`) / поиск по compose+configs+scripts+docs |
 | PROVISION | `new-env` | bootstrap `.env` на чистом VPS |
 | SETUP | `setup` | симлинк git-хуков (commit-msg, pre-commit) в `.git/hooks/` |
-| META | `plan-check` | валидатор структуры `.claude/plans/roadmap.md` |
+| META | `plan-check` / `project-check` | структура `.claude/plans/roadmap.md` / продуктовый слой `docs/project/` |
 
-Канонический gate перед claim «готово» / push — **`make check`** (validate + doctor + plan-check).
+Канонический gate перед claim «готово» / push — **`make check`** (validate + doctor + plan-check + project-check).
 
 ## Raw-docker — когда легитимно
 

@@ -6,6 +6,7 @@
 #
 # Subcommands:
 #   status       — remote `make ps` + status.sh
+#   smoke        — remote `smoke-run.sh` (серверный смок: host-витали + контейнеры)
 #   deploy       — ssh + git pull + make deploy
 #   restart SVC  — ssh + make restart SVC=<name>
 #   logs SVC     — ssh + tail логов одного сервиса
@@ -56,6 +57,9 @@ case "${1:-}" in
   status)
     $SSH "cd $REMOTE_DIR && make ps && bash scripts/tools/status.sh"
     ;;
+  smoke)
+    $SSH "cd $REMOTE_DIR && bash scripts/tools/smoke-run.sh"
+    ;;
   deploy)
     $SSH "cd $REMOTE_DIR && make deploy"
     ;;
@@ -72,7 +76,7 @@ case "${1:-}" in
     $SSH "cd $REMOTE_DIR && $*"
     ;;
   *)
-    echo "usage: $0 {status|deploy|restart SVC|logs SVC|exec CMD ...}" >&2
+    echo "usage: $0 {status|smoke|deploy|restart SVC|logs SVC|exec CMD ...}" >&2
     exit 2
     ;;
 esac

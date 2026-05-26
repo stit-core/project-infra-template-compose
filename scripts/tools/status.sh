@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
-# Сводка состояния репо для cockpit-skill smartdev. Секции парсятся им
+# Локальная сводка состояния репо для cockpit-skill smartdev — pure-local:
+# git / roadmap / fragments, БЕЗ docker и БЕЗ SSH. Секции парсятся smartdev'ом
 # детерминированно для чейнинга:
-#   == Critical ==     ATTENTION: <…>  → чейн в triage   (none = чисто)
+#   == Critical ==     ATTENTION: <…> (git/deploy-drift) → чейн в triage (none = чисто)
 #   == Infra-touch ==  список corp-классов → чейн в corp-handoff (none = чисто)
 #   == Plan ==         активный план из roadmap → продолжить атомы
-# Без SSH; серверные проверки — через scripts/tools/ssh.sh status.
-# Сам всегда exit 0 (информационный); сигналы — в тексте секций.
+# Серверный смок (host-витали + здоровье контейнеров) — НЕ здесь: его собирает
+# таргет `make status` секцией == Server == (smoke-run.sh на VPS / ssh.sh smoke
+# с workstation). Сам всегда exit 0 (информационный); сигналы — в тексте секций.
 set -o pipefail
 cd "$(dirname "$0")/../.."
 
@@ -36,17 +38,13 @@ echo "modified: $mod, staged: $sta, untracked: $unt"
 echo
 echo "== Critical =="
 # ATTENTION:-строки парсит smartdev → чейн в triage. none = чисто.
+# Только git/deploy-drift — pure-local. Контейнерное здоровье VPS (unhealthy/
+# exited/restart-loop) живёт в смоке (== Server ==, smoke.d/20-containers.sh):
+# его собирает таргет make status, не этот скрипт (никакого docker здесь).
 crit=0
 if [ "${behind:-0}" -gt 0 ] 2>/dev/null; then
   echo "ATTENTION: upstream разошлась ($behind behind) — git pull --ff-only / deploy упадёт"
   crit=1
-fi
-if command -v docker >/dev/null 2>&1; then
-  unhealthy=$(docker ps --filter health=unhealthy --format '{{.Names}}' 2>/dev/null | paste -sd' ' -)
-  exited=$(docker ps -a --filter status=exited --filter label=com.docker.compose.project \
-             --format '{{.Names}}' 2>/dev/null | paste -sd' ' -)
-  [ -n "$unhealthy" ] && { echo "ATTENTION: unhealthy: $unhealthy — make logs SVC=<svc> / skill triage"; crit=1; }
-  [ -n "$exited" ]    && { echo "ATTENTION: exited: $exited — make ps / skill triage"; crit=1; }
 fi
 [ "$crit" -eq 0 ] && echo "none"
 
@@ -104,6 +102,4 @@ shopt -u globstar nullglob
 echo
 echo "== Recent commits =="
 git log --oneline -5 2>/dev/null | sed 's/^/  /' || echo "  (none)"
-
-echo
-echo "OK"
+# Финальный маркер (== Server == + OK) печатает таргет make status — см. Makefile.
