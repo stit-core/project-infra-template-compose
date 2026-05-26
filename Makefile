@@ -26,11 +26,13 @@ validate: ## Compose syntax + yamllint + .tpl + .env coverage (FORMAT=detailed)
 doctor: ## Live fail-fast preflight: compose/vault-agent/dns/vault/env (A= --full)
 	@bash scripts/tools/doctor.sh $(A)
 
-check: ## Каноничный pre-ship gate: validate + doctor
+check: ## Каноничный pre-ship gate: validate + doctor + plan-check
 	@echo "→ make validate"
 	@$(MAKE) -s validate
 	@echo "→ make doctor"
 	@$(MAKE) -s doctor
+	@echo "→ make plan-check"
+	@$(MAKE) -s plan-check
 	@echo "✓ check clean"
 
 ##@ SHIP
@@ -78,5 +80,5 @@ setup: ## симлинк scripts/git-hooks/* → .git/hooks/
 	bash scripts/hooks-install.sh
 
 ##@ META
-plan-check: ## Валидатор структуры планов .claude/plans/*.md (A= конкретный план)
+plan-check: ## Валидатор структуры единого плана .claude/plans/roadmap.md (A=<file> override)
 	@bash scripts/tools/validate-plan.sh $(A)

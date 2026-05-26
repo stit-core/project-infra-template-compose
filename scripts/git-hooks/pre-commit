@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# pre-commit hook для project-infra-template-compose.
+# Валидирует структуру единого плана при изменении .claude/plans/roadmap.md —
+# чтобы битый план (нет Verify/Зависит от:, dangling-dep, кривой статус) не
+# доезжал до push. Установка — `make setup` (симлинк в .git/hooks/).
+#
+# Формат сообщения коммита (Conventional Commits) проверяет отдельный commit-msg hook.
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+
+CHANGED_ROADMAP=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '^\.claude/plans/roadmap\.md$' || true)
+if [ -n "$CHANGED_ROADMAP" ]; then
+  echo "pre-commit: validating .claude/plans/roadmap.md…"
+  if [ -x scripts/tools/validate-plan.sh ]; then
+    bash scripts/tools/validate-plan.sh
+  else
+    echo "WARN: scripts/tools/validate-plan.sh не исполняемый — пропускаю" >&2
+  fi
+fi

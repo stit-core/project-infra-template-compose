@@ -38,25 +38,39 @@ if ! make check; then
 fi
 
 # --- Corp-handoff агрегация (.claude/rules/corp-handoff.md) ---
-# Печатает агрегированный ## Corp impact из активных планов; если corp-
-# поверхность тронута в неотправленных коммитах, а блока нет — warn.
+# Печатает агрегированный Corp impact из активных планов; если corp-поверхность
+# тронута в неотправленных коммитах, а блока нет — warn.
 # Advisory: пуш не блокирует (передача корп-админу — out-of-band).
+#
+# Single-file модель: единый .claude/plans/roadmap.md. На каждую `### <slug>`-секцию
+# под `## Active` — захватываем подсекцию `**Corp impact.**` (bold-лейбл) до следующего
+# bold-лейбла / `#### `-фазы / `### `/`## `-границы. Пустой маркер `—` пропускаем.
 corp_impact=""
-for p in .claude/plans/*.md; do
-  [ -e "$p" ] || continue
-  [ "$(basename "$p")" = "roadmap.md" ] && continue
-  # f — внутри секции; skip — внутри <...>-placeholder (возможно многострочного,
-  # как в шаблоне skill plan). Реальный CORP-HANDOFF-блок угловых скобок не имеет.
-  body=$(awk '
-    /^## Corp impact/{f=1;next}
-    /^## /{f=0}
-    f{
-      if ($0 ~ /</) skip=1
-      if (!skip) print
-      if ($0 ~ />/) skip=0
-    }' "$p" | grep -vE '^[[:space:]]*$|^[[:space:]]*—[[:space:]]*$' || true)
-  [ -n "$body" ] && corp_impact+="--- $p ---"$'\n'"$body"$'\n'
-done
+roadmap=.claude/plans/roadmap.md
+if [ -f "$roadmap" ]; then
+  corp_impact=$(awk '
+    function emit(s, line,   t) {
+      t = line; gsub(/^[[:space:]]+|[[:space:]]+$/, "", t)
+      if (t == "" || t == "—" || t == "|") return
+      if (!hdr[s]) { print "--- " s " ---"; hdr[s] = 1 }
+      print line
+    }
+    /^## Active/ { inact = 1; next }
+    /^## /       { inact = 0; slug = ""; cap = 0; next }
+    !inact       { next }
+    /^### /      { slug = $0; sub(/^### /, "", slug); sub(/ .*/, "", slug); cap = 0; next }
+    slug == ""   { next }
+    /^\*\*Corp impact\.\*\*/ {
+      cap = 1
+      rest = $0; sub(/^\*\*Corp impact\.\*\*[[:space:]]*/, "", rest)
+      emit(slug, rest)            # инлайн-хвост после лейбла, если есть
+      next
+    }
+    cap && /^\*\*[^*]+\.\*\*/   { cap = 0; next }   # следующий bold-лейбл закрывает
+    cap && /^(#### |### |## )/  { cap = 0 }
+    cap                         { emit(slug, $0) }
+  ' "$roadmap")
+fi
 
 range=""
 if up=$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null); then

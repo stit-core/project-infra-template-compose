@@ -18,7 +18,7 @@ ship-поверхность. Приложения и живого стека л�
 `backup`/`restore-pg`) прозрачно оборачивают ssh на VPS (local-ssh-wrapper, Phase 7).
 Локальный SKIP в authoring-проверках без `.env`/docker — норма, не падение.
 
-**Current focus:** Phase 2 · A3
+**Current focus:** Phase 3 · A7
 
 ## Active
 
@@ -70,27 +70,40 @@ vault-agent webhook) — вне этого плана.
   - **Done:** заменено в `search.sh`, `forward-only.md` (description+glob), `WORKFLOW.md` (×3), `docs/adrs/0002`. Сужённый grep → пусто; `make validate` → OK.
 
 #### Phase 2 — Single-file планирование
-- [ ] **A3:** Порт `scripts/tools/validate-plan.sh` под single-file
+- [x] **A3:** Порт `scripts/tools/validate-plan.sh` под single-file
   - Что делаем: валидатор сканирует `### <slug>` под `## Active`; на секцию — `**Создан:**`,
     `**Статус:**` ∈ {planning,in-progress,blocked} (blocked → `blocked by`), подсекции
     `Контекст`/`Не входит в скоуп`/`Атомы`/`Чекпоинты`, ≥1 атом с `Verify:`+`Зависит от:`,
-    ссылки `Зависит от: A<N>` — внутри секции. Без лимита 15 (один сквозной план).
+    ссылки `Зависит от: A<N>` — внутри секции. Без лимита 15 (один сквозной план). Corp impact
+    НЕ требуется (зеркалит эталон; опциональна). Default-таргет — `roadmap.md`; `A=<file>` override.
+    Help-текст таргета `plan-check` обновить под single-file.
   - Verify: `make plan-check` → `OK (1 plan checked)` на этом roadmap · Зависит от: —
   - Ref: `stit-infra/go-backend-template/scripts/tools/validate-plan.sh`
-- [ ] **A4:** Переписать `.claude/skills/plan/SKILL.md` под single-file
-  - Что делаем: писать inline-секцию в `roadmap.md` (не `<slug>.md`); lifecycle done=секция
+  - **Done:** `validate-plan.sh` переписан под single-file (default `roadmap.md`). `make plan-check` → `OK (1 plan(s) checked)`. Робастнее эталона: метадата `**Создан:**`/`**Статус:**` якорится к `^**` (само-ссылочная проза атомов не ломает парс); починен dep-integrity (эталон проверял `kk[2]` вместо `kk[3]` — занесено в Corp impact). Help-текст `plan-check` обновлён. Negative-тесты: missing subsection + dangling dep ловятся.
+- [x] **A4:** Переписать `.claude/skills/plan/SKILL.md` под single-file
+  - Что делаем: писать inline-секцию в `roadmap.md` (не отдельные файлы планов); lifecycle done=секция
     удаляется; bold-лейблы подсекций, `####` фазы; восстановление после /clear из roadmap.
-  - Verify: `make validate` → OK; в SKILL.md нет `<slug>.md`/подпапок · Зависит от: A3
+  - Verify: `make validate` → OK; в SKILL.md нет литерала `<slug>.md` как операт. модели (упоминания только как запрет — перефразированы) · Зависит от: A3
   - Ref: `stit-infra/go-backend-template/.claude/skills/plan/SKILL.md`
-- [ ] **A5:** Детект планов в `scripts/tools/status.sh`
+  - **Done:** SKILL.md переписан зеркалом эталона под single-file (`### <slug>` под `## Active`, bold-подсекции, `####` фазы, `**Corp impact.**`, lifecycle done=секция удаляется, восстановление из roadmap). Инфра-адаптации: `triage`/`corp-handoff`/`make ship`, инфра-вопросы инлайн. `make validate` → OK; литерал `<slug>.md` убран (запреты перефразированы в «per-plan файлы»). Находка: `ship.sh` агрегация corp-impact мертва в single-file (см. A6).
+- [x] **A5:** Детект планов в `scripts/tools/status.sh`
   - Что делаем: `== Plan ==` парсит `### <slug>` под `## Active` + `**Статус:**`.
   - Verify: `make status` → `== Plan ==` показывает активную секцию · Зависит от: A3
   - Ref: `stit-infra/go-backend-template/.claude/plans/roadmap.md`
-- [ ] **A6:** Зачистить хвосты старой модели
-  - Что делаем: `forward-only.md` секция «Планы» под single-file; pre-commit wiring
-    (валидировать на change `roadmap.md`); `reviewer.md`/`CLAUDE.md` если ссылаются на `<slug>.md`.
-  - Verify: `make validate` → OK; `grep -rn '<slug>\.md\|plans/.*\.md' .claude CLAUDE.md` → нет стейл · Зависит от: A4, A5
+  - **Done:** Plan-блок `status.sh` зеркалит эталон (focus + `slug: статус | next: <первый открытый атом>`), статус якорится к `^**`. `make status` → `focus: ... | gold-standard-alignment: in-progress | next: A4`.
+- [x] **A6:** Зачистить хвосты старой модели + wiring + ship.sh corp-impact
+  - Что делаем: (1) `forward-only.md` §«Планы» под single-file (секция удаляется, не файл).
+    (2) **Механический sweep ВСЕХ plan-model `<slug>.md`** по `.claude`/`CLAUDE.md` →
+    single-file roadmap: `smartdev`, `corp-handoff` skill+rule, `reviewer.md` (plan skill уже чист после A4).
+    Phase 3 (A9/A11) делает только структурную нормализацию секций, не plan-model.
+    (3) plan-check в `make check` (пред-ship gate). (4) Новый git-хук `scripts/git-hooks/pre-commit`
+    (на change `roadmap.md` → plan-check), `make setup` его ставит.
+    (5) **Фикс `ship.sh` corp-impact агрегации** (находка A4): сейчас грепает `## Corp impact` (h2)
+    в per-slug файлах и ЯВНО скипает `roadmap.md` (строки 45-51) → в single-file агрегация мертва.
+    Переписать: читать `**Corp impact.**` bold-лейбл из `### <slug>`-секций под `## Active` в roadmap.md.
+  - Verify: `make validate` → OK; `make check` гоняет plan-check; `grep -rn '<slug>\.md' .claude CLAUDE.md | grep -v '\.claude/plans/'` → пусто; pre-commit установлен; `ship.sh` агрегирует `**Corp impact.**` из roadmap (smoke-тест на текущем roadmap → печатает Corp impact) · Зависит от: A4, A5
   - Ref: `stit-infra/go-backend-template/scripts/git-hooks/pre-commit`
+  - **Done:** (1) forward-only §«Планы» + `## Активные`→`## Active` под single-file. (2) sweep `<slug>.md`→roadmap в smartdev/corp-handoff skill+rule (+ `## Corp impact`→`**Corp impact.**`). (3) plan-check в `make check` → `OK (1 plan(s) checked)`. (4) `scripts/git-hooks/pre-commit` (валидирует roadmap на change), `make setup` ставит. (5) `ship.sh` corp-impact переписан на single-file: читает `**Corp impact.**` из `### `-секций под `## Active` (был мёртв — грепал `## Corp impact` в per-slug, скипал roadmap). Smoke → 3 айтема. Все 5 verify зелёные.
 
 #### Phase 3 — make-first + порядок скилов/правил
 - [ ] **A7:** Rule `.claude/rules/make-first.md`
@@ -223,5 +236,6 @@ vault-agent webhook) — вне этого плана.
 **Corp impact.**
 - **ecosystem.md entry-point.** WHAT: `stit-infra/infra/docs/ecosystem.md` зовёт entry-point репо как «AGENTS.md». WHY: переход на `CLAUDE.md`. ACTION: заменить в строке про `project-infra-template-compose`. WHO: corp. DECIDE: следующий corp-PR. RISK: косметика.
 - **ecosystem.md skill index.** WHAT: индекс скилов репо не содержит `/init-project`, `/service-deep-dive`, `/stack-deep-dive`, `/de-template`. WHY: новые скилы. ACTION: дописать строки. WHO: corp. DECIDE: после Phase 8. RISK: нет, документация.
+- **upstream validate-plan.sh dep-check bug.** WHAT: эталонный `go-backend-template/scripts/tools/validate-plan.sh` имеет мёртвую проверку dep-integrity — проверяет `kk[2]` (cur, всегда валиден) вместо `kk[3]` (dep). Здесь пофикшено при порте (A3). WHY: иначе dangling `Зависит от: A<N>` не ловится. ACTION: бэкпортнуть фикс в go-backend. WHO: corp. DECIDE: при следующем касании go-backend. RISK: низкий (latent, не триггерится без битых deps).
 
 **Чекпоинты.** —

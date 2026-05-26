@@ -69,16 +69,25 @@ fi
 
 echo
 echo "== Plan =="
-# Активные планы из roadmap (in-progress/planning со ссылкой на <slug>.md).
+# Единый roadmap: Current focus + по секции ## Active — slug, статус, следующий открытый атом.
+# Метадата-строки якорятся к ^** (проза атомов с `**Статус:**` иначе ломает парс).
 roadmap=.claude/plans/roadmap.md
 if [ -f "$roadmap" ]; then
-  active=$(grep -nE '^- \[(in-progress|planning|blocked)\] \[`' "$roadmap" | sed 's/^[0-9]*://; s/^/  /')
-  [ -z "$active" ] && active=$(grep -E '^- \[(in-progress|planning|blocked)\]' "$roadmap" | sed 's/^/  /')
-  if [ -n "$active" ]; then
-    printf '%s\n' "$active"
-  else
-    echo "none"
-  fi
+  foc=$(grep -m1 '^\*\*Current focus:\*\*' "$roadmap" | sed -E 's/\*\*Current focus:\*\*[[:space:]]*//')
+  [ -n "$foc" ] && echo "  focus: $foc"
+  awk '
+    function flush(){ if(slug!="") printf "  %s: %s | next: %s\n", slug, st, (nx==""?"—":nx) }
+    /^## Active/ { inact=1; next }
+    /^## /       { flush(); inact=0; slug=""; next }
+    !inact       { next }
+    /^### /      { flush(); slug=$0; sub(/^### /,"",slug); sub(/ .*/,"",slug); st="?"; nx=""; next }
+    slug=="" { next }
+    /^\*\*Создан:\*\*/ { if ($0 ~ /\*\*Статус:\*\*/){ s=$0; sub(/.*\*\*Статус:\*\*[[:space:]]*/,"",s); sub(/[[:space:]].*$/,"",s); st=s } }
+    /^\*\*Статус:\*\*/ { s=$0; sub(/^\*\*Статус:\*\*[[:space:]]*/,"",s); sub(/[[:space:]].*$/,"",s); st=s }
+    /^- \[ \] \*\*A[0-9]/ && nx=="" { n=$0; sub(/^- \[ \] \*\*/,"",n); sub(/:.*/,"",n); nx=n }
+    END { flush() }
+  ' "$roadmap"
+  grep -q '^### ' "$roadmap" || echo "  none (нет активных планов)"
 else
   echo "none (roadmap отсутствует)"
 fi
