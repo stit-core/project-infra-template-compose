@@ -224,32 +224,67 @@ getting-started.md (полный Day-0/Day-1, не лёгкий design-first). /
   - **Done:** `git rm .claude/WORKFLOW.md`; убран `.claude/WORKFLOW.md` из `paths:` frontmatter правила
     `forward-only.md` (был его триггером). Файла нет; grep WORKFLOW.md (excl plans) → CLEAN; `make validate` → OK.
 
-#### Phase 6 — Креды: .env.local (ops-креды, tool-only)
-- [ ] **A20:** Rule `.claude/rules/env-local.md` + `.env.local.example`
-  - Что делаем: порт правила + расширение на ops-креды (SSH к VPS, git-PAT, свежие ROLE_ID/SECRET_ID);
-    `.env.local` в `.gitignore` (уже под `.env.*`), committed только `.env.local.example`.
-  - Verify: `make validate` → OK; `grep -q 'env.local' .gitignore`-эквивалент покрывает · Зависит от: A8
+#### Phase 6 — Креды: .env.local (workstation connection + tool-only)
+**Решения проработки (2026-05-27).** Факты разошлись с исходным текстом атомов: `ssh.sh` уже
+существует, SSH к VPS **key-based** (ключ на машине), deploy-key регистрируется руками,
+`ROLE_ID/SECRET_ID` идут в `.env` через `new-env.sh`. Реальная роль `.env.local` в этом репо:
+**workstation-файл с connection к VPS** (`SSH_HOST`/`SSH_PORT`/`SSH_USER`/`PROJECT_NAME` или
+`HOST=user@ip`) + любые токены, которые юзер кидает в чат. **Host берётся из `.env.local`, не
+хардкодится.** `.env` живёт только на сервере (workstation без `.env` — норма). Phase 6+7
+сливаются в одну фичу: workstation→server ops через `.env.local`-driven `ssh.sh`.
+- [x] **A20:** Rule `.claude/rules/env-local.md` + `.env.local.example`
+  - Что делаем: `env-local.md` — `.env.local` (workstation, gitignored) хранит connection (SSH_*/
+    PROJECT_NAME/HOST) + токены; SSH-ключ на машине; `.env` — серверный runtime. Инвариант: **токен
+    из чата → агент пишет в `.env.local`, значение НЕ эхоит**; доступ к значению — tool-only (grep в
+    bash), не `Read`/`cat`/echo. `.env.local.example` документирует ключи. `.gitignore` уже покрывает
+    (`.env.*` + `*.local`).
+  - Verify: `make validate` → OK; `.env.local` под gitignore; `.env.local.example` есть · Зависит от: A8
   - Ref: `stit-infra/go-backend-template/.claude/rules/env-local.md` + `.env.local.example`
-- [ ] **A21:** Tool-only доступ к кредам
-  - Что делаем: `scripts/tools/ssh.sh` (и др.) `grep`-ают `KEY=` внутри bash, значение не в stdout;
-    инвариант «никогда `Read`/`cat`/echo креда» — в правиле.
-  - Verify: `make validate` → OK; `ssh.sh` не эхоит значения · Зависит от: A20
+  - **Done:** `.claude/rules/env-local.md` (workstation `.env.local` = connection+токены; `.env`
+    серверный; поведение «токен из чата→.env.local, не эхоить»; security-инвариант tool-only;
+    известные ключи) + `.env.local.example` (SSH_HOST/PORT/USER/PROJECT_NAME/HOST + плейсхолдер токена).
+    `git check-ignore .env.local` → ignored; `make validate` → OK.
+- [x] **A21:** `ssh.sh` читает connection из `.env.local` (tool-only)
+  - Что делаем: `scripts/tools/ssh.sh` берёт `SSH_HOST`/`SSH_PORT`/`SSH_USER`/`PROJECT_NAME`/`HOST` из
+    `.env.local` (grep `KEY=` внутри bash, значение не в stdout); приоритет env > `.env.local` >
+    `inventory.ini` (fallback для bootstrap). Не эхоит connection-значения.
+  - Verify: `make validate` → OK; `ssh.sh` читает `.env.local`, не светит значения · Зависит от: A20
   - Ref: `stit-infra/go-backend-template/scripts/tools/logs.sh`
-- [ ] **A22:** Врезка в `bootstrap-vps` + `request-secret`
-  - Что делаем: ссылка на `env-local`, забор кред через tools, без переспрашивания/эха.
+  - **Done:** `ssh.sh` — `read_local KEY FILE` (grep, `|| true` чтобы pipefail+set -e не убивал при
+    отсутствии ключа), приоритет env > `.env.local` > inventory. Тест: temp `.env.local` → невалидный
+    subcommand печатает usage (exit 2), значение `10.20.30.40` НЕ в stdout (no leak); без источников →
+    внятная ошибка про SSH_HOST. `make validate` → OK.
+- [x] **A22:** Врезка в `bootstrap-vps` + `request-secret`
+  - Что делаем: ссылка на `env-local`; SECRET_ID/pubkey/токены — tool-only, без переспрашивания/эха
+    значения в чат; connection в `.env.local`.
   - Verify: `make validate` → OK · Зависит от: A20
   - Ref: `stit-infra/go-backend-template/.claude/skills/query-logs/SKILL.md`
+  - **Done:** bootstrap-vps — Guard'рейл «Креды tool-only» (SECRET_ID/ROLE_ID/deploy-key/токены не
+    эхоить; connection→`.env.local`). request-secret — anti-pattern, разводящий намеренный
+    `vault kv put` hand-off от tool-only кредов оператора (токен→`.env.local`). `make validate` → OK.
 
 #### Phase 7 — local-ssh-wrapper для ops-вербов
-- [ ] **A23:** Ops-вербы оборачивают ssh
-  - Что делаем: `Makefile` (`ps`/`logs`/`restart`/`backup`/`restore-pg`) + `scripts/tools/ssh.sh` —
-    выполнять на VPS из рабочей станции; авто-хост из `ansible/inventory.ini`; fallback на локальный docker если уже на VPS.
-  - Verify: `make validate` → OK; `make ps` с рабочей станции бьёт по VPS · Зависит от: A21
+- [x] **A23:** Ops-вербы оборачивают ssh + `make ssh`
+  - Что делаем: `Makefile` ops-вербы (`ps`/`logs`/`restart`/`backup`/`restore-pg`) — на workstation
+    (нет `.env`) проксируют через `ssh.sh exec "make <verb> …"` на VPS; на VPS (есть `.env`) —
+    локальный docker (sentinel = наличие `.env`). Новый верб **`make ssh CMD="…"`** = `ssh.sh exec`.
+    Host/connection — из `.env.local` (A21), ничего не хардкодим. `ssh.sh` дописать под backup/restore-pg
+    (через `exec make …`, не нужен отдельный subcommand).
+  - Verify: `make validate` → OK; `make ps` с workstation идёт по ssh; `make ssh CMD=…` работает · Зависит от: A21
   - Ref: —
-- [ ] **A24:** Отразить wrapper в make-first + smartdev
-  - Что делаем: убрать «реализация — план» в `make-first.md`; smartdev точнее про local vs remote.
+  - **Done:** Makefile OPS — все 5 вербов обёрнуты `if [ -f .env ] then docker… else ssh.sh exec make
+    <verb>` (sentinel `.env`); новый `ssh` верб (`make ssh CMD="…"`), `.PHONY` дополнен. Тест: `make ps`
+    без `.env` уходит в ssh.sh (ошибка SSH_HOST, НЕ локальный docker); `make ssh` без CMD → usage; `ssh`
+    в `make help`. `make validate` → OK. backup/restore-pg идут через `exec make …`, отдельный subcommand
+    в ssh.sh не понадобился.
+- [x] **A24:** Отразить wrapper в make-first + smartdev
+  - Что делаем: убрать «реализация — план» в `make-first.md` (ops-вербы теперь реально оборачивают ssh);
+    добавить `make ssh` в словарь; smartdev точнее про local vs remote (sentinel `.env`).
   - Verify: `make validate` → OK · Зависит от: A23
   - Ref: `stit-infra/go-backend-template/.claude/rules/` (стиль)
+  - **Done:** make-first — словарь OPS дополнен `ssh CMD=`; §Local-vs-remote переписан на present-state
+    (sentinel `.env`, auto-proxy через ssh.sh, connection из `.env.local`, без «реализация-план»).
+    smartdev §1 — серверные проверки описаны через auto-proxy + `.env.local`. `make validate` → OK.
 
 #### Phase 8 — Продуктовый слой /init-project
 **Решения проработки (2026-05-27).** Слой `docs/project/` = продуктовый уровень ВЫШЕ go-backend

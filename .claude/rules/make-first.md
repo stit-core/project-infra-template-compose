@@ -20,8 +20,9 @@ paths:
 |---|---|---|
 | LOOP | `validate` / `doctor` / `check` | compose syntax+tpl+.env / live preflight / оба + `plan-check` |
 | SHIP | `ship MSG="…"` / `deploy` / `render` | commit+check+push+(main)ssh-deploy / server-side / envsubst+agent.hcl |
-| OPS | `ps` / `logs SVC=` / `restart SVC=` | статус / логи сервиса / рестарт сервиса |
+| OPS | `ps` / `logs SVC=` / `restart SVC=` | статус / логи сервиса / рестарт сервиса (на VPS) |
 | | `backup` / `restore-pg SNAPSHOT=` | one-shot backup / restore postgres из restic |
+| | `ssh CMD="…"` | произвольная команда на VPS (через `ssh.sh`) |
 | INTEL | `status` / `search Q= [P=]` | cockpit-сводка / поиск по compose+configs+scripts+docs |
 | PROVISION | `new-env` | bootstrap `.env` на чистом VPS |
 | SETUP | `setup` | симлинк git-хуков (commit-msg, pre-commit) в `.git/hooks/` |
@@ -49,12 +50,14 @@ paths:
 
 Репо живёт на **рабочей станции оператора**: authoring / `validate` / `plan` / `ship` —
 локально, живого стека тут нет. Ops-вербы (`ps`/`logs`/`restart`/`backup`/`restore-pg`)
-логически выполняются **на проектном VPS** — через `scripts/tools/ssh.sh` (хост из
-`ansible/inventory.ini`). `make ship` пушит и триггерит remote `deploy.sh`.
+выполняются **на проектном VPS** и **сами проксируют туда**: sentinel — наличие `.env` (живёт
+только на сервере). Нет `.env` (workstation) → верб уходит через `scripts/tools/ssh.sh exec make
+<verb>` на VPS; есть `.env` (на VPS) → локальный `docker`. `make ssh CMD="…"` — произвольная
+команда на VPS.
 
-Реализация-план: сейчас ops-вербы Makefile (`make ps`/`logs`) гоняют **локальный** `docker compose`
-на том хосте, где вызваны; сквозная ssh-обёртка ops-вербов из рабочей станции — Phase 7 (A23).
-До неё remote-ops идут через `scripts/tools/ssh.sh <subcommand>` напрямую либо `ssh root@<vps>`.
+Connection (host/port/user/project) берётся из **`.env.local`** (workstation, gitignored —
+`.claude/rules/env-local.md`), **не хардкодится**; fallback — `ansible/inventory.ini`. `make ship`
+пушит и триггерит remote `deploy.sh`.
 
 ## Запреты
 

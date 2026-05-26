@@ -1,4 +1,4 @@
-.PHONY: help validate doctor check ship deploy render ps logs restart backup restore-pg status search new-env setup plan-check project-check
+.PHONY: help validate doctor check ship deploy render ps logs restart backup restore-pg ssh status search new-env setup plan-check project-check
 
 SHELL := /usr/bin/env bash
 
@@ -48,22 +48,34 @@ render: ## envsubst для *.tpl + сборка agent.hcl из parts
 	bash scripts/render-configs.sh
 
 ##@ OPS
-ps: ## docker compose ps
-	docker compose $(COMPOSE_ARGS) ps
+# Ops-вербы выполняются НА VPS. Sentinel — наличие `.env` (живёт только на сервере):
+# есть .env → локальный docker; нет → проксируем через scripts/tools/ssh.sh на VPS.
+# Connection для ssh.sh — из .env.local (см. .claude/rules/{make-first,env-local}.md).
+ps: ## статус сервисов (на VPS; с workstation — через ssh)
+	@if [ -f .env ]; then docker compose $(COMPOSE_ARGS) ps; \
+	else bash scripts/tools/ssh.sh exec make ps; fi
 
-logs: ## docker compose logs -f --tail=100 (SVC= один сервис)
-	docker compose $(COMPOSE_ARGS) logs -f --tail=100 $(SVC)
+logs: ## логи -f --tail=100 (SVC= один сервис; с workstation — через ssh)
+	@if [ -f .env ]; then docker compose $(COMPOSE_ARGS) logs -f --tail=100 $(SVC); \
+	else bash scripts/tools/ssh.sh exec make logs SVC=$(SVC); fi
 
 restart: ## рестарт одного сервиса: make restart SVC=backend
 	@if [ -z "$(SVC)" ]; then echo "usage: make restart SVC=<name>"; exit 2; fi
-	docker compose $(COMPOSE_ARGS) restart $(SVC)
+	@if [ -f .env ]; then docker compose $(COMPOSE_ARGS) restart $(SVC); \
+	else bash scripts/tools/ssh.sh exec make restart SVC=$(SVC); fi
 
-backup: ## one-shot backup внутри backup-контейнера (daily — busybox crond внутри)
-	docker exec backup /usr/local/bin/backup-now
+backup: ## one-shot backup (на VPS; с workstation — через ssh)
+	@if [ -f .env ]; then docker exec backup /usr/local/bin/backup-now; \
+	else bash scripts/tools/ssh.sh exec make backup; fi
 
-restore-pg: ## restore postgres из restic-снапшота. usage: make restore-pg SNAPSHOT=latest
+restore-pg: ## restore postgres из restic: make restore-pg SNAPSHOT=latest
 	@if [ -z "$(SNAPSHOT)" ]; then echo "usage: make restore-pg SNAPSHOT=<id|latest>"; exit 2; fi
-	bash scripts/restore-pg.sh "$(SNAPSHOT)"
+	@if [ -f .env ]; then bash scripts/restore-pg.sh "$(SNAPSHOT)"; \
+	else bash scripts/tools/ssh.sh exec make restore-pg SNAPSHOT=$(SNAPSHOT); fi
+
+ssh: ## выполнить команду на VPS: make ssh CMD="docker ps"
+	@if [ -z "$(CMD)" ]; then echo 'usage: make ssh CMD="<command>"'; exit 2; fi
+	@bash scripts/tools/ssh.sh exec $(CMD)
 
 ##@ INTEL
 status: ## Сводка состояния репо для smartdev (A= "--full")

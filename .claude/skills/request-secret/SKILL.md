@@ -109,3 +109,8 @@ vault kv put kv/projects/<p>/<env>/<name> \
 - **Засеивать creds в .env вместо Vault.** Любой секрет = Vault. `.env` только для identity + AppRole-bootstrap + локально-сгенерированных артефактов (CROWDSEC_BOUNCER_API_KEY).
 
 - **Префиксы env'а в name.** Не `db-prod`/`db-dev` — env-разделение уже в path (`kv/projects/<p>/<env>/db`). Имя описывает _что_, не _где_.
+
+- **Путать seed-блок с tool-only кредами.** Печатаемый `vault kv put` блок — намеренный hand-off
+  корп-админу (значения в нём — для copy-paste out-of-band). А вот креды, которые **присылает
+  оператор** (готовый токен, connection к VPS), и `VAULT_SECRET_ID`/`ROLE_ID` — НЕ эхо-ить: токен →
+  агент пишет в `.env.local`, значение не цитирует (`.claude/rules/env-local.md`).

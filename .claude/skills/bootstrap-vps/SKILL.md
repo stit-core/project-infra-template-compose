@@ -222,6 +222,9 @@ docker exec minio mc ls local/backups/
 
 - **Не запускай ssh-hardening без проверки** что в `/root/.ssh/authorized_keys` есть твой ключ. Роль `ssh-hardening` обязана это assert'нуть, но дополнительно проверь руками.
 - **Не публикуй deploy-key из stdout/log'а** — это секрет. Передай оператору приватным каналом.
+- **Креды tool-only.** `VAULT_SECRET_ID`/`ROLE_ID`, deploy-key, токены — не эхо-ить значение в чат
+  (подтверждай факт, не печатай секрет; `.claude/rules/env-local.md`). Connection к VPS для ops-вербов
+  после bootstrap — в `.env.local` (workstation, gitignored), не хардкодь; `ssh.sh` читает его сам.
 - **DNS-cutover до первого deploy** — иначе LE rate-limit съедает попытки выпуска.
 - **Rehearsal → ВСЕГДА staging** — production LE сжигается за день многократных итераций. Если режим rehearsal, но `meta.acme_caserver` указывает на prod — это твоя ошибка, проси корп-патч.
 - **Production → НИКОГДА staging** — клиент получит untrusted cert. Если режим production и видишь staging в `kv/.../meta.acme_caserver` — стоп, перепроверь с юзером.

@@ -1,6 +1,7 @@
 .env
 .env.*
 !.env.example
+!.env.local.example
 
 # Legacy: до multi-env (Phase 1+) new-env.sh генерил .onboard-creds локально.
 # Теперь creds выдаёт `make request-secret KIND=...` (stdout, ничего не пишет

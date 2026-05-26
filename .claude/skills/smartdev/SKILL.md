@@ -34,9 +34,10 @@ make status
 - `== Plan ==` — активные планы из roadmap или `none`
 - `== Branch ==` / `== Working tree ==` / `== Compose ==` / `== Recent commits ==` — фон
 
-Серверные проверки требуют доступа: `make ps` / `make logs SVC=<svc>` / `make doctor`
-(на VPS либо через `scripts/tools/ssh.sh`; local/remote split — rule `make-first`). Локально
-без `.env` многое будет SKIP — это норма.
+Серверные проверки: ops-вербы сами проксируют на VPS — `make ps` / `make logs SVC=<svc>` /
+`make restart SVC=` / `make ssh CMD="…"` уходят через `scripts/tools/ssh.sh`, когда локально нет
+`.env` (sentinel; connection из `.env.local`). На VPS (есть `.env`) — локальный docker. Split и
+`.env.local` — rules `make-first`/`env-local`. `make doctor` без `.env` локально → SKIP, это норма.
 
 ## 2. Поднять контекст
 
