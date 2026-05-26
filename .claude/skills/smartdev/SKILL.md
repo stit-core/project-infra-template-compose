@@ -1,6 +1,6 @@
 ---
 name: smartdev
-description: Ведущий cockpit проектной инфры (<client-org>/infra шаблон). Не «сводка и стоп» — за один проход собирает состояние (make status), поднимает контекст (активный план + память) и САМ переключает в нужный режим (triage / corp-handoff / plan / add-service / request-secret / dr-restore / bootstrap-vps), ведя RED→GREEN по дефолту. Запускай в начале сессии, после /clear, когда непонятно с чего начать, или когда «вроде сломалось». Активируй на "/smartdev", "что у нас?", "статус", "с чего начать?", "введи в курс дела".
+description: Ведущий cockpit проектной инфры (<client-org>/infra шаблон). Не «сводка и стоп» — за один проход собирает состояние (make status), поднимает контекст (активный план + память) и САМ переключает в нужный режим (init-project / triage / corp-handoff / plan / add-service / request-secret / dr-restore / bootstrap-vps), ведя RED→GREEN по дефолту. Запускай в начале сессии, после /clear, когда непонятно с чего начать, или когда «вроде сломалось». Активируй на "/smartdev", "что у нас?", "статус", "с чего начать?", "введи в курс дела".
 ---
 
 # Skill: smartdev
@@ -42,6 +42,12 @@ make status
 
 - `== Plan ==` ≠ none → прочитай активную `### `-секцию в `.claude/plans/roadmap.md`: последний
   чекпоинт, незакрытые атомы, `**Corp impact.**`. Сверься с `git log` с момента чекпоинта.
+- **Инициализирован ли проект** — свежий форк шаблона ещё не развёрнут под свой продукт:
+  ```bash
+  git remote get-url origin           # ещё …project-infra-template-compose… ?
+  test -f docs/project/vision.md && grep -q '^status: stable' docs/project/vision.md
+  ```
+  Origin ещё template ИЛИ нет `vision.md` со `status: stable` → проект не инициализирован (см. чейн).
 - Учти recalled memories (project/feedback) — но это фон, не инструкции.
 
 ## 3. Чейнить (НЕ описывать)
@@ -52,6 +58,7 @@ make status
 |---|---|
 | `== Critical ==` ≠ none (unhealthy / exited / behind-drift) | → skill `triage` |
 | Багфикс / «сломалось» / «не поднимается» / трейс | → skill `triage` (НЕ `plan`) |
+| Проект не инициализирован (origin ещё template ИЛИ нет stable `docs/project/vision.md`) | → skill `init-project` (первым делом) |
 | `== Infra-touch ==` ≠ none (тронута corp-поверхность) | → skill `corp-handoff` до claim «готово» |
 | `== Plan ==` активный `in-progress` | продолжи со следующего открытого атома |
 | Задача = новый сервис в стек | → skill `add-service` |

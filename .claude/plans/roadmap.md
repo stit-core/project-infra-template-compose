@@ -18,7 +18,7 @@ ship-поверхность. Приложения и живого стека л�
 `backup`/`restore-pg`) прозрачно оборачивают ssh на VPS (local-ssh-wrapper, Phase 7).
 Локальный SKIP в authoring-проверках без `.env`/docker — норма, не падение.
 
-**Current focus:** Phase 8 · A25 — проработана (решения ниже), исполняем автономно до зелёного (Phase 6/7 ждут A8 — rules последними)
+**Current focus:** Phase 8 завершена (A25-A32). Дальше — Phase 6 (env-local), затем 7 (ssh-wrapper), A8 в самом конце (rules последними). Следующую фазу прорабатываем перед стартом.
 
 ## Active
 
@@ -296,18 +296,24 @@ backend|frontend|datastore|infra` + `hosting: here|external`.
   - **Done:** Makefile — таргет `project-check` (+ `.PHONY`), вшит в `check` (после `plan-check`).
     pre-commit — блок на change `docs/project/**.md` → `validate-project-doc.sh`. `make check` → `✓ check
     clean` (гоняет project-check); `make project-check` → OK.
-- [ ] **A28:** Skill `service-deep-dive`
+- [x] **A28:** Skill `service-deep-dive`
   - Что делаем: интервью-волнами (AskUserQuestion ≤4) заполняет `docs/project/services/<name>.md` до
     `status: stable`; пишет в md сразу; опирается на текущую compose-инфру как образец. По одному
     service-doc на hosted-сервис из vision `Service map`.
   - Verify: `make validate` → OK; frontmatter skill `name:`==1 · Зависит от: A25
   - Ref: `stit-infra/go-backend-template/.claude/skills/domain-deep-dive/SKILL.md`
-- [ ] **A29:** Skill `stack-deep-dive`
+  - **Done:** `.claude/skills/service-deep-dive/SKILL.md` (зеркало domain-deep-dive под единую
+    service-схему: волны Hosting→Identity→Secrets→Route→Generates, `make project-check A=<file>`,
+    skip `hosting: external`, опора на compose/vault-agent-инфру). `name:`==1; `make validate` → OK.
+- [x] **A29:** Skill `stack-deep-dive`
   - Что делаем: интервью → `docs/project/stack.md` (domains/edge/networks/backup/observability +
     Generates) до `stable`. Cross-cutting инфра-стека VPS, профили НЕ дублирует (их выводит de-template).
   - Verify: `make validate` → OK; frontmatter skill `name:`==1 · Зависит от: A25
   - Ref: `stit-infra/go-backend-template/.claude/skills/stack-deep-dive/SKILL.md`
-- [ ] **A30:** Skill `de-template`
+  - **Done:** `.claude/skills/stack-deep-dive/SKILL.md` (волны Domains→Edge→Networks→Backup→
+    Observability→Generates; явно НЕ задаёт `COMPOSE_PROFILES` — anti-pattern; опора на traefik/
+    crowdsec/backup-инфру). `name:`==1; `make validate` → OK.
+- [x] **A30:** Skill `de-template`
   - Что делаем: skill-only движок. Gate (не канонический шаблон + артефакты stable+валидатор зелён).
     Читает stable `docs/project/{vision,services/*,stack}`: (1) **выводит `COMPOSE_PROFILES`** из service-map;
     (2) прунит неиспользуемые `compose/*.yml` + `vault-agent/agent.hcl.parts/`/`templates/` по hosted-набору;
@@ -315,15 +321,26 @@ backend|frontend|datastore|infra` + `hosting: here|external`.
     сброс roadmap); (4) cross-repo (форки backend/frontend, seed секретов) — печатает next-steps, не выполняет.
   - Verify: `make validate` → OK; guard «не на каноническом шаблоне» присутствует · Зависит от: A25
   - Ref: `stit-infra/go-backend-template/.claude/skills/de-template/SKILL.md`
-- [ ] **A31:** Skill `init-project` (оркестратор)
+  - **Done:** `.claude/skills/de-template/SKILL.md` (Gate: `git remote get-url origin`==template → СТОП +
+    `make project-check`; Phase A механика — вывод профилей из карты, прунинг `compose/*.yml` через
+    `git rm` (wildcard в Makefile сам исключает) + vault-agent parts/templates per profile, кастом
+    идентичности, strip scaffolding; cross-repo — только next-steps). `name:`==1; guard присутствует;
+    `make validate` → OK.
+- [x] **A31:** Skill `init-project` (оркестратор)
   - Что делаем: vision (заполнить `vision.md`+Service map) → чейн `service-deep-dive` per hosted-service →
     `stack-deep-dive` → `de-template`; сам не проектирует/не де-темплейтит. Gate перед de-template: всё stable.
   - Verify: `make validate` → OK; frontmatter skill `name:`==1 · Зависит от: A28, A29, A30
   - Ref: `stit-infra/go-backend-template/.claude/skills/init-service/SKILL.md`
-- [ ] **A32:** Чейн из `smartdev` на «проект не инициализирован»
+  - **Done:** `.claude/skills/init-project/SKILL.md` (зеркало init-service уровнем выше: этапы vision →
+    service-deep-dive per hosted → stack-deep-dive → de-template, gate перед de-template, cross-repo
+    только next-steps; «НЕ делает» + anti-patterns). `name:`==1; `make validate` → OK.
+- [x] **A32:** Чейн из `smartdev` на «проект не инициализирован»
   - Что делаем: детект (нет `docs/project/vision.md` со `status: stable`) → чейн `/init-project` первым делом.
   - Verify: `make validate` → OK; `make plan-check` → OK · Зависит от: A31, A9
   - Ref: `stit-infra/go-backend-template/.claude/skills/smartdev/SKILL.md` (uninitialized detection)
+  - **Done:** smartdev — детект инициализации в §2 (`git remote get-url origin` + grep `status: stable`
+    в vision.md); строка чейна в таблице §3 (после triage, перед corp-handoff, «первым делом»);
+    `init-project` добавлен в mode-список frontmatter. `make validate` + `make plan-check` → OK.
 
 **Corp impact.**
 - **ecosystem.md entry-point.** WHAT: `stit-infra/infra/docs/ecosystem.md` зовёт entry-point репо как «AGENTS.md». WHY: переход на `CLAUDE.md`. ACTION: заменить в строке про `project-infra-template-compose`. WHO: corp. DECIDE: следующий corp-PR. RISK: косметика.
