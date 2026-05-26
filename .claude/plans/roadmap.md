@@ -18,7 +18,7 @@ ship-поверхность. Приложения и живого стека л�
 `backup`/`restore-pg`) прозрачно оборачивают ssh на VPS (local-ssh-wrapper, Phase 7).
 Локальный SKIP в authoring-проверках без `.env`/docker — норма, не падение.
 
-**Current focus:** Phase 3 · A7
+**Current focus:** Phase 3 · A9 (A8 отложен в самый конец — rules последними)
 
 ## Active
 
@@ -111,27 +111,30 @@ vault-agent webhook) — вне этого плана.
     (`docker exec` под `restic`/`cscli`/`mc`/`ls`), local-vs-remote split (ops → ssh-wrapper).
   - Verify: `make validate` → OK; `grep -c '^name:' .claude/rules/make-first.md` → 1 · Зависит от: —
   - Ref: `stit-infra/go-backend-template/.claude/rules/` (стиль path-scoped rule)
-- [ ] **A8:** Rule `.claude/rules/skill-authoring.md` + `name:` во всех правилах
-  - Что делаем: канонический скелет SKILL.md (секции) + frontmatter-контракт правил; дописать
-    `name:` в `secrets-and-env.md`.
-  - Verify: `make validate` → OK; во всех `.claude/rules/*.md` есть `name:` · Зависит от: —
-  - Ref: `stit-infra/go-backend-template/docs/contributing.md`
+  - **Done:** `.claude/rules/make-first.md` создан (frontmatter `name`+`description`+`paths`: Makefile/scripts/skills). Словарь вербов из `make help`, raw-docker исключения (restic/cscli/mc/ls через `docker exec`, `docker compose config`, throwaway `docker run` в DR, explanatory deploy.sh-внутренности), local-vs-remote split (ops на VPS; ssh-обёртка вербов = «реализация-план» Phase 7/A23, снимет A24), запреты через permissions.deny. `make validate` → OK; `grep -c '^name:'` → 1.
+- [ ] **A8:** Frontmatter-контракт всех правил `.claude/rules/*.md` — **ВЫПОЛНЯЕТСЯ В САМОМ КОНЦЕ** (rules трогаем последними, по решению юзера; skill-authoring.md отменён как лишний)
+  - Что делаем: дописать `name:` во ВСЕ `.claude/rules/*.md` (аудит: сейчас `name:` нет ни в одном).
+    **Находка:** `multi-env.md` вообще без frontmatter (нет `description`/`paths`) → не
+    автоподгружается как path-scoped правило — дописать полный frontmatter (paths: `.env*`,
+    `configs/vault-agent/**`, `compose/*.yml`, ansible onboard — по содержимому правила).
+  - Verify: `make validate` → OK; во всех `.claude/rules/*.md` есть `name:`+`description:`+`paths:` · Зависит от: —
+  - Ref: —
 - [ ] **A9:** Нормализовать `smartdev` + `triage`
-  - Что делаем: секции под скелет; `docker logs` → `make logs SVC=`; внутренности `deploy.sh`
-    пометить explanatory; local/remote из make-first.
-  - Verify: `make validate` → OK; raw docker — только explanatory · Зависит от: A7, A8
+  - Что делаем: секции под де-факто канон (`Когда применять`/`Когда НЕ применять`/`Шаги`/`Anti-patterns`);
+    `docker logs` → `make logs SVC=`; внутренности `deploy.sh` пометить explanatory; local/remote из make-first.
+  - Verify: `make validate` → OK; raw docker — только explanatory · Зависит от: A7
   - Ref: `stit-infra/go-backend-template/.claude/skills/smartdev/SKILL.md`
 - [ ] **A10:** Нормализовать `bootstrap-vps` + `dr-restore`
-  - Что делаем: raw `docker exec` под restic/cscli/mc — legit со ссылкой на make-first; остальное через make; секции под скелет.
-  - Verify: `make validate` → OK · Зависит от: A7, A8
+  - Что делаем: raw `docker exec` под restic/cscli/mc — legit со ссылкой на make-first; остальное через make; секции под де-факто канон.
+  - Verify: `make validate` → OK · Зависит от: A7
   - Ref: `stit-infra/go-backend-template/.claude/skills/triage-failure/SKILL.md`
 - [ ] **A11:** Нормализовать `add-service` + `corp-handoff` + `request-secret`
-  - Что делаем: порядок секций под скелет, ссылки на make-first; контент по сути не менять.
-  - Verify: `make validate` → OK · Зависит от: A7, A8
+  - Что делаем: порядок секций под де-факто канон, ссылки на make-first; контент по сути не менять.
+  - Verify: `make validate` → OK · Зависит от: A7
   - Ref: `stit-infra/go-backend-template/.claude/skills/scaffold/SKILL.md`
 - [ ] **A12:** Замок: сверка `grep docker` + `CLAUDE.md` §Стиль
   - Что делаем: каждый raw-docker — explanatory или в исключениях make-first; в `CLAUDE.md`
-    §Стиль ссылки на `make-first` + `skill-authoring`.
+    §Стиль ссылка на `make-first`.
   - Verify: `make validate` → OK; `make plan-check` → OK · Зависит от: A9, A10, A11
   - Ref: `stit-infra/go-backend-template/CLAUDE.md`
 
