@@ -112,13 +112,17 @@ vault-agent webhook) — вне этого плана.
   - Verify: `make validate` → OK; `grep -c '^name:' .claude/rules/make-first.md` → 1 · Зависит от: —
   - Ref: `stit-infra/go-backend-template/.claude/rules/` (стиль path-scoped rule)
   - **Done:** `.claude/rules/make-first.md` создан (frontmatter `name`+`description`+`paths`: Makefile/scripts/skills). Словарь вербов из `make help`, raw-docker исключения (restic/cscli/mc/ls через `docker exec`, `docker compose config`, throwaway `docker run` в DR, explanatory deploy.sh-внутренности), local-vs-remote split (ops на VPS; ssh-обёртка вербов = «реализация-план» Phase 7/A23, снимет A24), запреты через permissions.deny. `make validate` → OK; `grep -c '^name:'` → 1.
-- [ ] **A8:** Frontmatter-контракт всех правил `.claude/rules/*.md` — **ВЫПОЛНЯЕТСЯ В САМОМ КОНЦЕ** (rules трогаем последними, по решению юзера; skill-authoring.md отменён как лишний)
+- [x] **A8:** Frontmatter-контракт всех правил `.claude/rules/*.md` (rules последними, по решению юзера; skill-authoring.md отменён как лишний)
   - Что делаем: дописать `name:` во ВСЕ `.claude/rules/*.md` (аудит: сейчас `name:` нет ни в одном).
     **Находка:** `multi-env.md` вообще без frontmatter (нет `description`/`paths`) → не
     автоподгружается как path-scoped правило — дописать полный frontmatter (paths: `.env*`,
     `configs/vault-agent/**`, `compose/*.yml`, ansible onboard — по содержимому правила).
   - Verify: `make validate` → OK; во всех `.claude/rules/*.md` есть `name:`+`description:`+`paths:` · Зависит от: —
   - Ref: —
+  - **Done:** `name:` дописан в 6 правил (ansible-style/compose-and-services/corp-handoff/forward-only/
+    secrets-and-env/traefik-routing; make-first уже имел). `multi-env.md` получил полный frontmatter
+    (name+description+paths: `.env*`/`configs/vault-agent/**`/`compose/*.yml`/`ansible/roles/stit-onboard/**`)
+    — был без frontmatter вовсе, не автоподгружался. Все 8 правил: name=1 desc=1 paths=1; `make validate` → OK.
 - [x] **A9:** Нормализовать `smartdev` + `triage`
   - Что делаем: секции под де-факто канон (`Когда применять`/`Когда НЕ применять`/`Шаги`/`Anti-patterns`);
     `docker logs` → `make logs SVC=`; внутренности `deploy.sh` пометить explanatory; local/remote из make-first.

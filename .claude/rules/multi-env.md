@@ -1,3 +1,13 @@
+---
+name: multi-env
+description: Проектная сторона multi-env контракта — vault-agent KV-paths (kv/projects/<p>/<env>/*), как оператор запрашивает seed'ы, profile-based opt-in, lazy-seed, ротация через vault kv patch. Один env = отдельный VPS со своим ENV + AppRole-парой. Грузится при работе с .env, vault-agent config, compose-профилями, ansible-онбордингом.
+paths:
+  - ".env*"
+  - "configs/vault-agent/**"
+  - "compose/*.yml"
+  - "ansible/roles/stit-onboard/**"
+---
+
 # Multi-environment
 
 Один проект может иметь несколько сред (`dev`, `prod`, опционально `staging`/etc). Каждая среда — **отдельный VPS** с одним и тем же compose-шаблоном, но со своим `ENV` в `.env` и своим набором AppRole-credentials. Шаблон агностичен к именам env'ов — это произвольные слаги.

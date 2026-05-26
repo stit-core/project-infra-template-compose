@@ -1,4 +1,5 @@
 ---
+name: corp-handoff
 description: Изменение corp-поверхности (новая Vault-KV-зависимость / профиль / env-контракт / crowdsec-whitelist / новый env-онбординг / новый сабдомен под LE) ОБЯЗАНО породить CORP-HANDOFF-блок корп-админу (или DNS-владельцу) до claim «готово». Грузится при правке configs/vault-agent, compose-профилей, .env.example, crowdsec whitelists, ansible onboard.
 paths:
   - "configs/vault-agent/**"

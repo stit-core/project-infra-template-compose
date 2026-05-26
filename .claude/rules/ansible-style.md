@@ -1,4 +1,5 @@
 ---
+name: ansible-style
 description: Правила ansible-bootstrap для нового VPS. Грузится при работе с playbook'ами / ролями.
 paths:
   - "ansible/**"

@@ -1,4 +1,5 @@
 ---
+name: traefik-routing
 description: Правила маршрутизации Traefik в проектной инфре. Грузится при работе с Traefik labels или dynamic-конфигом.
 paths:
   - "compose/**"

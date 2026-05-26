@@ -1,4 +1,5 @@
 ---
+name: secrets-and-env
 description: Правила секретов в проектной инфре. Multi-env (kv/projects/<p>/<env>/*), .env только identity+bootstrap, vault-agent рендерит .runtime/, ротация = vault kv patch + force-recreate. Грузится при работе с .env, .tpl, vault-agent.
 paths:
   - ".env*"

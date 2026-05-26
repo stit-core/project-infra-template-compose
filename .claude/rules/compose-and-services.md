@@ -1,4 +1,5 @@
 ---
+name: compose-and-services
 description: Правила docker-compose и сервисов проектной инфры. Грузится при правке compose-фрагментов.
 paths:
   - "compose/**"
