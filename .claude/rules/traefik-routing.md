@@ -1,8 +1,8 @@
 ---
 name: traefik-routing
-description: Правила маршрутизации Traefik в проектной инфре. Грузится при работе с Traefik labels или dynamic-конфигом.
+description: Инварианты маршрутизации Traefik — сабдомены `<name>.${DOMAIN}` (не path-based), `crowdsec@file` middleware на ВСЕХ публичных роутах (API ещё +secure-headers+rate-limit), internal-сервисы без traefik-labels, dashboard не expose'им. Грузится при правке configs/traefik/ или compose/*.yml с traefik-labels.
 paths:
-  - "compose/**"
+  - "compose/*.yml"
   - "docker-compose.yml"
   - "configs/traefik/**"
 ---
@@ -38,7 +38,7 @@ paths:
 
 ## TLS
 
-`websecure` entrypoint всегда применяет `secure-headers` глобально (`configs/traefik/traefik.yml`). LE-сертификаты выпускаются HTTP-01 challenge, хранятся в `traefik-letsencrypt` volume → попадают в restic backup. ACME email — `${ACME_EMAIL}`.
+`websecure` entrypoint всегда применяет `secure-headers` глобально (`configs/traefik/traefik.yml`). LE-сертификаты выпускаются HTTP-01 challenge, `acme.json` хранится в volume `traefik-acme`. Он **не** бэкапится (restic берёт только `pg_dumpall`) — при потере VPS сертификаты перевыпускаются заново. `email`/`caServer` приходят из Vault `meta` (`acme_email`/`acme_caserver`) — vault-agent рендерит их в `traefik.yml`, не через `${ENV}`-подстановку.
 
 ## Dashboard Traefik
 

@@ -1,8 +1,8 @@
 ---
 name: compose-and-services
-description: Правила docker-compose и сервисов проектной инфры. Грузится при правке compose-фрагментов.
+description: Инварианты compose-фрагментов — один сервис = один файл compose/<svc>.yml, pinned image (не :latest), обязательные restart/healthcheck/container_name/явные networks, depends_on vault-agent healthy для consumer'ов секретов, env_file фиксируется при CREATE (force-recreate на смену), internal-сеть + ports несовместимы. Грузится при правке compose/ или docker-compose.yml.
 paths:
-  - "compose/**"
+  - "compose/*.yml"
   - "docker-compose.yml"
 ---
 

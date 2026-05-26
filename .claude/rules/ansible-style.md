@@ -1,6 +1,6 @@
 ---
 name: ansible-style
-description: Правила ansible-bootstrap для нового VPS. Грузится при работе с playbook'ами / ролями.
+description: Инварианты ansible-bootstrap нового VPS — идемпотентность тасков (re-run safe), один концерн = одна роль (base/ssh-hardening/docker/stit-onboard), assert required-vars в pre_tasks, секреты НЕ в playbook'е (оператор кладёт .env руками), fail-fast перед disable password auth. Грузится при работе с ansible/.
 paths:
   - "ansible/**"
 ---

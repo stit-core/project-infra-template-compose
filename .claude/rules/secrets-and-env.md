@@ -2,7 +2,8 @@
 name: secrets-and-env
 description: Правила секретов в проектной инфре. Multi-env (kv/projects/<p>/<env>/*), .env только identity+bootstrap, vault-agent рендерит .runtime/, ротация = vault kv patch + force-recreate. Грузится при работе с .env, .tpl, vault-agent.
 paths:
-  - ".env*"
+  - ".env"
+  - ".env.example"
   - "**/*.tpl"
   - "configs/vault-agent/**"
   - "compose/vault-agent.yml"
@@ -18,7 +19,7 @@ paths:
 | Bootstrap auth | `VAULT_ROLE_ID`, `VAULT_SECRET_ID` | `.env` | оператор (из корп онбординга) |
 | Local-managed | `CROWDSEC_BOUNCER_API_KEY`, `COMPOSE_PROFILES` | `.env` | auto-register / оператор |
 | Корп-константы | `VAULT_ADDR`, `OTEL endpoint` | hardcoded в шаблоне | — |
-| Vault-managed конфиг | `BACKEND_TAG`, `ACME_EMAIL`, `ACME_CASERVER` | `kv/projects/<p>/<env>/meta` → `.runtime/env/compose.env` | корп-админ (vault kv put/patch) |
+| Vault-managed конфиг | meta: `backend_tag`→`BACKEND_TAG` в compose.env; `acme_email`/`acme_caserver`→traefik.yml | `kv/projects/<p>/<env>/meta` (vault-agent рендерит) | корп-админ (vault kv put/patch) |
 | Vault-managed секреты | DB, OIDC, JWT, OTEL_TOKEN, MinIO, Restic + AWS | `kv/projects/<p>/<env>/{db,oidc,jwt,otel,minio,backup}` → `.runtime/secrets/*.env` | корп-админ |
 
 Consumer-сервисы (postgres, backend, minio, backup, otel-agent) читают **только** `.runtime/secrets/*.env` и `.runtime/env/compose.env` через `env_file:` / compose `--env-file`. Они не знают про Vault напрямую.
@@ -34,7 +35,7 @@ Consumer-сервисы (postgres, backend, minio, backup, otel-agent) чита�
 | `.env.example` | да | Минимальный набор для bootstrap (5 переменных) |
 | `.env` | **нет** (gitignored, permissions.deny) | Реальные identity + AppRole на VPS |
 | `.runtime/secrets/*.env` | **нет** | Vault-agent rendered секреты |
-| `.runtime/env/compose.env` | **нет** | Vault-agent rendered non-secret конфиг для compose (BACKEND_TAG etc.) |
+| `.runtime/env/compose.env` | **нет** | Vault-agent rendered non-secret конфиг для compose (`BACKEND_TAG` из meta) |
 | `.runtime/configs/traefik.yml` | **нет** | Vault-agent rendered traefik static (acme email/caServer из Vault) |
 | `.runtime/configs/vault-health.sh` | **нет** | render-configs.sh generated healthcheck-script под активные profile'ы |
 | `.runtime/secrets-bootstrap/{role-id,secret-id}` | **нет** | Trampoline для AppRole login |
