@@ -100,7 +100,7 @@ new-env: ## Bootstrap .env на чистом VPS (interactive; либо PROJECT_
 
 ##@ SETUP
 setup: ## git-хуки (commit-msg, pre-commit) + dev-deps (PyYAML для frontmatter-проверки)
-	bash scripts/hooks-install.sh
+	bash scripts/setup.sh
 
 ##@ META
 plan-check: ## Валидатор структуры единого плана .claude/plans/roadmap.md (A=<file> override)

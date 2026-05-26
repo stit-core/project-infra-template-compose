@@ -57,8 +57,8 @@
       2. Re-run: ansible-playbook -i inventory.ini bootstrap.yml --tags onboard
   when: clone.failed | default(false)
 
-- name: Install git hooks (if cloned)
-  ansible.builtin.command: bash scripts/hooks-install.sh
+- name: Run repo setup — git hooks + dev-deps (if cloned)
+  ansible.builtin.command: bash scripts/setup.sh
   args:
     chdir: "{{ project_root }}"
   when: not (clone.failed | default(false))
