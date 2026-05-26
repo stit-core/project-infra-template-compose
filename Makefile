@@ -1,4 +1,4 @@
-.PHONY: help validate doctor check ship deploy render ps logs restart backup restore-pg status search new-env setup plan-check
+.PHONY: help validate doctor check ship deploy render ps logs restart backup restore-pg status search new-env setup plan-check project-check
 
 SHELL := /usr/bin/env bash
 
@@ -26,13 +26,15 @@ validate: ## Compose syntax + yamllint + .tpl + .env coverage (FORMAT=detailed)
 doctor: ## Live fail-fast preflight: compose/vault-agent/dns/vault/env (A= --full)
 	@bash scripts/tools/doctor.sh $(A)
 
-check: ## Каноничный pre-ship gate: validate + doctor + plan-check
+check: ## Каноничный pre-ship gate: validate + doctor + plan-check + project-check
 	@echo "→ make validate"
 	@$(MAKE) -s validate
 	@echo "→ make doctor"
 	@$(MAKE) -s doctor
 	@echo "→ make plan-check"
 	@$(MAKE) -s plan-check
+	@echo "→ make project-check"
+	@$(MAKE) -s project-check
 	@echo "✓ check clean"
 
 ##@ SHIP
@@ -82,3 +84,6 @@ setup: ## симлинк scripts/git-hooks/* → .git/hooks/
 ##@ META
 plan-check: ## Валидатор структуры единого плана .claude/plans/roadmap.md (A=<file> override)
 	@bash scripts/tools/validate-plan.sh $(A)
+
+project-check: ## Валидатор продуктового слоя docs/project/ (A=<path> override)
+	@bash scripts/tools/validate-project-doc.sh $(A)

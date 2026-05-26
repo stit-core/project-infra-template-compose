@@ -18,7 +18,7 @@ ship-поверхность. Приложения и живого стека л�
 `backup`/`restore-pg`) прозрачно оборачивают ssh на VPS (local-ssh-wrapper, Phase 7).
 Локальный SKIP в authoring-проверках без `.env`/docker — норма, не падение.
 
-**Current focus:** Phase 8 · A25 (Phase 6/7 ждут A8 — rules последними; Phase 8 разблокирована A15)
+**Current focus:** Phase 8 · A25 — проработана (решения ниже), исполняем автономно до зелёного (Phase 6/7 ждут A8 — rules последними)
 
 ## Active
 
@@ -169,7 +169,7 @@ getting-started.md (полный Day-0/Day-1, не лёгкий design-first). /
     roadmap + `make check`-gate в ship.sh; нет Claude-хуков, нет pre-push), course-correction,
     «осознанно не делаем» (CI/Claude-хуки/per-plan-файлы/ADR-папка/bloat), troubleshooting под
     make validate/doctor/plan-check. `make validate` → OK.
-- [ ] **A15:** Проработать `docs/reference/{architecture,ecosystem,runbook}.md`
+- [x] **A15:** Проработать `docs/reference/{architecture,ecosystem,runbook}.md`
   - Что делаем: architecture ← `docs/architecture.md` (present-state, без ADR-«почему»; §«Что НЕ в
     шаблоне» сохраняем). ecosystem ← тонкий локальный: роль проектной VPS + контракты с корпом +
     указатель на канон `stit-infra/infra/docs/ecosystem.md`. runbook ← `docs/runbook.md`. Удалить
@@ -182,7 +182,7 @@ getting-started.md (полный Day-0/Day-1, не лёгкий design-first). /
     с корпом + указатель на канон `stit-infra/infra/docs/ecosystem.md`). Sweep путей в CLAUDE.md (карта +
     auto-memory + Стек §), корневом README.md (×3), WORKFLOW.md (×4, удаляется в A19), dr-restore SKILL.md
     (×3). ADR-«почему» НЕ мигрировал (решено). Все 4 verify зелёные; grep-gate CLEAN.
-- [ ] **A16:** Удалить `docs/adrs/**` + почистить ADR-следы
+- [x] **A16:** Удалить `docs/adrs/**` + почистить ADR-следы
   - Что делаем: снести `docs/adrs/` целиком (0001/0002/template — «почему» НЕ мигрируем, решено);
     `forward-only.md` убрать секцию «Единственное исключение — ADR» + упоминания ADR в §«Чего не
     пишем»/§«Граница»; `.claude/agents/reviewer.md` убрать ADR-чек.
@@ -248,38 +248,80 @@ getting-started.md (полный Day-0/Day-1, не лёгкий design-first). /
   - Ref: `stit-infra/go-backend-template/.claude/rules/` (стиль)
 
 #### Phase 8 — Продуктовый слой /init-project
-- [ ] **A25:** Слой `docs/project/`: `README.md` + `_templates/{vision,service,stack}.md`
-  - Что делаем: kinds (vision/service[backend|frontend|datastore|infra]/stack), frontmatter
-    `id/kind/status: draft→stable`, workflow; файл-на-сервис (`services/<name>.md`).
-  - Verify: `make validate` → OK · Зависит от: A15
+**Решения проработки (2026-05-27).** Слой `docs/project/` = продуктовый уровень ВЫШЕ go-backend
+(там code-слой одного сервиса). 3 kind'а: `vision` (singleton `vision.md`), `service` (per
+hosted-service, `services/<name>.md`), `stack` (singleton `stack.md`). Frontmatter `id: project.<name>`
+/ `kind` / `name`==basename / `status: draft→stable`; service дополнительно `subtype:
+backend|frontend|datastore|infra` + `hosting: here|external`.
+- **service-схема единая** (не per-subtype): H2 `Hosting`/`Identity`/`Secrets`/`Route`/`Generates`
+  для всех subtype'ов; subtype — frontmatter-поле, per-subtype нюансы — в прозе/Generates.
+- **services/ = только compose-хостируемое** (postgres, minio, backend-контейнер, landing). Внешний
+  frontend-SPA / backend-код-репо — перечислены в vision `Service map` как контекст, без service-doc;
+  для них de-template печатает cross-repo next-steps.
+- **de-template выводит `COMPOSE_PROFILES` из service-map** (datastore→postgres/storage, backend→
+  backend), НЕ из явного prune-list. `stack.md` несёт только cross-cutting.
+- Required H2: vision — `Problem`/`Users`/`Service map`/`Boundaries`/`Environments`; service —
+  `Hosting`/`Identity`/`Secrets`/`Route`/`Generates`; stack — `Domains`/`Edge`/`Networks`/`Backup`/
+  `Observability`/`Generates`. Пустые → явный `N/A`/`_нет_` (зеркалит domain-дисциплину).
+- de-template — **skill-only** движок (зеркалит эталон), reviewable edits, guard «не на каноническом
+  шаблоне» (origin == `stit-infra/project-infra-template-compose` И не tmp-копия → СТОП).
+- Исполнение: автономно до зелёного `make check`, commit по phase-юнитам, push/ship — отдельным OK.
+- [x] **A25:** Слой `docs/project/`: `README.md` + `_templates/{vision,service,stack}.md`
+  - Что делаем: создать `docs/project/README.md` (3 kind'а, frontmatter-контракт `project.<name>` +
+    `subtype`/`hosting` для service, required-H2 таблица, workflow vision→services→stack→de-template,
+    gate stable+validator, anti-patterns) + три `_templates/{vision,service,stack}.md` с обязательными
+    H2 и `<...>`-плейсхолдерами. `services/` создаётся deep-dive'ами по карте, в шаблон не коммитим.
+  - Verify: `make validate` → OK; `test -e docs/project/README.md -a -e docs/project/_templates/vision.md -a -e docs/project/_templates/service.md -a -e docs/project/_templates/stack.md` · Зависит от: A15
   - Ref: `stit-infra/go-backend-template/docs/{domains,stack}/README.md` + `_templates/`
-- [ ] **A26:** `scripts/tools/validate-project-doc.sh`
-  - Что делаем: frontmatter (id/kind/name/status) + required sections per kind + ref-integrity при stable.
-  - Verify: валидатор зелёный на `_templates/` · Зависит от: A25
+  - **Done:** `docs/project/README.md` (продуктовый слой ВЫШЕ go-backend code-уровня; 3 kind'а
+    vision/service/stack, frontmatter `project.<name>`+service `subtype`/`hosting`, required-H2,
+    `Generates→инфра`-таблица «subtype→профиль», workflow, gate, anti-patterns) + три `_templates/`.
+    `make validate` → OK; file-existence → PASS.
+- [x] **A26:** `scripts/tools/validate-project-doc.sh`
+  - Что делаем: зеркало `validate-stack-doc.sh` под 3 kind'а. Frontmatter (id/kind/name/status;
+    service → ещё subtype∈{backend,frontend,datastore,infra}+hosting∈{here,external}); `basename==name`,
+    `id=="project.<name>"`; required H2 per kind; при `status: stable` — секции непусты. `_templates/`+
+    `README.md` скипаются.
+  - Verify: валидатор зелёный (no .md под `docs/project` кроме templates → `OK (0 ...)`); negative-тест на битом frontmatter ловится · Зависит от: A25
   - Ref: `stit-infra/go-backend-template/scripts/tools/validate-{domain,stack}-doc.sh`
-- [ ] **A27:** Вшить project-doc валидатор в `make check` + pre-commit
-  - Verify: `make check` гоняет project-doc валидацию; pre-commit на change `docs/project/**` · Зависит от: A26
+  - **Done:** `validate-project-doc.sh` зеркалит stack-валидатор под 3 kind'а; service-kind проверяет
+    `subtype`/`hosting` enum'ы. Empty-run → `OK (0 file(s) checked)`; positive (stable service) → OK;
+    negative (битый id + плохой subtype + пустая stable-секция) → 3 ошибки, exit 1.
+- [x] **A27:** Вшить project-doc валидатор в `make check` + pre-commit
+  - Что делаем: `make check` гоняет `validate-project-doc.sh docs/project`; `scripts/git-hooks/pre-commit`
+    на change `docs/project/**.md` → валидатор (рядом с roadmap-валидацией). Новый таргет `project-check`
+    в Makefile (зеркалит `plan-check`).
+  - Verify: `make check` гоняет project-doc валидацию; pre-commit на change `docs/project/**`; `make validate`→OK · Зависит от: A26
   - Ref: `stit-infra/go-backend-template/scripts/git-hooks/pre-commit`
+  - **Done:** Makefile — таргет `project-check` (+ `.PHONY`), вшит в `check` (после `plan-check`).
+    pre-commit — блок на change `docs/project/**.md` → `validate-project-doc.sh`. `make check` → `✓ check
+    clean` (гоняет project-check); `make project-check` → OK.
 - [ ] **A28:** Skill `service-deep-dive`
-  - Что делаем: интервью-волнами заполняет `docs/project/services/<name>.md` до `status: stable`.
-  - Verify: `make validate` → OK · Зависит от: A25
+  - Что делаем: интервью-волнами (AskUserQuestion ≤4) заполняет `docs/project/services/<name>.md` до
+    `status: stable`; пишет в md сразу; опирается на текущую compose-инфру как образец. По одному
+    service-doc на hosted-сервис из vision `Service map`.
+  - Verify: `make validate` → OK; frontmatter skill `name:`==1 · Зависит от: A25
   - Ref: `stit-infra/go-backend-template/.claude/skills/domain-deep-dive/SKILL.md`
 - [ ] **A29:** Skill `stack-deep-dive`
-  - Что делаем: интервью → `docs/project/stack.md` до `stable`.
-  - Verify: `make validate` → OK · Зависит от: A25
+  - Что делаем: интервью → `docs/project/stack.md` (domains/edge/networks/backup/observability +
+    Generates) до `stable`. Cross-cutting инфра-стека VPS, профили НЕ дублирует (их выводит de-template).
+  - Verify: `make validate` → OK; frontmatter skill `name:`==1 · Зависит от: A25
   - Ref: `stit-infra/go-backend-template/.claude/skills/stack-deep-dive/SKILL.md`
 - [ ] **A30:** Skill `de-template`
-  - Что делаем: читает stable-артефакты, ACT in-repo: прунит неиспользуемые `compose/*.yml` +
-    `vault-agent/agent.hcl.parts`/`templates`, ставит `COMPOSE_PROFILES`, кастомит `CLAUDE.md`/README
-    под идентичность проекта, срезает scaffolding; cross-repo форки/секреты — печатает next-steps.
-  - Verify: `make validate` → OK · Зависит от: A25
+  - Что делаем: skill-only движок. Gate (не канонический шаблон + артефакты stable+валидатор зелён).
+    Читает stable `docs/project/{vision,services/*,stack}`: (1) **выводит `COMPOSE_PROFILES`** из service-map;
+    (2) прунит неиспользуемые `compose/*.yml` + `vault-agent/agent.hcl.parts/`/`templates/` по hosted-набору;
+    (3) кастомит `CLAUDE.md`/`README.md` под идентичность проекта, срезает scaffolding (getting-started META,
+    сброс roadmap); (4) cross-repo (форки backend/frontend, seed секретов) — печатает next-steps, не выполняет.
+  - Verify: `make validate` → OK; guard «не на каноническом шаблоне» присутствует · Зависит от: A25
   - Ref: `stit-infra/go-backend-template/.claude/skills/de-template/SKILL.md`
 - [ ] **A31:** Skill `init-project` (оркестратор)
-  - Что делаем: vision → чейн `service-deep-dive` → `stack-deep-dive` → `de-template`; сам не проектирует.
-  - Verify: `make validate` → OK · Зависит от: A28, A29, A30
+  - Что делаем: vision (заполнить `vision.md`+Service map) → чейн `service-deep-dive` per hosted-service →
+    `stack-deep-dive` → `de-template`; сам не проектирует/не де-темплейтит. Gate перед de-template: всё stable.
+  - Verify: `make validate` → OK; frontmatter skill `name:`==1 · Зависит от: A28, A29, A30
   - Ref: `stit-infra/go-backend-template/.claude/skills/init-service/SKILL.md`
 - [ ] **A32:** Чейн из `smartdev` на «проект не инициализирован»
-  - Что делаем: детект (нет stable `docs/project/vision.md`) → чейн `/init-project` первым делом.
+  - Что делаем: детект (нет `docs/project/vision.md` со `status: stable`) → чейн `/init-project` первым делом.
   - Verify: `make validate` → OK; `make plan-check` → OK · Зависит от: A31, A9
   - Ref: `stit-infra/go-backend-template/.claude/skills/smartdev/SKILL.md` (uninitialized detection)
 
