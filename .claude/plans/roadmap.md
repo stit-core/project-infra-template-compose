@@ -18,7 +18,7 @@ ship-поверхность. Приложения и живого стека л�
 `backup`/`restore-pg`) прозрачно оборачивают ssh на VPS (local-ssh-wrapper, Phase 7).
 Локальный SKIP в authoring-проверках без `.env`/docker — норма, не падение.
 
-**Current focus:** Phase 5 · A18 (A8 отложен в самый конец — rules последними)
+**Current focus:** Phase 8 · A25 (Phase 6/7 ждут A8 — rules последними; Phase 8 разблокирована A15)
 
 ## Active
 
@@ -203,15 +203,22 @@ getting-started.md (полный Day-0/Day-1, не лёгкий design-first). /
     `make validate` + `make plan-check` → OK.
 
 #### Phase 5 — Раззнести и удалить WORKFLOW.md
-- [ ] **A18:** Раззнести `.claude/WORKFLOW.md` по homes
+- [x] **A18:** Раззнести `.claude/WORKFLOW.md` по homes
   - Что делаем: §цикл/course-correction → `smartdev`; §«что лежит где» → `CLAUDE.md` карта;
     §«осознанно не делаем» → `CLAUDE.md` границы; §«кто что enforces» → `docs/contributing.md`;
     §«когда сломалось» → `triage`; сценарии (VPS/сервис/bump/ротация/DR) уже в скилах — срезать.
   - Verify: `make validate` → OK; контент присутствует в homes · Зависит от: A1, A9, A14
   - Ref: `stit-infra/go-backend-template/` (нет WORKFLOW.md — цикл в CLAUDE.md+smartdev)
-- [ ] **A19:** `rm .claude/WORKFLOW.md` + sweep ссылок
-  - Verify: `test ! -e .claude/WORKFLOW.md`; `grep -rn 'WORKFLOW\.md' . | grep -v '/\.git/'` → пусто; `make validate` → OK · Зависит от: A18
+  - **Done:** verify-pass (контент front-load'ен раньше, нового порта не требовалось — решение проработки
+    Phase 5). Покрытие: §1/§2/§4/§5 → `docs/contributing.md` (A14); §2 cockpit + §4 чейнинг → smartdev;
+    §3 сценарии → скилы bootstrap-vps/add-service/dr-restore + rules multi-env/secrets-and-env; §6 trade-offs →
+    vault-isolation `secrets-and-env.md:23`, single-VPS `architecture.md:3`, no-CI-deploy `contributing.md`,
+    HA = очевидно (не фиксируем); §7 → triage «Категории падений» + `reference/runbook.md`. Ничего не теряется.
+- [x] **A19:** `rm .claude/WORKFLOW.md` + sweep ссылок
+  - Verify: `test ! -e .claude/WORKFLOW.md`; `grep -rn 'WORKFLOW\.md' . --include='*.md' | grep -v '/\.git/' | grep -v '\.claude/plans/'` → пусто (plans/ обсуждает миграцию легитимно); `make validate` → OK · Зависит от: A18
   - Ref: —
+  - **Done:** `git rm .claude/WORKFLOW.md`; убран `.claude/WORKFLOW.md` из `paths:` frontmatter правила
+    `forward-only.md` (был его триггером). Файла нет; grep WORKFLOW.md (excl plans) → CLEAN; `make validate` → OK.
 
 #### Phase 6 — Креды: .env.local (ops-креды, tool-only)
 - [ ] **A20:** Rule `.claude/rules/env-local.md` + `.env.local.example`
