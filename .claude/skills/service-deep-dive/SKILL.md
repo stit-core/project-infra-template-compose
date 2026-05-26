@@ -1,6 +1,6 @@
 ---
 name: service-deep-dive
-description: Спроектировать один hosted-сервис продукта — довести docs/project/services/<name>.md от драфта до status=stable через волны вопросов (Hosting→Identity→Secrets→Route→Generates). Артефакт — source of truth и вход для de-template (секция Generates: что родится/изменится в инфре). Активируй когда юзер проектирует сервис, говорит "спроектируем сервис X", "добьём service-doc", "/service-deep-dive <name>", или когда init-project дошёл до шага сервисов. Решения не выдумывай — интервьюируй.
+description: Спроектировать один hosted-сервис продукта — довести docs/project/services/<name>.md от драфта до status=stable через волны вопросов (Hosting→Identity→Secrets→Route→Generates). Артефакт — source of truth и вход для de-template (секция Generates — что родится/изменится в инфре). Активируй когда юзер проектирует сервис, говорит "спроектируем сервис X", "добьём service-doc", "/service-deep-dive <name>", или когда init-project дошёл до шага сервисов. Решения не выдумывай — интервьюируй.
 ---
 
 # Skill: service-deep-dive

@@ -1,6 +1,6 @@
 ---
 name: triage
-description: Red-арм cockpit'а — структурированный разбор инфра-падения: compose не стартует / сервис unhealthy / vault-agent залип / cert не выписан / render fail / deploy.sh упал / on-server drift. Найти корневую причину, не замазать симптом. smartdev чейнит сюда на `== Critical ==` ≠ none или когда юзер пишет «сломалось», «не поднимается», «упало», «почему unhealthy», «cert не выписался», «деплой красный», кидает лог/трейс. Багфикс идёт сюда, НЕ в plan.
+description: Red-арм cockpit'а — структурированный разбор инфра-падения — compose не стартует / сервис unhealthy / vault-agent залип / cert не выписан / render fail / deploy.sh упал / on-server drift. Найти корневую причину, не замазать симптом. smartdev чейнит сюда на `== Critical ==` ≠ none или когда юзер пишет «сломалось», «не поднимается», «упало», «почему unhealthy», «cert не выписался», «деплой красный», кидает лог/трейс. Багфикс идёт сюда, НЕ в plan.
 ---
 
 # Skill: triage

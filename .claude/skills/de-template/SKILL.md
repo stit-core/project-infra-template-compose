@@ -1,6 +1,6 @@
 ---
 name: de-template
-description: Развернуть форк project-infra-template-compose в самостоятельную проектную инфру по stable-артефактам docs/project — вывести COMPOSE_PROFILES из карты сервисов, прунить неиспользуемые compose/*.yml + vault-agent parts/templates, кастомить CLAUDE.md/README под проект, печатать cross-repo next-steps. Активируй когда юзер форкнул шаблон и говорит "/de-template", "разверни инфру", "де-темплейтизируй", "убери шаблонную мету", или когда init-project дошёл до развёртывания (vision+сервисы+стек stable). Движок skill-only: reviewable edits под этой процедурой. НЕ запускать на каноническом шаблоне.
+description: Развернуть форк project-infra-template-compose в самостоятельную проектную инфру по stable-артефактам docs/project — вывести COMPOSE_PROFILES из карты сервисов, прунить неиспользуемые compose/*.yml + vault-agent parts/templates, кастомить CLAUDE.md/README под проект, печатать cross-repo next-steps. Активируй когда юзер форкнул шаблон и говорит "/de-template", "разверни инфру", "де-темплейтизируй", "убери шаблонную мету", или когда init-project дошёл до развёртывания (vision+сервисы+стек stable). Движок skill-only — reviewable edits под этой процедурой. НЕ запускать на каноническом шаблоне.
 ---
 
 # Skill: de-template (движок развёртывания инфры)
