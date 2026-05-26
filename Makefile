@@ -99,7 +99,7 @@ new-env: ## Bootstrap .env на чистом VPS (interactive; либо PROJECT_
 	@bash scripts/new-env.sh
 
 ##@ SETUP
-setup: ## симлинк scripts/git-hooks/* → .git/hooks/
+setup: ## git-хуки (commit-msg, pre-commit) + dev-deps (PyYAML для frontmatter-проверки)
 	bash scripts/hooks-install.sh
 
 ##@ META
