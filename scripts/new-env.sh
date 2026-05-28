@@ -81,7 +81,7 @@ cat <<EOF
 Это происходит при \`onboard-project --envs $ENV\` на корп-стороне.
 
 Запусти:
-  make ship      # или \`bash scripts/deploy.sh\` напрямую на VPS
+  make ship      # с workstation; либо \`make deploy\` напрямую на VPS
 
 По мере необходимости — запрашивай seed'ы вторичных секретов через Claude:
   /request-secret               # skill в .claude/skills/request-secret/

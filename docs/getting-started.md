@@ -96,7 +96,7 @@ ssh root@<vps>
 cd /opt/<project>-infra
 PROJECT_NAME=acme ENV=prod DOMAIN=acme.com \
 VAULT_ROLE_ID=<id> VAULT_SECRET_ID=<id> \
-bash scripts/new-env.sh
+make new-env
 ```
 
 Создаёт `.env` (chmod 600) с 5 переменными identity+auth. Всё остальное — в Vault

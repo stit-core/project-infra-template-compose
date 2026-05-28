@@ -4,7 +4,7 @@
 !.env.local.example
 
 # Legacy: до multi-env (Phase 1+) new-env.sh генерил .onboard-creds локально.
-# Теперь creds выдаёт `make request-secret KIND=...` (stdout, ничего не пишет
+# Теперь seed-блоки KV выдаёт skill `/request-secret` (stdout, ничего не пишет
 # на диск). Запись оставлена safety-net на случай legacy-файлов от старых
 # обкаток — чтобы они не попали в commit.
 .onboard-creds

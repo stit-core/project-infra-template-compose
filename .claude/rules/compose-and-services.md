@@ -80,7 +80,7 @@ Docker фиксирует содержимое `env_file:` в container config �
 
 1. **На свежем bootstrap'е** vault-agent ещё не отрендерил `.runtime/secrets/*.env`, а compose уже валидирует **существование** этих путей до старта любого сервиса. Решение — `scripts/deploy.sh` делает `touch` пустых файлов перед `compose up`.
 
-2. **После изменения vault-template** (добавил поле, переименовал переменную) недостаточно сделать `docker restart <consumer>` — контейнер уже создан со старым ENV. Нужен `compose up -d --force-recreate <consumer>`. `scripts/deploy.sh` делает это автоматически когда видит изменения в `configs/vault-agent/templates/*.tpl` или `configs/vault-agent/agent.hcl.parts/*.hcl` между prev/new sha, а также на смену активного `COMPOSE_PROFILES` (хранит набор в `.runtime/.profiles-prev`).
+2. **После изменения vault-template** (добавил поле, переименовал переменную) недостаточно сделать `make restart SVC=<consumer>` — контейнер уже создан со старым ENV. Нужен `make recreate SVC=<consumer>`. `scripts/deploy.sh` делает это автоматически когда видит изменения в `configs/vault-agent/templates/*.tpl` или `configs/vault-agent/agent.hcl.parts/*.hcl` между prev/new sha, а также на смену активного `COMPOSE_PROFILES` (хранит набор в `.runtime/.profiles-prev`).
 
 ## Traefik labels
 

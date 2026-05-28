@@ -93,8 +93,8 @@ PG_DSN=postgres://{{ .Data.data.user }}:{{ .Data.data.password }}@postgres:5432/
 После — `make ship`. `scripts/deploy.sh` детектит изменения в `templates/` или `agent.hcl.parts/` + смену `COMPOSE_PROFILES` → restart vault-agent + force-recreate consumer'ов автоматически. Вручную:
 
 ```bash
-docker compose <args> restart vault-agent
-docker compose <args> up -d --no-deps --force-recreate <consumer>
+make restart SVC=vault-agent
+make recreate SVC=<consumer>
 ```
 
 ### Ротация
@@ -110,7 +110,7 @@ Vault-agent на проектном VPS заметит изменение и п�
 
 ```bash
 make restart SVC=backend     # ❌ контейнер не пересоздан, env_file не перечитан
-docker compose <args> up -d --no-deps --force-recreate backend  # ✅
+make recreate SVC=backend    # ✅
 ```
 
 `make ship` (без MSG, на чистом дереве) делает force-recreate автоматически когда видит смену `.tpl` / `parts/` / `COMPOSE_PROFILES` между deploy'ами.

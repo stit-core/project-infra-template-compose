@@ -83,7 +83,7 @@ kv/projects/<p>/
 На каждом VPS отдельный bootstrap (по одному на env):
 
 ```bash
-scripts/new-env.sh       # prompt: PROJECT_NAME, ENV, DOMAIN, VAULT_ROLE_ID, VAULT_SECRET_ID
+make new-env             # prompt: PROJECT_NAME, ENV, DOMAIN, VAULT_ROLE_ID, VAULT_SECRET_ID
 make ship                # минимальный стек: traefik + vault-agent + crowdsec + otel + node-exporter + cadvisor
 ```
 

@@ -54,7 +54,7 @@ VAULT_TOKEN=<root> bash scripts/onboard-project.sh --name acme --envs dev,prod
 ansible-playbook -i ansible/inventory.ini ansible/bootstrap.yml
 ssh root@<vps>; cd /opt/<p>-infra
 PROJECT_NAME=acme ENV=prod DOMAIN=acme.com VAULT_ROLE_ID=<id> VAULT_SECRET_ID=<id> \
-  bash scripts/new-env.sh        # .env (chmod 600), 5 переменных — остальное из Vault
+  make new-env                   # .env (chmod 600), 5 переменных — остальное из Vault
 ```
 
 **3. Первый деплой** (с рабочей станции оператора):

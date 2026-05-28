@@ -89,7 +89,7 @@ make restore-pg SNAPSHOT=latest                  # либо SNAPSHOT=<id>
 
 1. Provision нового VPS.
 2. Skill `bootstrap-vps` (ansible-playbook + регистрация deploy-key) — поднимет Docker, склонирует репо.
-3. На новом хосте: `bash scripts/new-env.sh` — те же AppRole creds для `(project, env)` (scope'ятся к паре, не к хосту). `RESTIC_REPOSITORY` рендерится из Vault, повторно ничего не вводить.
+3. На новом хосте: `make new-env` — те же AppRole creds для `(project, env)` (scope'ятся к паре, не к хосту). `RESTIC_REPOSITORY` рендерится из Vault, повторно ничего не вводить.
 4. DNS cutover на новый IP.
 5. `make ship` — стек поднимается, vault-agent рендерит секреты.
 6. Сценарий A выше — для postgres.

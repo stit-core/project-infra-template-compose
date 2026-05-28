@@ -80,8 +80,8 @@ docker exec backup restic snapshots
 docker exec backup restic check
 ```
 
-- **`Fatal: unable to open repo`**: `RESTIC_PASSWORD` / minio creds / `repository` endpoint ротированы. Меняются в Vault (`kv/data/projects/<p>/<env>/{backup,minio}`), vault-agent перерендерит `.runtime/secrets/backup.env`, после — `docker compose ... up -d --no-deps --force-recreate backup` (env_file подхватывается только при CREATE, не restart) или `make ship` без MSG (deploy.sh сам детектит template-change).
-- **Cron не триггерит**: cron внутри контейнера, не на хосте. Проверь `docker exec backup pgrep crond` и `docker logs backup --tail 20`. Если crond упал — `docker compose ... restart backup`. Расписание — `containers/backup/crontab`, rebuild при изменении.
+- **`Fatal: unable to open repo`**: `RESTIC_PASSWORD` / minio creds / `repository` endpoint ротированы. Меняются в Vault (`kv/data/projects/<p>/<env>/{backup,minio}`), vault-agent перерендерит `.runtime/secrets/backup.env`, после — `make recreate SVC=backup` (env_file подхватывается только при CREATE, не restart) или `make ship` без MSG (deploy.sh сам детектит template-change).
+- **Cron не триггерит**: cron внутри контейнера, не на хосте. Проверь `docker exec backup pgrep crond` и `docker logs backup --tail 20`. Если crond упал — `make restart SVC=backup`. Расписание — `containers/backup/crontab`, rebuild при изменении.
 - **Disk full на VPS**: `df -h`. Restic-cache в `/root/.cache/restic` внутри backup-контейнера может расти — `docker exec backup restic cache --cleanup`.
 
 ## Rollback после плохого деплоя
@@ -111,7 +111,7 @@ make ship
 
 1. Заказать новый VPS, обновить A-record `${DOMAIN}` и сабдомены на новый IP (TTL заранее снизить).
 2. `ansible-playbook -i inventory.ini bootstrap.yml` (с обновлённым `ansible_host`). Зарегистрировать deploy-key.
-3. На новом VPS: `bash scripts/new-env.sh` (используй те же per-env AppRole creds — они привязаны к паре `(project, env)`, не к VPS). `RESTIC_REPOSITORY` рендерится из Vault, вводить не нужно.
+3. На новом VPS: `make new-env` (используй те же per-env AppRole creds — они привязаны к паре `(project, env)`, не к VPS). `RESTIC_REPOSITORY` рендерится из Vault, вводить не нужно.
 4. `make ship` (или на VPS `make deploy`) → стек поднимается, vault-agent логинится, postgres стартует пустой.
 5. Restore postgres из restic:
    ```bash

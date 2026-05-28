@@ -125,7 +125,7 @@ ssh root@<IP>
 cd /opt/<project>-infra
 PROJECT_NAME=<p> ENV=<env> DOMAIN=<d> \
 VAULT_ROLE_ID=<id> VAULT_SECRET_ID=<id> \
-bash scripts/new-env.sh
+make new-env
 ```
 
 Создаёт `.env` (chmod 600) с **5 переменными** — identity + AppRole. Всё остальное (image tags, ACME-config, restic endpoint, runtime-секреты) приходит из Vault.
@@ -160,7 +160,7 @@ make deploy
 5. Traefik запрашивает LE-cert на `${DOMAIN}` (landing).
 
 **Если что-то не поднимается:**
-- vault-agent не healthy / retry-loop на `kv/.../meta` или `kv/.../otel` → корп не онбоарднул env (см. предусловия). `bash scripts/preflight-vault.sh` покажет какие KV-paths отсутствуют.
+- vault-agent не healthy / retry-loop на `kv/.../meta` или `kv/.../otel` → корп не онбоарднул env (см. предусловия). `make doctor` (секция «vault KV») покажет какие KV-paths отсутствуют.
 - LE cert не выпустился → DNS не указывает на VPS, или 80/443 закрыты файрволом.
 - crowdsec bouncer auto-register не сработал → fallback `docker exec crowdsec cscli bouncers add traefik` (cscli внутри контейнера — make-first исключение), прописать в `.env`, `make deploy`.
 

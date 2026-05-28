@@ -77,7 +77,7 @@ seed'а соответствующих KV. Сети: `proxy` (наружу), `ba
 | LOOP | `validate` / `doctor` / `check` | syntax+tpl+.env coverage / live preflight / validate+doctor+plan-check+project-check |
 | SHIP | `ship MSG="..."` | commit + check + push + (на main) ssh-deploy. Канон |
 | | `deploy` / `render` | server-side: git pull → render → compose up --wait / envsubst+agent.hcl |
-| OPS | `ps` / `logs SVC=` / `restart SVC=` | статус / логи / рестарт сервиса |
+| OPS | `ps` / `logs SVC=` / `restart SVC=` / `recreate SVC=` / `build SVC=` | статус / логи / рестарт / пересоздать (env_file pickup) / сборка образа сервиса |
 | | `backup` / `restore-pg SNAPSHOT=` | one-shot backup / restore postgres из restic |
 | INTEL | `status` / `search Q= [P=]` | cockpit-сводка / поиск по compose+configs+scripts+docs |
 | PROVISION | `new-env` | bootstrap `.env` на чистом VPS |
@@ -161,7 +161,7 @@ out-of-band. AppRole строго read-only на свой `<p>/<env>`. Подр�
 
 ## Что менять при копировании в `<org>/infra`
 
-1. `.env` — `bash scripts/new-env.sh` (PROJECT_NAME, ENV, DOMAIN, VAULT_ROLE_ID, VAULT_SECRET_ID).
+1. `.env` — `make new-env` (PROJECT_NAME, ENV, DOMAIN, VAULT_ROLE_ID, VAULT_SECRET_ID).
 2. `docker-compose.yml` — проверить network names (conflict-free на shared VPS).
 3. `compose/backend.yml` — `image:` под клиентский org, healthcheck path под backend API.
 4. `configs/vault-agent/templates/backend.env.tpl` — project-specific env, если backend читает сверх контракта.

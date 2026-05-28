@@ -20,7 +20,7 @@ paths:
 |---|---|---|
 | LOOP | `validate` / `doctor` / `check` | compose syntax+tpl+.env / live preflight / `validate`+`doctor`+`plan-check`+`project-check` |
 | SHIP | `ship MSG="…"` / `deploy` / `render` | commit+check+push+(main)ssh-deploy / server-side / envsubst+agent.hcl |
-| OPS | `ps` / `logs SVC=` / `restart SVC=` | статус / логи сервиса / рестарт сервиса (на VPS) |
+| OPS | `ps` / `logs SVC=` / `restart SVC=` / `recreate SVC=` / `build SVC=` | статус / логи / рестарт / пересоздать (env_file/тег pickup) / сборка образа сервиса (на VPS) |
 | | `backup` / `restore-pg SNAPSHOT=` | one-shot backup / restore postgres из restic |
 | | `ssh CMD="…"` | произвольная команда на VPS (через `ssh.sh`) |
 | INTEL | `status` / `search Q= [P=]` | cockpit-сводка (локальный `status.sh` + серверный смок `== Server ==` по SSH при `.env.local`) / поиск по compose+configs+scripts+docs |

@@ -84,7 +84,7 @@ Per-env AppRole + KV-scope (`kv/data/projects/<p>/<env>/*`) выдаёт `stit-i
 3. Consumer-сервисы (postgres / backend / otel-agent / minio / backup) ждут `vault-agent: condition: service_healthy`, потом стартуют и читают `env_file: .runtime/secrets/<svc>.env`.
 4. На rotation секрета (например `vault kv patch kv/projects/<p>/<env>/db password=NEW` на корп-стороне):
    - vault-agent на проектном VPS видит изменение, перерендеривает `.runtime/secrets/<svc>.env`.
-   - Но `env_file` фиксируется при container CREATE — простой `restart` старый ENV не пересоздаст. Нужен `compose up -d --force-recreate <consumer>`.
+   - Но `env_file` фиксируется при container CREATE — простой `restart` старый ENV не пересоздаст. Нужен `make recreate SVC=<consumer>`.
    - `scripts/deploy.sh` делает это автоматически когда видит изменения в `configs/vault-agent/templates/*.tpl` / `agent.hcl.parts/` или смену активного profile-набора между prev/new sha. На чистой ротации (без правок в репо) — `make ship` без MSG триггерит передеплой.
 
 ## Deploy-флоу

@@ -1,4 +1,4 @@
-.PHONY: help validate doctor check ship deploy render ps logs restart backup restore-pg ssh status search new-env setup plan-check project-check
+.PHONY: help validate doctor check ship deploy render ps logs restart recreate build backup restore-pg ssh status search new-env setup plan-check project-check
 
 SHELL := /usr/bin/env bash
 
@@ -63,6 +63,16 @@ restart: ## рестарт одного сервиса: make restart SVC=backend
 	@if [ -z "$(SVC)" ]; then echo "usage: make restart SVC=<name>"; exit 2; fi
 	@if [ -f .env ]; then docker compose $(COMPOSE_ARGS) restart $(SVC); \
 	else bash scripts/tools/ssh.sh exec make restart SVC=$(SVC); fi
+
+recreate: ## пересоздать сервис — подхват ротированного env_file/тега (restart не перечитывает env_file): make recreate SVC=backend
+	@if [ -z "$(SVC)" ]; then echo "usage: make recreate SVC=<name>"; exit 2; fi
+	@if [ -f .env ]; then docker compose $(COMPOSE_ARGS) up -d --no-deps --force-recreate $(SVC); \
+	else bash scripts/tools/ssh.sh exec make recreate SVC=$(SVC); fi
+
+build: ## пересобрать образ сервиса с build-context (напр. backup после правки crontab): make build SVC=backup
+	@if [ -z "$(SVC)" ]; then echo "usage: make build SVC=<name>"; exit 2; fi
+	@if [ -f .env ]; then docker compose $(COMPOSE_ARGS) build $(SVC); \
+	else bash scripts/tools/ssh.sh exec make build SVC=$(SVC); fi
 
 backup: ## one-shot backup (на VPS; с workstation — через ssh)
 	@if [ -f .env ]; then docker exec backup /usr/local/bin/backup-now; \
