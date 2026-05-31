@@ -1,88 +1,258 @@
 ---
 name: init-project
-description: Оркестратор онбординга проектной инфры из шаблона — ведёт путь vision → проектирование hosted-сервисов (service-deep-dive) → проектирование инфра-стека (stack-deep-dive) → de-template, пока форк не перестанет помнить про шаблон. Активируй когда юзер форкнул project-infra-template-compose и говорит "/init-project", "инициализируй проект", "развернуть инфру из шаблона", "с чего начать новый проект", или когда видишь свежий форк (origin ещё template, нет stable docs/project/vision.md). Сам не проектирует и не де-темплейтит — чейнит специализированные скиллы по порядку.
+description: Оркестратор онбординга проектной инфры из форка `project-infra-template-compose` — ведёт путь vision → проектирование hosted-сервисов (`/service-deep-dive`) → проектирование инфра-стека (`/stack-deep-dive`) → `/de-template`, пока форк не перестанет помнить про шаблон. Активируй когда юзер форкнул шаблон и говорит "/init-project", "инициализируй проект", "развернуть инфру из шаблона", "с чего начать новый проект", или когда видишь свежий форк (origin ещё template, нет stable `docs/project/vision.md`). Сам не проектирует и не де-темплейтит — чейнит специализированные скиллы по порядку. Фиксирует прогресс в `state/journey.md` (где остановились, что решено, что осталось).
 ---
 
-# Skill: init-project (онбординг-оркестратор)
+# init-project — онбординг-оркестратор
 
-Дирижёр пути «форк шаблона инфры → своя проектная инфра». Стоит **уровнем выше** `init-service`
-бэкенда: тот разворачивает один сервис, этот — весь продукт (карта сервисов → инфра VPS). Не
-проектирует/не де-темплейтит сам, а **ведёт по этапам и чейнит** специализированные скиллы, держа
-фокус: docs первичны, инфра разворачивается по ним. Один проход доводит до инфры, которая ничего
-не помнит про шаблон.
+Дирижёр пути «форк шаблона инфры → своя проектная инфра». Стоит
+**уровнем выше** deep-dive-скиллов: они проектируют по одной сущности,
+этот — ведёт по всему пути, держит фокус «docs первичны, инфра
+разворачивается по ним», переключает между этапами.
 
-Полное описание пути для человека — `docs/getting-started.md`; этот скилл его исполняет на слое
-`docs/project/`. Граница: cross-repo (форки backend/frontend, seed секретов) — только next-steps,
-не выполнение.
+Не проектирует и не де-темплейтит сам — **чейнит** специализированные
+скиллы (`/service-deep-dive`, `/stack-deep-dive`, `/de-template`) и
+фиксирует прогресс. Один проход доводит до инфры, которая ничего не
+помнит про шаблон.
 
-## Когда применять
+Полное описание пути для человека — `docs/getting-started.md`. Этот
+скилл его исполняет на слое `docs/project/`. Граница: cross-repo (форки
+backend/frontend, seed секретов) — только next-steps, не выполнение.
 
-- "/init-project" / "инициализируй проект" / "развернул форк инфры, что дальше"
-- Свежий форк: origin ещё `…project-infra-template-compose…` ИЛИ нет `docs/project/vision.md` со
-  `status: stable`
-- Юзер: «хочу развернуть инфру под новый клиентский проект»
+## Точки входа
 
-## Когда НЕ применять
+| вызов | поведение |
+|---|---|
+| `/init-project` | сводка состояния пути + чейн в следующий этап |
+| `/init-project status` | только сводка, без переключения (для smartdev) |
+| `/init-project resume` | продолжить с того места, что зафиксировано в state |
+| `/init-project restart` | сбросить state (с явным `AskUserQuestion`-подтверждением) и пройти заново |
 
-- Инфра уже инициализирована (свой origin `<org>/infra`, `vision.md` stable, профили выставлены) —
-  это обычный день-в-день, иди в `/smartdev`.
-- Юзер хочет добавить один сервис в уже-свою инфру — это `/add-service`, не онбординг.
-- Поднять чистый VPS под уже-инициализированную инфру — это `/bootstrap-vps`.
+## Интерактив — норма, plain-чат запрещён
+
+**Любое взаимодействие с архитектором — через `AskUserQuestion`.**
+Этот скилл — оркестратор, его основной артефакт диалога — выбор
+следующего этапа / следующего slash-command. Каждый такой выбор —
+структурированный `AskUserQuestion`-раунд, не chat-prompt.
+
+Принципы:
+
+- Сводка состояния идёт в чат как **преамбула** перед
+  `AskUserQuestion`, всегда сразу следует раунд «куда дальше?».
+- Заполнение vision.md (этап 1) — через волны `AskUserQuestion` по
+  Problem/Users/Service map/.., не свободный диалог.
+- «Готов к stable?», «Восстановить с этапа N?», «Restart?» — всё
+  `AskUserQuestion`.
+- Никаких длинных монологов — оператор должен **выбирать**, не читать.
+
+## Что делать сразу при запуске
+
+1. Проверить **pre-flight** (см. ниже). Не пройден — подсказать шаги
+   0 из `docs/getting-started.md`, дальше не идти.
+2. Прочитать `state/journey.md`, если есть — что зафиксировано.
+3. Прочитать `docs/project/{vision.md, services/*.md, stack.md}` —
+   реальное состояние артефактов.
+4. Сделать сводку «где мы на пути» (см. ниже) — короткой таблицей.
+5. **Сразу** `AskUserQuestion` (без ожидания свободного ответа): опции
+   — «продолжить текущий этап», «перейти к следующему», «показать
+   подробности по этапу N», «restart», Other.
 
 ## Pre-flight
 
-- [ ] Форк создан (Gitea → **Use this template** → `<org>/infra`), склонирован.
+- [ ] Форк создан (Gitea → **Use this template** → `<org>/infra`),
+  склонирован локально.
 - [ ] `make setup` прогнан (git-хуки commit-msg + pre-commit).
-- [ ] Если нет — подскажи шаги 0 из `docs/getting-started.md`, дальше не иди.
+- [ ] Origin — не канонический `…stit-infra/project-infra-template-compose`
+  (это форк или throwaway). Канонический шаблон → СТОП, объяснить
+  почему.
+
+```bash
+git remote get-url origin
+ls -la .git/hooks/commit-msg .git/hooks/pre-commit 2>/dev/null
+```
+
+## Сводка «где мы на пути»
+
+5 этапов, каждый — `pending` / `in_progress` / `done`:
+
+| этап | признак `done` |
+|---|---|
+| **1. Vision + карта сервисов** | `vision.md status=stable`, валидатор зелёный, `Service map` непуст |
+| **2. Hosted-сервисы** | каждый `services/<name>.md` (по карте `hosting: here`) → `status=stable`, валидатор зелёный |
+| **3. Инфра-стек** | `stack.md status=stable`, валидатор зелёный |
+| **4. Развёртывание** | `de-template` отработал: `COMPOSE_PROFILES` в `.env.example`, шаблонная мета зачищена (`CLAUDE.md` / `README.md` / `getting-started.md`), origin ≠ template |
+| **5. Финал** | `make check` зелёный + cross-repo next-steps отправлены оператору |
+
+См. `references/journey-stages.md` — детальные триггеры и выходы.
+
+Скилл выводит компактную сводку (≤10 строк):
+
+```
+## init-project — путь онбординга
+
+| этап                  | статус         | следующий шаг |
+|---|---|---|
+| 1. Vision + карта     | done           | — |
+| 2. Hosted-сервисы     | in_progress    | services/backend.md — draft, осталась секция Generates |
+| 3. Инфра-стек         | pending        | ждёт окончания этапа 2 |
+| 4. Развёртывание      | pending        | gate: все stable + make project-check зелёный |
+| 5. Финал              | pending        | gate: make check зелёный |
+```
 
 ## Этапы (чейнить по порядку, не делать самому)
 
+См. `references/journey-stages.md` — детали по каждому этапу.
+
 ### 1. Vision + карта сервисов
 
-- `cp docs/project/_templates/vision.md docs/project/vision.md`.
-- Через `AskUserQuestion` добей `Problem`/`Users`/`Service map`/`Boundaries`/`Environments`. Ключевой
-  выход — **Service map**: перечень всех частей продукта с `subtype`/`hosting`/repo. Именно карта
-  определяет, сколько будет `service-deep-dive` и какие профили родит `de-template`.
-- Промоуть `vision.md` → `stable` (валидатор зелёный).
+- Если `vision.md` нет: `cp _templates/vision.md docs/project/vision.md`.
+- Если есть и `draft`: подсказать оператору заполнить `Problem` / `Users`
+  / `Service map` / `Boundaries` / `Environments`. Если карта пустая —
+  через `AskUserQuestion` собрать минимальный набор сервисов.
+- `vision` — относительно простой singleton. **Дополнительного skill
+  `/vision-deep-dive` нет**, делаем точечно через AskUserQuestion здесь
+  или предлагаем оператору заполнить руками.
+- Промоушн `vision.md` → `stable` по `make project-check`.
 
-### 2. Спроектировать hosted-сервисы → `service-deep-dive`
+### 2. Спроектировать hosted-сервисы → `/service-deep-dive`
 
-- Для каждого сервиса карты с `hosting: here`: `cp _templates/service.md docs/project/services/<name>.md`,
-  заполни frontmatter (subtype/hosting/name).
-- **Чейнь в `/service-deep-dive <name>`**: волны inside-out до `status: stable`.
-- Сервисы `hosting: external` (frontend-SPA/CDN, backend-код-репо) — service-doc НЕ заводим, они
-  остаются строкой карты; для них шаг 4 печатает cross-repo next-steps.
-- Gate: `make project-check` зелёный по всем `services/*`.
+- Из `vision.md § Service map` извлечь сервисы с `hosting: here`.
+- Для каждого: если `services/<name>.md` нет — оператор делает
+  `/service-deep-dive <name>` (режим A); если есть и `draft` —
+  `/service-deep-dive <name>` (режим C).
+- Сервисы `hosting: external` — service-doc НЕ заводим. Запомнить в
+  state как cross-repo next-step.
+- **Этот скилл сам не интервьюирует**. Сообщает оператору:
+  «следующий — `/service-deep-dive <name>`», ждёт возврата.
+- Gate перехода к 3: все `services/*.md → stable`, валидатор зелёный.
 
-### 3. Спроектировать инфра-стек → `stack-deep-dive`
+### 3. Спроектировать инфра-стек → `/stack-deep-dive`
 
-- `cp _templates/stack.md docs/project/stack.md`.
-- **Чейнь в `/stack-deep-dive`**: domains/edge/networks/backup/observability + `Generates` до `stable`.
-- Gate: `make project-check` зелёный.
+- Если `stack.md` нет: `cp _templates/stack.md docs/project/stack.md`.
+- Сообщить оператору: «следующий — `/stack-deep-dive`».
+- Gate перехода к 4: `stack.md → stable`, `make project-check` зелёный
+  по всему `docs/project/`.
 
-### 4. Развернуть инфру → `de-template`
+### 4. Развернуть инфру → `/de-template`
 
-- Gate перед запуском: vision + все hosted-сервисы + стек `stable`, `make project-check` зелёный.
-- **Чейнь в `/de-template`**: выводит `COMPOSE_PROFILES` из карты, прунит неиспользуемые
-  `compose/*.yml` + vault-agent parts/templates, кастомит `CLAUDE.md`/README, сбрасывает roadmap,
-  печатает cross-repo next-steps. Механика — reviewable diff.
+- Pre-gate перед чейном: vision + все hosted-сервисы + стек `stable`,
+  `make project-check` зелёный.
+- Сообщить оператору: «следующий — `/de-template`».
+- После возврата проверить: `make validate` зелёный + origin ≠ template
+  + scaffolding убран.
 
 ### 5. Финал
 
-`make check` зелёный → инфра больше не помнит про шаблон. Сообщи юзеру: онбординг закрыт, дальше —
-`/bootstrap-vps` поднять VPS под env + cross-repo next-steps из `de-template` (форки, seed KV,
-корп-онбординг). `docs/getting-started.md` ([META]) удалён движком.
+- `make check` зелёный.
+- Сообщить оператору: онбординг закрыт.
+- Перечислить накопленные cross-repo next-steps (из state):
+  - форки бэкенда/фронта (`hosting: external` из карты);
+  - корп-онбординг через `onboard-project.sh`, если не сделан;
+  - seed вторичных KV под активные профили (`/request-secret`);
+  - egress IP VPS в crowdsec-whitelist (`/corp-handoff`);
+  - сабдомены под LE-DNS.
+- Сообщить о следующем шаге: `/bootstrap-vps` (поднять VPS для env'а).
 
-## Что init-project НЕ делает
+## Память `state/journey.md` — коммитится
 
-- ❌ Не интервьюирует по сервисам/стеку сам — это `service-deep-dive`/`stack-deep-dive`.
-- ❌ Не прунит инфру руками и не де-темплейтит — это `de-template` (по stable-артефактам).
-- ❌ Не запускает `de-template` до зелёного валидатора (gate).
-- ❌ Не выполняет cross-repo (форки/seed/онбординг) — только печатает next-steps (граница слоя).
+Заметка лежит **рядом со скиллом**:
 
-## Anti-patterns
+```
+.claude/skills/init-project/state/journey.md
+```
 
-- ❌ Прунить `compose/*` / править `.env.example` до того как спроектированы артефакты.
-- ❌ Заводить service-doc для внешнего сервиса (`hosting: external`) — он только в карте.
-- ❌ Дублировать процедуру deep-dive внутри этого скилла — он только дирижёр.
-- ❌ Пропускать vision ради «быстро прунить compose» — карта первична, иначе движку не из чего выводить профили.
+В отличие от deep-dive скиллов, у `init-project` **один state-файл** на
+весь путь (нет подсущностей).
+
+State — **коммитбл артефакт**, не приватная память агента:
+
+- В `.gitignore` НЕ попадает; коммитится по ходу онбординга.
+- Это **shared контекст** для команды и для возобновления сессии после
+  `/clear` или перехода между машинами оператора. Ревьюится в PR.
+- Особенно ценен `## Cross-repo next-steps` — финальный чеклист корп-side
+  / форков / seed'ов передаётся именно через этот файл.
+- **Не содержит секретов** — только ссылки и текстовые описания.
+
+См. `references/state-format.md`. Кратко:
+
+- Файл существует, пока идёт онбординг. После 5-го этапа (финал) —
+  оператор может удалить файл сам (или удалить вручную перед коммитом
+  финального состояния), но это не обязательно.
+- Секции:
+  - `## Текущий этап` — номер этапа + что сейчас blocking;
+  - `## Открытые вопросы` (`**blocker**` для блокирующих);
+  - `## Доменные решения` (для пути — обычно почти нет; ключевые
+    решения лежат в `vision`/`stack`);
+  - `## Cross-repo next-steps` — накопленные next-step'ы для финала
+    (форки, seed, корп-handoff).
+- Forward-only, без истории. После закрытия этапа — запись о нём
+  удаляется из state (статус «done» виден сам через артефакты).
+
+## Чейнинг — правила
+
+Скилл **не вызывает** другие скиллы сам через `Skill`-tool. Чейнинг
+выглядит так:
+
+1. Скилл фиксирует прогресс в state и в чате.
+2. Сообщает оператору: «следующий шаг — `/service-deep-dive backend`».
+3. Оператор вызывает указанный slash-command в своём сообщении.
+4. После возврата (новая сессия / в той же) оператор пишет
+   `/init-project` → скилл подхватывает прогресс из state +
+   артефактов, ведёт дальше.
+
+Альтернатива (если оператор пишет в одной сессии): после рекомендации
+скилл может **передать** контекст deep-dive-скиллу через рекомендацию
+конкретных args («оператор → `/service-deep-dive backend`»), но всё
+равно вызов — действие оператора.
+
+## Stub-цепочки
+
+Если на каком-то этапе обнаруживается, что артефакт нужно завести
+заранее (например, при заведении сервиса выясняется, что в карте его
+нет):
+
+1. Записать open-question в state «карта `vision.md` не содержит
+   `<name>` — допилить vision»;
+2. Сообщить оператору вернуться к этапу 1 (vision).
+3. После закрытия — продолжить с этапа 2.
+
+## Завершение сессии
+
+В конце каждой сессии init-project (не финал онбординга, а конец
+сессии):
+
+1. Короткая сводка (≤8 строк) — что сделано, какой этап закрыт.
+2. Обновить state (`## Текущий этап`, `## Открытые вопросы`,
+   `## Cross-repo next-steps`).
+3. Закоммитить state с понятным MSG: `meta(init-project): этап 2 done,
+   осталось services/db.md`.
+4. **`AskUserQuestion` «куда дальше?»** с опциями:
+   - «Перейти к `/<следующий-skill>`» (конкретное имя);
+   - «Сделать перерыв, сохранить state»;
+   - «Вернуться к предыдущему этапу (причина в Other)»;
+   - Other.
+
+В финале (этап 5 done):
+
+1. Сводка пути (≤10 строк).
+2. **`AskUserQuestion`** с опциями:
+   - «Открыть `## Cross-repo next-steps` для прохождения по списку»;
+   - «Перейти к `/bootstrap-vps` (поднять VPS)»;
+   - «Удалить `state/journey.md` (онбординг закрыт)»;
+   - Other.
+
+## Запреты
+
+- Не проектировать сам по сервисам/стеку — это `/service-deep-dive` /
+  `/stack-deep-dive`. Дублирование процедуры внутри этого скилла —
+  anti-pattern.
+- Не прунить compose/vault-agent руками — это `/de-template`.
+- Не запускать `/de-template` до зелёного валидатора (gate).
+- Не выполнять cross-repo (форки/seed/онбординг) — только печатать
+  next-steps в state и финале (граница продуктового слоя).
+- Не заводить service-doc для `hosting: external` — он только в карте.
+- Не пропускать vision ради «быстро прунить compose» — карта первична,
+  иначе движку не из чего выводить профили.
+- Не аккумулировать журнал «было/стало» в state — forward-only.
+- Не вызывать другие скиллы через Skill-tool сам; чейнинг = подсказка
+  оператору, который пишет slash-command.

@@ -1,126 +1,270 @@
 ---
 name: service-deep-dive
-description: Спроектировать один hosted-сервис продукта — довести docs/project/services/<name>.md от драфта до status=stable через волны вопросов (Hosting→Identity→Secrets→Route→Generates). Артефакт — source of truth и вход для de-template (секция Generates — что родится/изменится в инфре). Активируй когда юзер проектирует сервис, говорит "спроектируем сервис X", "добьём service-doc", "/service-deep-dive <name>", или когда init-project дошёл до шага сервисов. Решения не выдумывай — интервьюируй.
+description: Углублённая проработка hosted-сервиса в `docs/project/services/<name>.md` (Hosting · Identity · Secrets · Route · Generates). Ведёт сессию через структурированные вопросы (AskUserQuestion), фиксирует рабочее состояние в `state/services/<name>.md`, не выдумывает решения сам. Использовать всегда, когда речь о `docs/project/services/`, заполнении 5 артефактных секций сервиса, заведении или углублении hosted-сервиса, разборе сырья (описание продукта, скрин compose, готовый сервис у соседей), переходе `status draft → stable`, удалении с каскадом, или копании связей с `vision § Service map` и инфра-фрагментами (compose/vault-agent/traefik). Также — единственная точка входа в `docs/project/services/`.
 ---
 
-# Skill: service-deep-dive
+# service-deep-dive
 
-Проектирование одного **hosted**-сервиса проекта: доводит `docs/project/services/<name>.md` до
-`status: stable`. Где `/init-project` отвечает «из чего состоит продукт» (vision § Service map),
-этот скилл — «как именно этот сервис хостится на VPS»: хостинг/профиль, идентичность образа или
-движка, какой Vault KV нужен, как роутится, что из него родит `de-template`.
+Проектирование одного **hosted**-сервиса проекта: доводит
+`docs/project/services/<name>.md` до `status: stable`. Где `/init-project`
+отвечает «из чего состоит продукт» (vision § Service map), этот скилл —
+«как именно этот сервис хостится на VPS»: хостинг/профиль, идентичность
+образа или движка, какой Vault KV нужен, как роутится, что из него родит
+`/de-template`.
 
-Это **source of truth и вход для `de-template`**: секция `Generates` описывает, что из артефакта
-изменится в инфре (профиль, vault-agent part/template, traefik route). Работает через
-AskUserQuestion в режиме интервьюера — **не выдумывает** решения сам.
+Канон секций — `docs/project/README.md`. Скилл ведёт сеанс через
+структурированные вопросы, фиксирует контекст в `state/`, не выдумывает
+домен и инфра-выбор.
 
-В онбординг-флоу `/init-project` чейнит сюда по одному разу на каждый hosted-сервис из карты,
-затем — `/stack-deep-dive` → `/de-template`.
+Использовать как **единственную точку входа** в `docs/project/services/`:
+заведение, углубление, разбор сырья, переход `draft → stable`, удаление
+с каскадом.
 
-## Когда применять
+## Точки входа
 
-- "Спроектируем сервис `db`" / "Добьём `services/backend.md`"
-- "/service-deep-dive backend"
-- `/init-project` дошёл до проектирования сервиса из карты
-- service-doc в `draft` — нужно довести до `stable`
+| вызов | поведение |
+|---|---|
+| `/service-deep-dive` | сводка состояния + топ-3 кандидата на углубление (режим C) |
+| `/service-deep-dive <name>` | завести новый или углубить существующий по совпадению basename |
+| `/service-deep-dive <name>:<subtype>:<hosting>` | завести новый с явным subtype/hosting (режим A) |
+| `/service-deep-dive <свободный текст / описание>` | сырьё → разбор → план stub'ов (режим B) |
 
-## Когда НЕ применять
+`subtype` ∈ {`backend`, `frontend`, `datastore`, `infra`}.
+`hosting` ∈ {`here`, `external`}. service-doc заводим **только** для
+`hosting: here`; `external` остаётся строкой в `vision § Service map`.
 
-- Артефакта ещё нет — сначала `cp docs/project/_templates/service.md docs/project/services/<name>.md`,
-  заполни frontmatter (subtype/hosting/name).
-- Сервис `hosting: external` (frontend-SPA/CDN, backend-код-репо) — он живёт только в vision
-  `Service map`, своего service-doc не получает (см. `docs/project/README.md`).
-- Артефакт уже `stable` — запусти валидатор, не интервьюй заново.
-- Правка одной готовой секции (поменялся образ) — точечная правка, не deep-dive.
+## Что делать сразу при запуске
 
-## Шаги
+1. Прочитать `docs/project/README.md` — освежить контракт kinds и
+   маппинг `subtype → профиль`.
+2. Прочитать `docs/project/vision.md § Service map` — авторитетный
+   перечень. Из карты вычислить, какие hosted-сервисы должны иметь
+   service-doc.
+3. Если args пустые — сделать сводку (см. ниже) и через
+   `AskUserQuestion` предложить выбор что копать.
+4. Если args указывают на сервис — определить режим (A/B/C),
+   применить маршрут из `references/workflow-patterns.md`.
 
-### 1. Сканируй контекст
+## Сводка состояния (без args)
 
-```bash
-ls docs/project/services/
-make project-check A=docs/project/services/<name>.md
+1. Прочитать `vision.md § Service map` — список с `hosting: here`.
+2. Прочитать все `docs/project/services/*.md` — frontmatter
+   (`status`, `subtype`, `hosting`) + H2 заполненность.
+3. Сверить: карта vs файлы. Пометить расхождения как кандидатов:
+   - **в карте есть, файла нет** → нужен stub + A-режим;
+   - **файл есть, в карте нет** → каскад (удалить файл или дописать карту);
+   - **`hosting: external` имеет файл** → каскад (удалить файл).
+4. Прочитать `state/services/` — собрать `**blocker**`-вопросы.
+5. Выявить топ-3 «горячих» кандидата по приоритету:
+   - draft с `**blocker**`-вопросами;
+   - draft с большим числом пустых обязательных секций;
+   - draft, на которые ссылаются stable-соседи (например, чужой
+     `transition-to-service` если такая связь в проекте есть).
+6. Запустить `make project-check` — если красный, показать ошибки.
+7. Через `AskUserQuestion` предложить: «какой сервис копать?».
+
+## Три режима
+
+См. `references/workflow-patterns.md` — детали сценариев и примеры
+вопросов.
+
+- **A. Новая сущность**. Args = `<name>` (нет файла), либо
+  `<name>:<subtype>:<hosting>`. Если subtype/hosting не дан — раунд
+  `AskUserQuestion` с enum-опциями.
+  `cp _templates/service.md services/<name>.md`, заполняем frontmatter
+  (basename/id/name/subtype/hosting/status=draft), потом — волны по
+  5 секциям inside-out: Hosting → Identity → Secrets → Route → Generates.
+- **B. Сырьё**. Args = свободный текст / описание продукта / приложение
+  (скрин чужого compose, README соседнего проекта). Извлечь кандидатов
+  на сервисы, показать план, по подтверждению завести stub-строки в
+  карте + stub service-doc для `hosting: here`, погрузиться в каждую
+  через режим C.
+- **C. Углубление**. Args = `<name>` существующего файла, либо выбран из
+  сводки. Точечные вопросы по дырам и подозрениям; чек-лист
+  `draft → stable` после каждой правки.
+
+## Интерактив — норма, plain-чат запрещён
+
+**Любое взаимодействие с архитектором — через `AskUserQuestion`.** Не
+«выведи таблицу и жди ответа в свободной форме», не «дай развёрнутый
+рассказ и спроси что дальше». Сводки в чат допустимы только как
+**преамбула** перед `AskUserQuestion`-раундом — самоё вопрос всегда
+структурирован.
+
+Принципы:
+
+- Каждый «выбор» — `AskUserQuestion` с опциями (≤4 за tool-call).
+- Свободная форма только через **Other** в опциях, не в чат.
+- «Что копать дальше?», «Готов к stable?», «Подтверждаешь каскад?»,
+  «Какой сервис из сводки?» — всё `AskUserQuestion`, не chat-prompt.
+- Длинные монологи скилла — anti-pattern. Сводки коротко (≤8 строк) и
+  сразу `AskUserQuestion`.
+
+## Стиль вопросов
+
+См. `references/workflow-patterns.md`.
+
+- **Всегда через `AskUserQuestion`**, до 4 вопросов в одном раунде.
+- **Опции** только для:
+  - enum-полей (`subtype`, `hosting`, `entrypoint: true/false`);
+  - anti-patterns (бинарное «это похоже на X — согласен?»);
+  - тест-критерия (✅/❌ из секции «Тест-критерий» в field-checklists);
+  - выбора существующего соседа (профиль из карты, KV-kind из
+    `configs/vault-agent/templates/`, существующий compose-фрагмент как
+    образец).
+- **Свободная форма** (через Other) — для **значения**: имена
+  (`container_name`, образ-tag, KV-поля), маршруты (`<sub>.${DOMAIN}`,
+  healthcheck path/команда), что де-факто рендерит vault-agent template.
+- **Никогда** не подсказывать конкретные домены/теги/имена от себя.
+  Anti-patterns — да. Сама формулировка — нет.
+
+## Память `state/services/<name>.md` — коммитится
+
+Заметки лежат **рядом со скиллом**, не в `docs/project/`:
+
+```
+.claude/skills/service-deep-dive/state/services/<name>.md
 ```
 
-Зелёный и `stable` → выходи: «сервис спроектирован, делать нечего». Иначе прочитай frontmatter
-(`subtype`/`hosting`/`status`) и H2-заголовки, вычисли заполненность по обязательным секциям
-(`docs/project/README.md`).
+Дальше — короткое `state/`, это сокращение того же пути.
 
-### 2. Покажи карту состояния
+State — **коммитбл артефакт**, не приватная память агента:
 
-Сжато, ≤8 строк:
+- В `.gitignore` НЕ попадает; коммитится в репо как часть PR'а вместе
+  с `services/<name>.md`.
+- Это **shared контекст** команды архитекторов: ревьюится в Pull Request,
+  виден всем, не привязан к конкретной сессии Claude.
+- Переживает `/clear` именно за счёт коммита — не «локальный кеш агента»,
+  а часть истории решения.
+- **Не содержит секретов** (значений KV-полей, токенов, паролей). Только
+  ссылки на KV-пути и описания.
 
-```
-## Состояние services/<name>.md (subtype=<…>, hosting=<…>)
+См. `references/state-format.md`. Кратко:
 
-| секция | заполнено | дыра |
-|---|---|---|
-| Hosting   | да  | — |
-| Secrets   | нет | Vault KV не определён |
-| Generates | нет | контракт для de-template пуст |
-```
+- Файл существует, пока есть хоть одна непустая секция.
+- Три возможные секции (любая может отсутствовать):
+  - `## Открытые вопросы` (опц. префикс `**blocker**` у вопроса,
+    блокирующего stable),
+  - `## Доменные решения` (неочевидные смысловые решения, не лезущие
+    в md сервиса),
+  - `## Что копать дальше`.
+- Если все три пусты — заметку удалить (`git rm`).
+- Заметка не журнал: forward-only, без «было/стало».
 
-### 3. Веди волны
+## Зеркало с `vision § Service map`
 
-Порядок — фундамент → производное (запоминай, у пользователя не спрашивай):
+Карта сервисов в `vision.md` — **авторитетный перечень**. service-doc
+обязан быть в карте; запись в карте с `hosting: here` обязана иметь
+service-doc.
 
-1. **Hosting** — `here`/`external`, какой профиль `COMPOSE_PROFILES` активирует, source-репо (для
-   backend: код внешний, контейнер here).
-2. **Identity** — образ (`git.stit.tech/<org>/<name>:<tag>`, pinned) или движок (postgres 17 / minio);
-   container_name, healthcheck, сети (`proxy`/`backend-net`).
-3. **Secrets** — какой `kv/projects/<p>/<env>/<kind>` нужен + поля; какой vault-agent template
-   рендерит env. Нет секретов → `N/A`.
-4. **Route** — public (сабдомен `<name>.${DOMAIN}` + traefik + `crowdsec@file`) или internal → `_internal_`.
-5. **Generates** — явно: что `de-template` родит/изменит (профиль, `agent.hcl.parts/<part>.hcl` +
-   `templates/<kind>.env.tpl`, traefik labels, для external — cross-repo next-step). Без `Generates`
-   артефакт бесполезен движку.
+Скилл держит зеркало синхронным **автоматически после правки**:
 
-Для текущей секции: 3–5 предметных вопросов через `AskUserQuestion` (≤4 за tool-call). После
-ответов **сразу** пиши в md через Edit/Write — не копи «запишу в конце» (теряется при /clear).
-Кратко покажи, что добавилось, переходи дальше.
+- Создание `services/<name>.md` (A-режим) → если строки в карте нет,
+  предложить через `AskUserQuestion` дописать строку (опции: «дописать
+  с дефолтами» / «отказаться — карта правится отдельно» / Other).
+- Удаление `services/<name>.md` (каскад) → предложить удалить строку
+  из карты или перевести `hosting: here → external`.
+- Правка frontmatter `subtype`/`hosting`/`name` → пересчитать карту.
 
-### 4. Правила вопросов
+Если `vision.md` сам в `draft` или валидатор красный — не блокируй
+service-deep-dive, но напомни юзеру в конце сессии: «карта в draft,
+после неё прогони `/init-project` или допили vision вручную».
 
-- **Конкретные, falsifiable.** Плохо: «как с секретами?». Хорошо: «`db` читает
-  `kv/projects/<p>/<env>/db` поля user/password/database, или ещё `sslmode`?».
-- **Bounded.** Опции AskUserQuestion взаимоисключающие (или `multiSelect=true`).
-- **Не выдумывай.** «Не знаю» → пиши `TBD` явно, вернись позже.
-- **Опирайся на инфру как образец.** `compose/<name>.yml`, `configs/vault-agent/templates/<kind>.env.tpl`,
-  `.claude/rules/compose-and-services.md` — живой пример: «healthcheck сейчас `pg_isready` — оставляем?».
+## Контракт `draft → stable`
 
-### 5. Промоушн status
+См. `references/draft-stable.md`. Чек-лист после каждой правки:
 
-После всех волн:
+1. Frontmatter валиден: `id == "project.<name>"`, `basename == name`,
+   `subtype` и `hosting` из enum'ов.
+2. Все 5 обязательных H2 (Hosting/Identity/Secrets/Route/Generates)
+   присутствуют и непусты (placeholder `<...>` не считается
+   содержимым). Опциональные значения — `N/A` явной строкой.
+3. Все ссылки валидны:
+   - `Secrets` упоминает существующий KV-kind (`db`/`minio`/`backup`/
+     `backend`/`otel`/`meta`/`jwt`/`oidc`) либо явный
+     stub-next-step «нужен `vault kv put` через /request-secret»;
+   - `Route` ссылается на сабдомен — должен быть упомянут в
+     `stack § Domains` (либо явный «допилить stack»);
+   - `Generates` упоминает реальные compose/vault-agent имена.
+4. Тест-критерий из `field-checklists.md` явно подтверждён архитектором
+   в этой сессии (раунд `AskUserQuestion` ✅/❌).
+5. В `state/services/<name>.md` нет `**blocker**`-вопросов.
+6. `make project-check A=docs/project/services/<name>.md` зелёный.
 
-```bash
-make project-check A=docs/project/services/<name>.md
-```
+Если все ✅ — предложить через `AskUserQuestion`: «Готов к stable,
+повышаем?». По подтверждению — изменить `status: draft → stable`.
+**Скилл не повышает сам.**
 
-Зелёный → правь frontmatter `status: draft → stable`, запусти валидатор ещё раз (теперь проверит
-non-empty bodies). Красный → вернись к проблемным секциям, не маркируй stable.
+Понижение `stable → draft` — только архитектор. Скилл может предложить,
+не делать.
 
-### 6. Финал
+## Stub-цепочки
 
-Сводка: сервис `stable`. Следующий шаг:
-- **Онбординг** (из `/init-project`): остались сервисы из карты → следующий `/service-deep-dive`;
-  все hosted готовы → `/stack-deep-dive`.
-- **Отдельно**: артефакт — актуальный source of truth; правь при изменении сервиса.
+Если копаемый сервис ссылается на ещё несуществующую сущность:
 
-## Anti-patterns
+- **Соседний сервис** (например, backend упоминает `db` которого нет в
+  карте): дописать строку в карту с `status: draft`, завести
+  stub service-doc через A-режим (минимум frontmatter + пустые H2),
+  записать `state/services/<сосед>.md` с открытым вопросом «заведён
+  как stub в контексте `<откуда>` — докопать».
+- **KV-секрет** (например, упомянули `backup` но нет ни `kv/.../backup`,
+  ни template): отметить в `state` как `**blocker**` (без существующего
+  KV `Secrets` неполна) + cross-repo next-step «через `/request-secret`
+  заказать seed».
+- **Сабдомен** (Route указывает на не-stack-уровень): отметить в
+  `state` как открытый (не blocker) + напомнить в финале «допилить
+  `stack § Domains`».
 
-- ❌ >4 вопросов одним AskUserQuestion (инструмент режет до 4).
-- ❌ Копить ответы в RAM, писать в конце — теряется при /clear.
-- ❌ Заводить service-doc для `hosting: external` — он только в vision `Service map`.
-- ❌ Оставить `Generates` пустым — движку `de-template` не из чего разворачивать.
-- ❌ Дублировать `COMPOSE_PROFILES` целиком — профиль сервиса родит de-template из карты; здесь только
-  какой профиль активирует ЭТОТ сервис.
-- ❌ Промоутить `stable` при красном валидаторе.
+После заведения stub возврат в исходную сущность, копание продолжается.
 
-## Что делает валидатор (для справки)
+## Удаление сущности (каскад)
 
-- Frontmatter: `id`/`kind`/`name`/`status` + (service) `subtype`∈{backend,frontend,datastore,infra},
-  `hosting`∈{here,external}.
-- `basename == name`; `id == "project.<name>"`.
-- Все обязательные H2 (Hosting/Identity/Secrets/Route/Generates) присутствуют; при `stable` — непусты.
+1. Прочитать все `services/*.md` + `vision.md § Service map` + `state/`
+   — найти все ссылки на удаляемый name.
+2. Прочитать `compose/<name>.yml`, `configs/vault-agent/agent.hcl.parts/`
+   и `configs/vault-agent/templates/` — что фактически развёрнуто в
+   инфре (если уже после `/de-template`).
+3. Показать каскад: «ссылаются X, Y, Z; в инфре развёрнуто A, B; вот
+   что сломается».
+4. Через `AskUserQuestion` по каждому месту — опции: «переименовать на
+   другой name» / «удалить ссылающуюся запись» / «оставить с stub'ом».
+5. По подтверждению — выполнить правки одним пакетом.
+6. Удалить `services/<name>.md`.
+7. Удалить `state/services/<name>.md`.
+8. Если карта изменилась — напомнить про `vision.md` промоушн.
+9. Если инфра уже развёрнута — отдельный шаг через `/de-template` или
+   ручной прунинг (не задача этого скилла).
 
-См. `scripts/tools/validate-project-doc.sh` и `docs/project/README.md`.
+## Завершение сессии
+
+В конце короткая сводка в чат (≤10 строк) — что затронуто, что осталось
+— и сразу `AskUserQuestion` «куда дальше?» с опциями:
+
+- «Копать следующий сервис из карты» (если есть `draft`/отсутствующие);
+- «Перейти к `/stack-deep-dive`» (если все `here`-сервисы `stable`);
+- «Зафиксировать остановку, выйти» (записать в state, выйти);
+- Other — свой следующий шаг.
+
+Не «вот сводка, действуй» — всегда структурированный выбор. Накопленные
+cross-repo next-steps (seed KV, форки, правка карты) идут **в state**, не
+в чат — оператор увидит их при следующем `/init-project` или ревью PR'а.
+
+## Запреты
+
+- Не редактировать service.md вслепую — всегда сначала `Read`.
+- Не выдумывать значения: тегов образов, доменов, KV-полей, healthcheck
+  команд. Anti-patterns как опции — да; конкретный текст — нет.
+- Не заводить service-doc для `hosting: external` — он только в карте.
+- Не оставлять `Generates` пустым — движку `/de-template` не из чего
+  разворачивать.
+- Не дублировать `COMPOSE_PROFILES` целиком — здесь только какой профиль
+  активирует **этот** сервис; набор выводит `/de-template` из карты.
+- Не повышать `draft → stable` без явного подтверждения архитектора и
+  зелёного `make project-check`.
+- Не понижать `stable → draft` сам.
+- Не оставлять зеркало с картой рассинхронным.
+- Не аккумулировать историю в `state/` — forward-only.
+- Не создавать `state/services/<name>.md`, если все секции были бы
+  пустыми.
+- Не дёргать `docker volume rm`/`down -v` при удалении сервиса —
+  deny-blocked в `.claude/settings.json`.
