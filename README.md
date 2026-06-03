@@ -51,6 +51,7 @@ VAULT_TOKEN=<root> bash scripts/onboard-project.sh --name acme --envs dev,prod
 **2. Форк + bootstrap VPS** (один VPS на env): **Use this template** → `<client-org>/infra`,
 клон, затем поднять чистый VPS и завести identity:
 ```bash
+cp ansible/inventory.example.ini ansible/inventory.ini   # заполни host/IP (gitignored)
 ansible-playbook -i ansible/inventory.ini ansible/bootstrap.yml
 ssh root@<vps>; cd /opt/<p>-infra
 PROJECT_NAME=acme ENV=prod DOMAIN=acme.com VAULT_ROLE_ID=<id> VAULT_SECRET_ID=<id> \

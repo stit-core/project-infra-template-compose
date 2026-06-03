@@ -38,11 +38,11 @@ paths:
 
 ## TLS
 
-`websecure` entrypoint всегда применяет `secure-headers` глобально (`configs/traefik/traefik.yml`). LE-сертификаты выпускаются HTTP-01 challenge, `acme.json` хранится в volume `traefik-acme`. Он **не** бэкапится (restic берёт только `pg_dumpall`) — при потере VPS сертификаты перевыпускаются заново. `email`/`caServer` приходят из Vault `meta` (`acme_email`/`acme_caserver`) — vault-agent рендерит их в `traefik.yml`, не через `${ENV}`-подстановку.
+`websecure` entrypoint всегда применяет `secure-headers` глобально (static-конфиг — `.runtime/configs/traefik.yml`, рендерится vault-agent'ом из `configs/vault-agent/templates/traefik.yml.tpl`). LE-сертификаты выпускаются HTTP-01 challenge, `acme.json` хранится в volume `traefik-acme`. Он **не** бэкапится (restic берёт только `pg_dumpall`) — при потере VPS сертификаты перевыпускаются заново. `email`/`caServer` приходят из Vault `meta` (`acme_email`/`acme_caserver`) — vault-agent рендерит их в static-конфиг, не через `${ENV}`-подстановку.
 
 ## Dashboard Traefik
 
-**НЕ expose'им** — dashboard на проектной стороне не нужен (single-tenant), `api.insecure: true` отключён в `traefik.yml`. Если для отладки нужен — точечно через `docker exec traefik wget ... /api/...`.
+**НЕ expose'им** — dashboard на проектной стороне не нужен (single-tenant), `api.insecure: true` отключён в static-конфиге. Если для отладки нужен — точечно через `docker exec traefik wget ... /api/...`.
 
 ## gRPC / WebSocket
 
@@ -51,5 +51,5 @@ gRPC — `&& Headers(\`Content-Type\`, \`application/grpc\`)` рулом + `load
 ## После правки
 
 - `compose/*.yml` labels → `make deploy` (Traefik watcher подхватит).
-- `configs/traefik/traefik.yml` (static) → **рестарт** Traefik (`make restart SVC=traefik`).
+- `configs/vault-agent/templates/traefik.yml.tpl` (static-конфиг, security-sensitive: vault-agent рендерит в `.runtime/configs/traefik.yml`) → **рестарт** Traefik (`make restart SVC=traefik`).
 - `configs/traefik/dynamic/*.yml` (dynamic) → подхватится через `watch: true`. `.tpl` рендерятся через `scripts/render-configs.sh`.

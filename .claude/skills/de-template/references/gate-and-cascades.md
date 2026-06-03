@@ -14,7 +14,7 @@ de-template — однократный движок, который меняет
 
 ### 1. Не канонический шаблон
 
-Запуск `/de-template` на каноне `…stit-infra/project-infra-template-compose`
+Запуск `/de-template` на каноне `…stit-template/project-infra-template-compose`
 сносит его шаблонные фрагменты. Защита:
 
 ```bash
@@ -23,7 +23,7 @@ git remote get-url origin
 
 | origin | действие |
 |---|---|
-| содержит `stit-infra/project-infra-template-compose` | СТОП. Через `AskUserQuestion`: «это форк `<client-org>/infra` или throwaway-копия?» (опции «Да, форк» / «Да, throwaway тест-копия» / «Нет, канон» / Other). При «Нет» — выйти, объяснить почему. |
+| содержит `stit-template/project-infra-template-compose` | СТОП. Через `AskUserQuestion`: «это форк `<client-org>/infra` или throwaway-копия?» (опции «Да, форк» / «Да, throwaway тест-копия» / «Нет, канон» / Other). При «Нет» — выйти, объяснить почему. |
 | любое другое (включая `git.stit.tech/<org>/infra`) | OK, идти дальше |
 | origin не настроен (`origin: no upstream`) | через `AskUserQuestion`: «нет origin — это локальный throwaway?» (опции «Да» / «Нет, настроить origin сначала») |
 

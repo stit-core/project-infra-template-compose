@@ -77,8 +77,10 @@ if up=$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null); the
   range="$up..HEAD"
 fi
 touched=""
+# CrowdSec-whitelist здесь не фильтруется: файл живёт corp-side (stit-infra/infra),
+# в проектном репо его нет — corp-handoff по нему оформляется вручную (skill corp-handoff).
 [ -n "$range" ] && touched=$(git diff --name-only "$range" 2>/dev/null \
-  | grep -E '^configs/vault-agent/|^compose/[^/]+\.ya?ml$|^\.env\.example$|^configs/crowdsec/whitelists\.yaml$|^ansible/roles/stit-onboard/' || true)
+  | grep -E '^configs/vault-agent/|^compose/[^/]+\.ya?ml$|^\.env\.example$|^ansible/roles/stit-onboard/' || true)
 
 if [ -n "$corp_impact" ]; then
   echo
@@ -87,7 +89,7 @@ if [ -n "$corp_impact" ]; then
   echo "=== (out-of-band: Slack / тикет / PR в stit-infra/infra) ==="
 elif [ -n "$touched" ]; then
   echo
-  echo "⚠ corp-поверхность тронута в этом push, но ## Corp impact пуст:" >&2
+  echo "⚠ corp-поверхность тронута в этом push, но **Corp impact.** пуст:" >&2
   printf '    %s\n' $touched >&2
   echo "  Оформи CORP-HANDOFF (skill corp-handoff) и передай корп-админу до claim «готово»." >&2
 fi

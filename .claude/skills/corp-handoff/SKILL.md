@@ -14,7 +14,8 @@ description: Оформить CORP-HANDOFF-блок, когда изменени
 - `make status` → `== Infra-touch ==` ≠ none (smartdev чейнит сюда)
 - Правишь `configs/vault-agent/` (`agent.hcl.parts/`, `templates/`),
   добавляешь профиль в `COMPOSE_PROFILES`/`compose/*.yml`, новый `${VAR}` в
-  `.env.example`, `configs/crowdsec/whitelists.yaml`, `ansible/roles/stit-onboard/`
+  `.env.example`, `ansible/roles/stit-onboard/`, либо нужен CrowdSec-whitelist
+  egress-IP корп-side (файл в `stit-infra/infra`, не здесь)
 - Юзер: «нужен seed для X», «что передать корп-админу», «новый env/VPS»
 
 ## Когда НЕ применять

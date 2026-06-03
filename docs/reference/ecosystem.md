@@ -1,17 +1,20 @@
 # Ecosystem — место проектной VPS среди репо
 
 Этот репо — **шаблон проектной инфры**: один форк (`<org>/infra`) = один клиентский проект,
-один VPS на среду (`dev`/`prod`/...). Канон карты контрактов между всеми 4 репо живёт в
-`stit-infra/infra/docs/ecosystem.md` — здесь только роль *этого* репо и его контракты.
+один VPS на среду (`dev`/`prod`/...). Экосистема: 4 форкаемых шаблона `stit-template/*`
+(go-backend-template, spa-frontend-template, project-docs-template, project-infra-template-compose)
++ корп control-plane (`stit-infra/infra`, `stit-infra/golibinfra`) + дизайн-система `stit-design`.
+Канон карты контрактов живёт в `stit-infra/infra/docs/ecosystem.md` — здесь только роль *этого*
+репо и его контракты.
 
 ## Репо
 
 | Репо | Роль |
 |---|---|
 | `stit-infra/infra` | Корп-VPS: Vault, OTel ingest, Gitea registry, CrowdSec. Source of truth контрактов. |
-| `stit-infra/go-backend-template` | Шаблон Go-бэкенда. Форк `<org>/backend` собирает образ в `git.stit.tech`. |
-| `stit-infra/project-docs-template` | Шаблон продуктовой аналитики (business → projects: vision/persona/**surface** → interface → screens). Форк `<org>/docs`. |
-| `stit-infra/project-infra-template-compose` | **Этот.** Шаблон проектной VPS — runtime стека одного проекта. Форк `<org>/infra`. |
+| `stit-template/go-backend-template` | Шаблон Go-бэкенда. Форк `<org>/backend` собирает образ в `git.stit.tech`. |
+| `stit-template/project-docs-template` | Шаблон продуктовой аналитики (business → projects: vision/persona/**surface** → interface → screens). Форк `<org>/docs`. |
+| `stit-template/project-infra-template-compose` | **Этот.** Шаблон проектной VPS — runtime стека одного проекта. Форк `<org>/infra`. |
 | `<org>/infra` + `<org>/docs` + `<org>/backend` + ... | Клиентские форки. Один `<org>/infra` обслуживает N сервис-форков и читает `<org>/docs`. |
 
 ## Зависит от `stit-infra/infra` (корп)

@@ -5,7 +5,6 @@ paths:
   - "configs/vault-agent/**"
   - "compose/*.yml"
   - ".env.example"
-  - "configs/crowdsec/whitelists.yaml"
   - "ansible/roles/stit-onboard/**"
 ---
 
@@ -29,7 +28,7 @@ AppRole/онбординг, CrowdSec-whitelist, OTLP-tenant. Любое изме
 |---|---|---|
 | **Vault KV** | новый профиль в `COMPOSE_PROFILES` / новый сервис, которому нужен KV-объект (`db`/`oidc`/`jwt`/`minio`/`backup`/project-specific); новое поле в существующем объекте; новый `${VAR}` из vault-agent template | корп (Vault) — через skill `request-secret` |
 | **Env-онбординг** | новый `ENV`/проект (новый VPS) — нужен AppRole `projects-<p>-<env>` + seed `meta`+`otel` | корп (`onboard-project.sh --envs`) |
-| **CrowdSec whitelist** | новый egress-IP проектной VPS (иначе otel-collector UA ловит `http-bad-user-agent`, метрики режутся 403) | корп (`whitelists.yaml` + crowdsec restart) |
+| **CrowdSec whitelist** | новый egress-IP проектной VPS (иначе otel-collector UA ловит `http-bad-user-agent`, метрики режутся 403) | корп (whitelist corp-side в `stit-infra/infra` + crowdsec restart) |
 | **DNS** | новый сабдомен `<name>.${DOMAIN}` под LE HTTP-01 | владелец DNS (A-record `*.${DOMAIN}` → VPS IP) |
 
 Не-corp: чисто локальная правка (compose-логика без нового KV/профиля, .tpl-рефактор
@@ -62,14 +61,14 @@ RISK   <что будет, если не сделано: стек не подн�
 ## Делать
 
 - Оформлять блок **до** claim «готово»/коммита, не после.
-- Один блок на одно логически цельное corp-изменение; несколько — список в `## Corp impact`.
+- Один блок на одно логически цельное corp-изменение; несколько — список в `**Corp impact.**`.
 - Конкретика: точный KV-path, имя поля, required-флаг, точное действие. «Что-то с Vault» — бесполезно админу.
 - Для seed/patch KV — делегируй skill `request-secret` (он печатает готовый `vault kv put`-блок).
 
 ## Не делать
 
 - ❌ Молча закоммитить новый профиль / KV-зависимость / `${VAR}` из template без блока.
-- ❌ Откладывать «на ship» — ship агрегирует уже **записанное** в `## Corp impact`; не записал → потерял.
+- ❌ Откладывать «на ship» — ship агрегирует уже **записанное** в `**Corp impact.**`; не записал → потерял.
 - ❌ Самому выполнять `vault kv put`/`patch` / `ssh` на корп-VPS — не зона этого репо.
 - ❌ Писать значение секрета в блок/чат — только имя пути/поля и факт «нужен» (см. `.claude/rules/secrets-and-env.md`).
 - ❌ Workaround'ить отсутствующий KV/политику обходом вместо handoff (см. skill `triage`).
@@ -79,6 +78,6 @@ RISK   <что будет, если не сделано: стек не подн�
 
 - `make status` → `== Infra-touch ==` ≠ none (cockpit `smartdev` чейнит сюда).
 - Правишь файл под `paths:` этого правила (оно само в контексте).
-- `make ship` напомнил, что `## Corp impact` пуст при тронутой corp-поверхности.
+- `make ship` напомнил, что `**Corp impact.**` пуст при тронутой corp-поверхности.
 
 Процедура — skill `corp-handoff`. Seed конкретного KV — skill `request-secret` (его частный случай).

@@ -116,7 +116,8 @@ oбa под `*.acme.dev`, public только backend и minio Console»).
      сервисы public) + `services/*.md § Route` (какие сабдомены упомянуты).
    - **environments** → `.claude/rules/multi-env.md` (один VPS = один ENV).
    - **edge** → `compose/traefik.yml`, `compose/crowdsec.yml`,
-     `configs/crowdsec/whitelists.yaml` (живой образец).
+     `configs/crowdsec/acquis.yaml` (живой образец; whitelist egress-IP —
+     corp-side в `stit-infra/infra`, не в этом репо).
    - **networks** → `docker-compose.yml` + `compose/*.yml` (какие сети
      реально есть).
    - **backup** → `compose/backup.yml` (если уже есть),
@@ -124,7 +125,7 @@ oбa под `*.acme.dev`, public только backend и minio Console»).
    - **observability** → `compose/otel-agent.yml`,
      `configs/otel-agent/`.
    - **generates** → `configs/traefik/dynamic/`, `.env.example`,
-     `configs/crowdsec/whitelists.yaml`.
+     crowdsec source-IP next-step (corp-side).
 4. Применить `field-checklists.md § <секция>` к строкам. Найти:
    - пустые обязательные поля (placeholder `<...>`);
    - подозрения по anti-patterns (Backup без retention; public-сабдомен

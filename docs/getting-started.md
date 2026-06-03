@@ -24,7 +24,7 @@ VPS = одна среда). `make ship` пушит и триггерит remote 
 
 ## 0. Форк
 
-1. Gitea (`https://git.stit.tech`) → `stit-infra/project-infra-template-compose` →
+1. Gitea (`https://git.stit.tech`) → `stit-template/project-infra-template-compose` →
    **Use this template** → `<org>/infra`.
 2. `git clone git@git.stit.tech:<org>/infra.git && cd infra`.
 3. `make setup` — ставит git-хуки (commit-msg, pre-commit на `roadmap.md`).

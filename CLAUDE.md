@@ -81,9 +81,10 @@ seed'а соответствующих KV. Сети: `proxy` (наружу), `ba
 | | `deploy` / `render` | server-side: git pull → render → compose up --wait / envsubst+agent.hcl |
 | OPS | `ps` / `logs SVC=` / `restart SVC=` / `recreate SVC=` / `build SVC=` | статус / логи / рестарт / пересоздать (env_file pickup) / сборка образа сервиса |
 | | `backup` / `restore-pg SNAPSHOT=` | one-shot backup / restore postgres из restic |
+| | `ssh CMD="…"` | произвольная команда на VPS (через `ssh.sh`) |
 | INTEL | `status` / `search Q= [P=]` | cockpit-сводка / поиск по compose+configs+scripts+docs |
 | PROVISION | `new-env` | bootstrap `.env` на чистом VPS |
-| SETUP | `setup` | поставить git-хуки (commit-msg) |
+| SETUP | `setup` | поставить git-хуки (commit-msg + pre-commit) |
 | META | `plan-check` / `project-check` | структура планов / инфра-слой `docs/project/` (stack + сервисы) |
 
 ## Карта: где что
@@ -146,13 +147,15 @@ out-of-band. AppRole строго read-only на свой `<p>/<env>`. Подр�
 - Перед claim «готово» — `make check` (validate + doctor + plan-check + project-check); после деплоя — `make ps`.
 - **Изменение — через план** (planning-first; skill `/plan`). Отклонение — осознанное, проговаривается.
 - Тронул corp-поверхность (`configs/vault-agent/`, `compose/*.yml` профили, `.env.example`,
-  `configs/crowdsec/whitelists.yaml`, `ansible/`) — оформи **CORP-HANDOFF**-блок до claim «готово»
+  `ansible/`) или изменение требует CrowdSec-whitelist'а egress-IP корп-side (файл живёт в
+  `stit-infra/infra`, не здесь) — оформи **CORP-HANDOFF**-блок до claim «готово»
   (skill `/corp-handoff`; `make status → == Infra-touch ==` это ловит).
 - Любая новая `${VAR}` в compose/configs — в `.env.example` сразу.
 - Bumps версий образов — отдельным коммитом после явного OK.
 
 ### Сначала спросить
-- `compose/traefik.yml` static config — глобальные изменения требуют рестарта Traefik.
+- Traefik static-конфиг (`configs/vault-agent/templates/traefik.yml.tpl` → рендерится в
+  `.runtime/configs/traefik.yml`) — глобальные изменения требуют рестарта Traefik.
 - `compose/vault-agent.yml` / `configs/vault-agent/` — security-sensitive.
 - `containers/backup/` или `compose/backup.yml` — риск потери restore-points.
 
@@ -198,5 +201,3 @@ out-of-band. AppRole строго read-only на свой `<p>/<env>`. Подр�
 
 Любой текст в репо описывает **только текущее состояние / намерение** — не «было/стало».
 История — в `git log` + Conventional Commits. Полное правило — `.claude/rules/forward-only.md`.
-</content>
-</invoke>

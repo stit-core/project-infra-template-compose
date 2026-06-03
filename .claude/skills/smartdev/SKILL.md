@@ -82,8 +82,9 @@ Split и `.env.local` — rules `make-first`/`env-local`. `make doctor` без `
 | Задачи нет, working tree чистый, план none | спроси юзера: какую задачу решаем |
 
 Security-sensitive (план + явный OK обязательны до правки): `configs/vault-agent/`
-(`agent.hcl.parts/`, `templates/`), `configs/traefik/traefik.yml` (рестарт Traefik =
-downtime), `containers/backup/` + `compose/backup.yml` (риск потери restore-points).
+(`agent.hcl.parts/`, `templates/` — вкл. `traefik.yml.tpl`, static-конфиг Traefik рендерится
+из него в `.runtime/configs/traefik.yml`; правка → рестарт Traefik = downtime),
+`containers/backup/` + `compose/backup.yml` (риск потери restore-points).
 
 ## 4. Дефолтная петля — RED→GREEN
 

@@ -79,7 +79,7 @@ A.2/A.3, обнуление roadmap в A.5, удаление getting-started) и
    ```bash
    git remote get-url origin
    ```
-   Если origin == `…stit-infra/project-infra-template-compose…` И
+   Если origin == `…stit-template/project-infra-template-compose…` И
    каталог не временная тест-копия → СТОП. Запуск на каноне сносит
    шаблонные фрагменты. Через `AskUserQuestion` явно подтвердить: «это
    форк `<client-org>/infra` или throwaway-копия?». При «нет» — выйти.

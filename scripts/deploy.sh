@@ -91,9 +91,9 @@ echo "→ crowdsec early (для bouncer auto-register)"
 docker compose "${args[@]}" up -d --wait --wait-timeout 60 crowdsec
 
 # CrowdSec bouncer auto-register. Если в .env ключ пустой — генерим сейчас,
-# ДО старта traefik (см. комментарий выше про порядок). Раньше блок жил в
-# конце deploy.sh, после полного --wait — partial failure (например,
-# minio-init exit 1) обрывал set -euo pipefail и блок никогда не запускался.
+# ДО старта traefik (см. комментарий выше про порядок) и ДО полного --wait:
+# при set -euo pipefail partial failure в --wait (например minio-init exit 1)
+# прервал бы скрипт, не дойдя до регистрации bouncer'а.
 if grep -qE '^CROWDSEC_BOUNCER_API_KEY=$' .env; then
   echo "→ auto-registering CrowdSec bouncer (traefik)"
   if key=$(docker exec crowdsec cscli bouncers add traefik -o raw 2>/dev/null); then

@@ -37,7 +37,7 @@
 | public-сервисы из карты | `Domains` | каждый `Route: <sub>` имеет соответствующий пункт в `Domains` ИЛИ open-question в state |
 | имена сетей | `Networks` | соответствуют тому, что есть в `compose/` (или явный rename-план в `Generates`) |
 | `Backup: N/A` ↔ карта | `Backup` | в карте нет `datastore` И нет volume'ов под бэкап |
-| `Generates` пути | `Generates` | реалистичны (`configs/traefik/dynamic/*`, `.env.example`, `configs/crowdsec/whitelists.yaml`) |
+| `Generates` пути | `Generates` | реалистичны (`configs/traefik/dynamic/*`, `.env.example`, crowdsec source-IP next-step corp-side) |
 | `acme_email`/`acme_caserver` | `Domains` / `Generates` | значения отмечены как next-step через `meta` KV (corp-handoff) |
 
 ### 4. `Generates` содержит хотя бы один реальный артефакт

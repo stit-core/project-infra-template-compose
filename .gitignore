@@ -24,6 +24,7 @@ ansible/inventory.ini
 
 # local
 *.local
+.claude/settings.local.json
 .DS_Store
 *.swp
 *~
