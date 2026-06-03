@@ -143,14 +143,16 @@ make ship          # commit + check + push + (на main) ssh-deploy
 
 Какой профиль от каких KV зависит — `.claude/rules/multi-env.md § Profile-based opt-in`.
 
-## 7. `/init-project` — спроектировать проект
+## 7. `/init-project` — спроектировать инфру под продукт
 
-Skill-оркестратор `/init-project` ведёт продуктовый онбординг: vision → проектирование сервисов
-(`/service-deep-dive`) → стек (`/stack-deep-dive`) → `/de-template`. Сам не проектирует —
-интервьюирует и наполняет `docs/project/*` до `status: stable`, затем чейнит развёртку.
+Skill-оркестратор `/init-project` ведёт онбординг инфры: читает продуктовый контекст из соседнего
+`<org>/docs` (vision / surfaces — форк `project-docs-template`, sibling-checkout) → проектирование
+стека и **карты сервисов** (`/stack-deep-dive`) → hosted-сервисы (`/service-deep-dive`) →
+`/de-template`. Сам не проектирует — чейнит специализированные скиллы и наполняет `docs/project/*`
+(`stack.md` + `services/<name>.md`) до `status: stable`, затем чейнит развёртку.
 
-*(Продуктовый слой достраивается — см. roadmap Phase 8. До его появления проектирование и
-де-темплейтизация — вручную по чек-листу `CLAUDE.md § Что менять при копировании`.)*
+Продуктовый слой (vision / surfaces / personas) **не авторится здесь** — он живёт в `<org>/docs` и
+проектируется его скиллами. Этот шаг читает его как scope. Резолв пути — `docs/reference/ecosystem.md`.
 
 ## 8. `/de-template` — своя инфра
 

@@ -45,8 +45,10 @@ env (dev/staging/prod).
 хостит registry `git.stit.tech`.
 **Обслуживает:** `<client-org>/backend` (форк `go-backend-template`) — runtime для его образа;
 deploy через `vault kv patch kv/projects/<p>/<env>/meta backend_tag=<tag>` + `make ship`.
+**Читает:** `<client-org>/docs` (форк `project-docs-template`) — продуктовый контекст (vision,
+surfaces); sibling-checkout рядом с этим репо, read-only. Резолв пути — `docs/reference/ecosystem.md`.
 
-Карта 4 репо и канонические контракты — `stit-infra/infra/docs/ecosystem.md`.
+Карта репо и канонические контракты — `stit-infra/infra/docs/ecosystem.md`.
 
 ## Стек
 
@@ -82,20 +84,22 @@ seed'а соответствующих KV. Сети: `proxy` (наружу), `ba
 | INTEL | `status` / `search Q= [P=]` | cockpit-сводка / поиск по compose+configs+scripts+docs |
 | PROVISION | `new-env` | bootstrap `.env` на чистом VPS |
 | SETUP | `setup` | поставить git-хуки (commit-msg) |
-| META | `plan-check` / `project-check` | структура планов / продуктовый слой `docs/project/` |
+| META | `plan-check` / `project-check` | структура планов / инфра-слой `docs/project/` (stack + сервисы) |
 
 ## Карта: где что
 
 | Тема | Где |
 |---|---|
 | Архитектура, сети, профили, non-goals | `docs/reference/architecture.md` |
+| Инфра-слой проекта (stack + карта сервисов + service-doc'и) | `docs/project/README.md` (вход для `/init-project` + `/de-template`) |
+| Продуктовый контекст (vision/surfaces) | соседний `<org>/docs` (форк `project-docs-template`), читается cross-repo |
 | KV-layout, AppRole, multi-env, lazy-seed | `.claude/rules/multi-env.md` |
 | Compose-инварианты сервиса | `.claude/rules/compose-and-services.md` |
 | Секреты и `.env` | `.claude/rules/secrets-and-env.md` |
 | Корп-handoff (когда тронул corp-поверхность) | `.claude/rules/corp-handoff.md` + skill `/corp-handoff` |
 | Онбординг / путь потребителя | `docs/getting-started.md` |
 | Runbook / инциденты | `docs/reference/runbook.md` |
-| Экосистема 4 репо, контракты | `docs/reference/ecosystem.md` (→ канон `stit-infra/infra/docs/ecosystem.md`) |
+| Экосистема репо, контракты | `docs/reference/ecosystem.md` (→ канон `stit-infra/infra/docs/ecosystem.md`) |
 
 ## Корп-контракт
 
@@ -166,6 +170,10 @@ out-of-band. AppRole строго read-only на свой `<p>/<env>`. Подр�
 3. `compose/backend.yml` — `image:` под клиентский org, healthcheck path под backend API.
 4. `configs/vault-agent/templates/backend.env.tpl` — project-specific env, если backend читает сверх контракта.
 5. `configs/traefik/dynamic/` — клиент-специфичные routers/middlewares (опц.).
+
+Продуктовый слой проекта (vision / surfaces / personas) — в соседнем `<org>/docs` (форк
+`project-docs-template`), проектируется его скиллами; здесь инфру под него ведёт `/init-project`
+(читает `<org>/docs` cross-repo → стек+карта сервисов → service-doc'и → `/de-template`).
 
 Полный путь потребителя — `docs/getting-started.md`.
 

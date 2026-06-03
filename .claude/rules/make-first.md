@@ -26,7 +26,7 @@ paths:
 | INTEL | `status` / `search Q= [P=]` | cockpit-сводка (локальный `status.sh` + серверный смок `== Server ==` по SSH при `.env.local`) / поиск по compose+configs+scripts+docs |
 | PROVISION | `new-env` | bootstrap `.env` на чистом VPS |
 | SETUP | `setup` | симлинк git-хуков (commit-msg, pre-commit) в `.git/hooks/` |
-| META | `plan-check` / `project-check` | структура `.claude/plans/roadmap.md` / продуктовый слой `docs/project/` |
+| META | `plan-check` / `project-check` | структура `.claude/plans/roadmap.md` / инфра-слой `docs/project/` (stack + сервисы) |
 
 Канонический gate перед claim «готово» / push — **`make check`** (validate + doctor + plan-check + project-check).
 

@@ -39,17 +39,15 @@ make project-check
 Проверки:
 
 - `make project-check` → зелёный;
-- `vision.md → status: stable`;
+- `stack.md → status: stable` (вкл. непустой `Service map`);
 - все `services/*.md → status: stable` (для `hosting: here`);
-- `stack.md → status: stable`;
 - `Generates` секции непусты в `service` и `stack`.
 
 | результат | действие |
 |---|---|
 | всё зелёное и stable | OK |
-| `vision draft` | СТОП → инструкция: «оператор → допили vision через `/init-project`» |
-| `services/*` draft | СТОП → «оператор → `/service-deep-dive <name>`» |
 | `stack draft` | СТОП → «оператор → `/stack-deep-dive`» |
+| `services/*` draft | СТОП → «оператор → `/service-deep-dive <name>`» |
 | `make project-check` красный | СТОП → показать ошибки валидатора, инструкция куда копать |
 
 ### 3. Идемпотентность
@@ -164,7 +162,7 @@ make project-check
 
 Ссылки в репо:
 - README.md ссылается на docs/getting-started.md в секции
-  «Развёртывание» — заменю на «см. vision.md / stack.md / docs/project/».
+  «Развёртывание» — заменю на «см. stack.md / docs/project/ / <org>/docs».
 - CLAUDE.md ссылается на docs/getting-started.md в «Корп-контракт» —
   заменю на «см. corp-handoff и init-project».
 

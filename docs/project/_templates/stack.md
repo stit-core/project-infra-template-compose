@@ -7,8 +7,23 @@ status: draft
 
 # Stack — инфра VPS
 
-Cross-cutting инфры одного VPS под этот проект. Профили НЕ описывает — их выводит `de-template`
-из `vision § Service map`. Здесь — то, что общее для всего стека.
+Cross-cutting инфры одного VPS под этот проект + **карта сервисов** (авторитетный инвентарь, из
+которого `de-template` выводит `COMPOSE_PROFILES`) + среды. Продуктовый контекст (Problem / Users /
+surfaces) живёт в соседнем `<org>/docs` (`docs/projects/<slug>/`) — здесь не дублируется, читается
+cross-repo.
+
+## Service map
+<Авторитетный перечень всех частей продукта на стороне инфры. Сервис с hosting: here крутится
+контейнером в этом репо и получает `docs/project/services/<name>.md`; external — только строка
+контекста (по ней `de-template` печатает cross-repo next-step). Из этой карты выводятся
+`COMPOSE_PROFILES` (datastore→postgres/storage, backend→backend).>
+
+| name | subtype | hosting | repo / source | назначение |
+|---|---|---|---|---|
+| backend | backend | here | `<org>/backend` (форк go-backend-template) | API |
+| db | datastore | here | — (postgres в этом репо) | Postgres 17 |
+| storage | datastore | here | — (minio в этом репо) | S3 + Console |
+| web | frontend | external | `<org>/frontend` (CDN) | SPA |
 
 ## Domains
 <Корневой `DOMAIN` и сабдомены: какие сервисы публичны и под какими именами
@@ -30,10 +45,15 @@ crond, retention. `N/A` если storage-профиль не включён.>
 <otel-agent → otel.stit.tech (OTLP + Prom-scrape host-метрик), resource attrs, accountID/token
 из kv otel. cadvisor + node-exporter (always-on).>
 
+## Environments
+<Какие среды у проекта (dev/staging/prod) — каждая = отдельный VPS с одним ENV. Чем отличаются
+(домен, масштаб, какие сервисы включены). `N/A` если среда одна.>
+
 ## Generates
 <Что de-template родит/изменит из этого артефакта:
+- COMPOSE_PROFILES — выводится из Service map выше (subtype + hosting)
 - configs/traefik/dynamic/* — клиент-специфичные routers/middlewares
 - DOMAIN в .env.example
 - crowdsec source-IP next-step (corp-handoff: egress IP в whitelist)
 - acme_email/caserver — meta KV next-step
-(COMPOSE_PROFILES здесь НЕ задаётся — выводится из service-map)>
+- для external-строк карты: cross-repo next-step (форкни <repo>)>

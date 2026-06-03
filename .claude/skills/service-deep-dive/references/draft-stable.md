@@ -12,7 +12,7 @@
 - `name == basename(file)` без `.md`.
 - `subtype` ∈ {`backend`, `frontend`, `datastore`, `infra`}.
 - `hosting` ∈ {`here`, `external`}. **`external` → service-doc не должно
-  существовать вообще** (только строка в `vision § Service map`); если
+  существовать вообще** (только строка в `stack § Service map`); если
   файл есть, это рассинхрон, требует каскада.
 - `status` ∈ {`draft`, `stable`}.
 
@@ -46,7 +46,7 @@
 
 ### 4. Зеркало с картой консистентно
 
-- В `vision.md § Service map` есть строка с `name == <name>`.
+- В `stack.md § Service map` есть строка с `name == <name>`.
 - Строка в карте: `subtype` и `hosting` равны frontmatter сервиса.
 - Если `hosting: external` — service-doc отсутствует (см. п.1).
 

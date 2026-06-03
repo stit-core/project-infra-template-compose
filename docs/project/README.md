@@ -1,10 +1,11 @@
-# Project artifacts
+# Infra artifacts
 
-Продуктовый слой проектной инфры — **первичный source of truth** и **вход для skill
-`de-template`**. Уровень ВЫШЕ кодового `docs/{domains,stack}` бэкенда: там «какая бизнес-логика
-одного сервиса», здесь — «из каких сервисов состоит продукт клиента и как этот VPS их хостит».
+Инфра-слой проектной VPS — **source of truth для `de-template`**: из чего стек состоит и как
+этот VPS его хостит. **Продуктовый контекст** (проблема, пользователи, поверхности продукта)
+живёт в соседнем репо `project-docs-template` (форк `<org>/docs`, `docs/projects/<slug>/`) и
+читается **cross-repo** — здесь не дублируется. См. `docs/reference/ecosystem.md § sibling-docs`.
 
-Заполняется через `/init-project` (оркестратор) → `/service-deep-dive` + `/stack-deep-dive`,
+Заполняется через `/init-project` (оркестратор) → `/stack-deep-dive` + `/service-deep-dive`,
 валидируется `scripts/tools/validate-project-doc.sh`, разворачивается `/de-template`.
 
 ## Структура
@@ -13,38 +14,34 @@
 docs/project/
 ├── README.md                ← этот файл
 ├── _templates/              ← пустые шаблоны для копирования
-│   ├── vision.md
-│   ├── service.md
-│   └── stack.md
-├── vision.md                ← kind: vision (singleton) — продукт + карта сервисов
-├── services/
-│   └── <name>.md            ← kind: service — по одному на hosted-сервис
-└── stack.md                 ← kind: stack (singleton) — cross-cutting инфры VPS
+│   ├── stack.md
+│   └── service.md
+├── stack.md                 ← kind: stack (singleton) — cross-cutting + карта сервисов + среды
+└── services/
+    └── <name>.md            ← kind: service — по одному на hosted-сервис
 ```
 
-`services/` и `vision.md`/`stack.md` рождаются deep-dive'ами по карте сервисов — в шаблон не
-коммитятся (только `_templates/`).
+`stack.md` и `services/` рождаются deep-dive'ами — в шаблон не коммитятся (только `_templates/`).
 
 ## Kinds
 
 | kind | файл | что описывает |
 |---|---|---|
-| `vision` | `vision.md` | продукт: проблема, пользователи, **карта сервисов**, границы, среды |
+| `stack` | `stack.md` | cross-cutting инфры VPS (домены, edge, сети, бэкап, телеметрия) + **карта сервисов** + среды |
 | `service` | `services/<name>.md` | один **hosted** сервис: хостинг, идентичность, секреты, роут |
-| `stack` | `stack.md` | cross-cutting инфры VPS: домены, edge, сети, бэкап, телеметрия |
 
-`vision § Service map` — авторитетный перечень всех частей продукта. Сервис с `hosting: here`
-крутится контейнером в ЭТОМ репо и получает свой `services/<name>.md`. Внешние части (frontend-SPA
-на CDN, backend-код в отдельном репо) перечислены в карте как контекст — **без** service-doc;
-`de-template` печатает по ним cross-repo next-steps.
+`stack § Service map` — авторитетный перечень всех частей продукта на стороне инфры. Сервис с
+`hosting: here` крутится контейнером в ЭТОМ репо и получает свой `services/<name>.md`. Внешние
+части (frontend-SPA на CDN, backend-код в отдельном репо) перечислены в карте как контекст —
+**без** service-doc; `de-template` печатает по ним cross-repo next-steps.
 
 ## Frontmatter
 
 ```yaml
-# vision.md
-id: project.vision
-kind: vision
-name: vision
+# stack.md
+id: project.stack
+kind: stack
+name: stack
 status: draft            # draft → stable (через валидатор)
 ```
 
@@ -58,21 +55,12 @@ name: <name>             # == basename файла без .md
 status: draft
 ```
 
-```yaml
-# stack.md
-id: project.stack
-kind: stack
-name: stack
-status: draft
-```
-
 ## Обязательные H2 по kind
 
 | kind | обязательные H2 |
 |---|---|
-| `vision` | Problem, Users, Service map, Boundaries, Environments |
+| `stack` | Service map, Domains, Edge, Networks, Backup, Observability, Environments, Generates |
 | `service` | Hosting, Identity, Secrets, Route, Generates |
-| `stack` | Domains, Edge, Networks, Backup, Observability, Generates |
 
 Пустые/неприменимые секции — явной пометкой `N/A` или `_нет_` (зеркалит domain-дисциплину).
 Пустых таблиц быть не должно.
@@ -83,7 +71,7 @@ status: draft
 
 ## Generates → инфра (что выводит de-template)
 
-`de-template` **выводит `COMPOSE_PROFILES` из карты сервисов**, не из явного списка:
+`de-template` **выводит `COMPOSE_PROFILES` из `stack § Service map`**, не из явного списка:
 
 | subtype сервиса | профиль | хостируемое |
 |---|---|---|
@@ -97,16 +85,28 @@ Always-on edge/телеметрия (`traefik`/`crowdsec`/`vault-agent`/`otel-ag
 `cadvisor`) — фиксированный фундамент шаблона, не описывается service-doc'ами. `stack § Generates`
 несёт только cross-cutting: traefik dynamic routes, `DOMAIN`, crowdsec source-IP next-step.
 
+## Cross-repo: продуктовый контекст
+
+Продуктовая аналитика (vision / persona / surface / capability) живёт в `<org>/docs`
+(`project-docs-template`), склонированном **рядом** с `<org>/infra` (sibling-checkout). Скиллы
+читают её при старте, чтобы привязать инфру к продукту:
+
+- `stack-deep-dive` читает `<org>/docs/.../surface.md` — какие поверхности public (нужны сабдомены).
+- `de-template` читает `<org>/docs/.../vision.md § Problem` — кастомизировать `CLAUDE.md` под проект.
+
+Авторская сторона продуктовых артефактов — **только** `<org>/docs`; здесь их не редактируем.
+Конвенция расположения и pointer — `docs/reference/ecosystem.md`.
+
 ## Workflow
 
-1. `/init-project` копирует `_templates/vision.md` → `docs/project/vision.md`, ведёт интервью до
-   заполненной `Service map`.
-2. Per hosted-сервис из карты: `cp _templates/service.md docs/project/services/<name>.md` →
-   `/service-deep-dive <name>` — волны вопросов inside-out до `status: stable`.
-3. `cp _templates/stack.md docs/project/stack.md` → `/stack-deep-dive` до `stable`.
+1. `/init-project` читает продуктовый контекст из `<org>/docs` (vision + surfaces) как scope.
+2. `cp _templates/stack.md docs/project/stack.md` → `/stack-deep-dive` — волны вопросов до
+   заполненной `Service map` + cross-cutting + Environments, до `status: stable`.
+3. Per hosted-сервис из карты (`hosting: here`): `cp _templates/service.md
+   docs/project/services/<name>.md` → `/service-deep-dive <name>` — до `status: stable`.
 4. `scripts/tools/validate-project-doc.sh docs/project` зелёный → промоушн `status: draft → stable`.
-5. `/de-template` читает stable-артефакты, выводит профили, прунит неиспользуемое, кастомит
-   `CLAUDE.md`/README под проект, печатает cross-repo next-steps.
+5. `/de-template` читает stable-артефакты, выводит профили из `stack § Service map`, прунит
+   неиспользуемое, кастомит `CLAUDE.md`/README под проект, печатает cross-repo next-steps.
 
 ## Gate
 
@@ -117,8 +117,11 @@ domain/stack-gate эталона. `scripts/git-hooks/pre-commit` гонит ва
 ## Anti-patterns
 
 - ❌ Заводить `services/<name>.md` для внешнего frontend/backend-кода (`hosting: external`) — он
-  только в `vision § Service map`. service-doc — для **hosted** контейнеров этого VPS.
-- ❌ Дублировать `COMPOSE_PROFILES` в `stack.md` — профили выводит `de-template` из карты сервисов.
+  только в `stack § Service map`. service-doc — для **hosted** контейнеров этого VPS.
+- ❌ Дублировать `COMPOSE_PROFILES` явным списком в `stack.md` — профили выводит `de-template` из
+  `Service map`.
+- ❌ Дублировать продуктовую аналитику (Problem / Users / surfaces) здесь — она в `<org>/docs`,
+  читается cross-repo.
 - ❌ Оставлять `Generates` пустым — движку `de-template` не из чего разворачивать.
 - ❌ Промоутить `status: stable` руками без зелёного валидатора.
 - ❌ Описывать always-on edge/телеметрию service-doc'ом — это фиксированный фундамент шаблона.

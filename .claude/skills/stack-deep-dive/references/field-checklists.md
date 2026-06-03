@@ -1,8 +1,8 @@
 # Чек-листы секций stack.md
 
-`docs/project/stack.md` несёт 6 обязательных H2: Domains / Edge /
-Networks / Backup / Observability / Generates. По разделу на каждую
-секцию:
+`docs/project/stack.md` несёт 8 обязательных H2: Service map / Domains /
+Edge / Networks / Backup / Observability / Environments / Generates. По
+разделу на каждую секцию:
 
 - **Что фиксируем** — поля.
 - **Опции опрашиваются как** — enum / anti-pattern / Other.
@@ -12,6 +12,55 @@ Networks / Backup / Observability / Generates. По разделу на кажд
 
 Полный канон — `docs/project/README.md` и
 `docs/reference/architecture.md`. Здесь — выжимка для скилла.
+
+---
+
+## Service map
+
+**Что фиксируем** — авторитетный инвентарь частей продукта на стороне
+инфры (одна строка = одна часть):
+
+- `name` — слаг сервиса (`backend`, `db`, `storage`, `web`).
+- `subtype` — `backend` / `frontend` / `datastore` / `infra`.
+- `hosting` — `here` (контейнер в этом репо) / `external` (свой репо/CDN).
+- `repo / source` — откуда (`<org>/backend`, «postgres в этом репо», CDN).
+- `назначение` — одна фраза.
+
+Карта — **драйвер `COMPOSE_PROFILES`** (`/de-template` выводит профили из
+неё: datastore→postgres/storage, backend→backend). Сверяется с
+продуктовыми surfaces из `<org>/docs` (cross-repo): public-surface обычно
+= `frontend`/`backend`-строка; datastore/infra surface не имеют.
+
+**Опции опрашиваются как**:
+
+- `subtype`: enum (4 значения).
+- `hosting`: 2 опции (`here` / `external`).
+- name / repo / назначение: Other (значения проекта).
+
+**Что НЕ**:
+
+- Заводить строку для always-on фундамента (traefik/crowdsec/vault-agent/
+  otel-agent/cadvisor/node-exporter/landing) — это не «часть продукта».
+- Авторить здесь продуктовые surfaces — они в `<org>/docs`, читаются
+  cross-repo (карта — про инфра-инвентарь, не про UX-поверхности).
+- `hosting: here` строка без последующего `services/<name>.md`.
+
+**Тест-критерий**:
+
+- ✅ «`backend` (backend/here/`<org>/backend`/API), `db` (datastore/here/
+  postgres/Postgres 17), `storage` (datastore/here/minio/S3), `web`
+  (frontend/external/CDN/SPA) — из карты выводятся профили backend,
+  postgres, storage».
+- ❌ «traefik строкой в карте» — это фундамент, не часть продукта.
+- ❌ «`hosting: here` без service-doc» — нарушен инвариант зеркала.
+
+**Порядок копания**:
+
+1. Прочитать surfaces из `<org>/docs` (cross-repo) — кандидаты public-частей.
+2. Per часть продукта — `name`/`subtype` (enum)/`hosting` (2 опции)/repo/
+   назначение (Other).
+3. Каждой `hosting: here` строке — напомнить про `services/<name>.md`.
+4. Anti-patterns.
 
 ---
 
@@ -233,6 +282,46 @@ Networks / Backup / Observability / Generates. По разделу на кажд
 
 ---
 
+## Environments
+
+**Что фиксируем**:
+
+- Какие среды у проекта (`dev` / `staging` / `prod` / произвольные слаги).
+- Каждая среда = **отдельный VPS** с одним `ENV` в `.env` и своей
+  AppRole-парой (канон — `.claude/rules/multi-env.md`).
+- Чем среды отличаются: домен (`dev.acme.dev` vs `acme.dev`), масштаб
+  (RAM/CPU VPS), какой набор профилей включён.
+- `N/A` — если среда одна (single-env проект).
+
+**Опции опрашиваются как**:
+
+- Список сред: Other (слаги проекта).
+- Домен на среду: Other (стратегия именования).
+- Профили на среду: multiSelect (`postgres`/`storage`/`backend`).
+
+**Что НЕ**:
+
+- Конвертировать среду in-place — добавление env = bootstrap нового VPS
+  (это не stack-факт, а операция; `skill bootstrap-vps`).
+- Хардкодить `VAULT_ROLE_ID`/`SECRET_ID` per env — они в `.env` на VPS.
+- Описывать корп-онбординг AppRole/KV — это `multi-env.md` + корп-сторона.
+
+**Тест-критерий**:
+
+- ✅ «`dev` (`dev.acme.dev`, 2GB, профили postgres+backend) и `prod`
+  (`acme.dev`, 4GB, postgres+storage+backend) — каждая отдельный VPS».
+- ✅ «`N/A` — проект single-env (только prod)».
+- ❌ «Перечислены среды без указания, чем отличаются» — пустая карта сред.
+- ❌ «Секреты/role_id в Environments» — их место в `.env` на VPS.
+
+**Порядок копания**:
+
+1. Список сред (Other) или `N/A`.
+2. Per среда: домен (Other), масштаб, профили (multiSelect).
+3. Anti-patterns.
+
+---
+
 ## Generates
 
 **Что фиксируем** — контракт для `/de-template`:
@@ -246,7 +335,8 @@ Networks / Backup / Observability / Generates. По разделу на кажд
 
 **Что НЕ**:
 
-- `COMPOSE_PROFILES` — выводится из карты, не отсюда.
+- `COMPOSE_PROFILES` явным списком — выводится из `Service map` (выше в
+  этом же файле), не задаётся списком в Generates.
 - Always-on (`compose/traefik.yml` etc.) — фундамент, не Generates.
 - service-specific traefik labels — они в service-doc `Generates`.
 
@@ -278,7 +368,8 @@ Networks / Backup / Observability / Generates. По разделу на кажд
 | `Backup: N/A` при datastore в карте | Backup | «в карте есть postgres — точно `N/A`?» |
 | Public без `crowdsec@file` где-то в проекте | Edge | «все public роуты через middleware?» |
 | Сабдомен не в карте | Domains | «сервис существует или это план?» |
-| `COMPOSE_PROFILES` в stack | Generates | «выводит de-template — убрать?» |
+| `hosting: here` строка без service-doc | Service map | «завести `services/<name>.md`?» |
+| `COMPOSE_PROFILES` явным списком в Generates | Generates | «выводится из Service map — убрать список?» |
 | Always-on в Generates | Generates | «это фундамент шаблона — он не Generates?» |
 | Сети не описаны / без имён | Networks | «shared VPS — нужны кастомные имена?» |
 | acme значения хардкодом | Domains | «через `meta` KV — да?» |
@@ -287,11 +378,12 @@ Networks / Backup / Observability / Generates. По разделу на кажд
 
 Через `AskUserQuestion` 1 раунд, 2 опции:
 
-- ✅ «Этот файл описывает cross-cutting инфры VPS целиком: домены, edge,
-  сети, бэкап, телеметрия, контракт для `/de-template` — без описания
-  отдельных сервисов и без дублирования `COMPOSE_PROFILES`».
-- ❌ «Это часть описания (некоторые секции `<...>`), или пересекается с
-  service-doc'ами, или содержит `COMPOSE_PROFILES`».
+- ✅ «Этот файл описывает инфру VPS целиком: карту сервисов, домены, edge,
+  сети, бэкап, телеметрию, среды, контракт для `/de-template` — карта
+  сервисов живёт здесь, но `COMPOSE_PROFILES` явным списком не дублируется;
+  отдельные сервисы детально не расписаны (это service-doc)».
+- ❌ «Это часть описания (некоторые секции `<...>`), или детально
+  пересекается с service-doc'ами, или содержит `COMPOSE_PROFILES` списком».
 
 При ❌ — выйти в C-режим по конкретной дыре. При ✅ — пункт 5
 чек-листа `draft-stable.md` пройден.

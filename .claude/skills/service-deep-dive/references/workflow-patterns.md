@@ -11,14 +11,14 @@
 
 ### Шаги
 
-1. Прочитать `docs/project/README.md` (контракт), `vision.md § Service
+1. Прочитать `docs/project/README.md` (контракт), `stack.md § Service
    map` (карта), `field-checklists.md` (выжимка по kind=service).
 2. Если subtype/hosting не указаны в args — раунд 1 `AskUserQuestion`:
    - **subtype** — 4 опции enum (`backend` / `frontend` / `datastore` /
      `infra`).
    - **hosting** — 2 опции enum (`here` / `external`). Если выбран
      `external` — СТОП, объяснить: «у external нет service-doc, добавь
-     строку в `vision § Service map` и выходи». Через `AskUserQuestion`:
+     строку в `stack § Service map` и выходи». Через `AskUserQuestion`:
      «Дописать строку в карту? / Уже есть? / Отказаться».
 3. Раунд 2 `AskUserQuestion` — идентичность:
    - **container_name** (Other) — обычно равен `<name>`, но иногда нужен
@@ -29,7 +29,7 @@
 4. `cp docs/project/_templates/service.md docs/project/services/<name>.md`
    через Read+Write. Заполнить frontmatter (id/kind/subtype/hosting/
    name/status=draft) и пустые H2.
-5. Если строки в `vision § Service map` нет — раунд `AskUserQuestion`:
+5. Если строки в `stack § Service map` нет — раунд `AskUserQuestion`:
    «Дописать строку (`name` / `subtype` / `hosting` / `repo` /
    `назначение`)?» — заполнить через Other.
 6. Зайти на волны inside-out: Hosting → Identity → Secrets → Route →
@@ -72,7 +72,7 @@
 
 ### Шаги
 
-1. Прочитать материал внимательно. Прочитать `vision.md § Service map`
+1. Прочитать материал внимательно. Прочитать `stack.md § Service map`
    и существующие `services/*.md` — что уже есть.
 2. Извлечь кандидатов на сервисы. Фильтр — секции `Что НЕ` из
    `field-checklists.md`:
@@ -91,7 +91,7 @@
 4. Раунд `AskUserQuestion` — подтвердить план / попросить корректировку
    через Other.
 5. По подтверждению — для каждого hosted:
-   - дописать строку в `vision § Service map` (если ещё нет);
+   - дописать строку в `stack § Service map` (если ещё нет);
    - завести stub `services/<name>.md` (frontmatter + пустые H2);
    - создать `state/services/<name>.md` с открытым вопросом «извлечено
      из сырья — уточнить <что>».
@@ -120,7 +120,7 @@
 
 1. Прочитать `docs/project/services/<name>.md`.
 2. Прочитать `state/services/<name>.md`, если есть.
-3. Прочитать соседей: `vision § Service map` (как описан в карте),
+3. Прочитать соседей: `stack § Service map` (как описан в карте),
    `stack.md § Domains` (если public — есть ли сабдомен), компоненты
    инфры рядом (`compose/<name>.yml`, `configs/vault-agent/templates/`,
    `configs/vault-agent/agent.hcl.parts/`) — образец, если уже развёрнут.

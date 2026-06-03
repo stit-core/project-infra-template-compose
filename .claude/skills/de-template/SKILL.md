@@ -1,15 +1,16 @@
 ---
 name: de-template
-description: Развернуть форк `project-infra-template-compose` в самостоятельную проектную инфру по stable-артефактам `docs/project` — вывести `COMPOSE_PROFILES` из карты сервисов, прунить неиспользуемые `compose/*.yml` + vault-agent parts/templates, кастомить `CLAUDE.md`/`README.md` под проект, печатать cross-repo next-steps. Активируй когда юзер форкнул шаблон и говорит "/de-template", "разверни инфру", "де-темплейтизируй", "убери шаблонную мету", или когда `/init-project` дошёл до развёртывания (vision+сервисы+стек stable). Движок skill-only — reviewable edits по фазам с показом каскадов перед прунингом. НЕ запускать на каноническом шаблоне.
+description: Развернуть форк `project-infra-template-compose` в самостоятельную проектную инфру по stable-артефактам `docs/project` — вывести `COMPOSE_PROFILES` из `stack § Service map`, прунить неиспользуемые `compose/*.yml` + vault-agent parts/templates, кастомить `CLAUDE.md`/`README.md` под проект (продуктовый контекст читает cross-repo из `<org>/docs`), печатать cross-repo next-steps. Активируй когда юзер форкнул шаблон и говорит "/de-template", "разверни инфру", "де-темплейтизируй", "убери шаблонную мету", или когда `/init-project` дошёл до развёртывания (стек+сервисы stable). Движок skill-only — reviewable edits по фазам с показом каскадов перед прунингом. НЕ запускать на каноническом шаблоне.
 ---
 
 # de-template — движок развёртывания инфры
 
 Превращает форк `project-infra-template-compose` в проектную инфру,
-которая ничего не помнит про шаблон. Читает **stable** артефакты
-`docs/project/{vision, services/*, stack}` и:
+которая ничего не помнит про шаблон. Читает **stable** инфра-артефакты
+`docs/project/{services/*, stack}` (+ продуктовый контекст cross-repo из
+`<org>/docs` для кастомизации идентичности) и:
 
-1. Выводит `COMPOSE_PROFILES` из карты сервисов.
+1. Выводит `COMPOSE_PROFILES` из `stack § Service map`.
 2. Прунит неиспользуемые compose/vault-agent-фрагменты (с показом
    каскада — что исчезнет — до удаления).
 3. Кастомит идентичность (`CLAUDE.md`/`README.md` под проект).
@@ -59,8 +60,10 @@ A.2/A.3, обнуление roadmap в A.5, удаление getting-started) и
 
 1. Прочитать `state/de-template.md`, если есть (что уже сделано).
 2. Прогнать **Gate** (см. ниже).
-3. Прочитать stable-артефакты: `docs/project/vision.md § Service map`
-   + все `services/*.md` + `stack.md`.
+3. Прочитать stable-артефакты: `docs/project/stack.md` (§ Service map +
+   § Generates) + все `services/*.md`. Для A.4 — продуктовый
+   `<org>/docs/.../vision.md § Problem` (cross-repo; резолв пути —
+   `docs/reference/ecosystem.md`).
 4. Если args = `status` — только сводка + `AskUserQuestion` «что
    делать?» (продолжить / пропустить фазу X / выход).
 5. Если args = `phase=<x>` — после Gate `AskUserQuestion` «прогнать
@@ -85,9 +88,9 @@ A.2/A.3, обнуление roadmap в A.5, удаление getting-started) и
    ```bash
    make project-check
    ```
-   Зелёный И vision + все `services/*` + stack — `status: stable`,
-   секции `Generates` непусты. Иначе СТОП → инструкция оператору:
-   `/service-deep-dive`/`/stack-deep-dive` добить.
+   Зелёный И `stack` + все `services/*` — `status: stable`, секции
+   `Generates` непусты, `stack § Service map` непуст. Иначе СТОП →
+   инструкция оператору: `/stack-deep-dive`/`/service-deep-dive` добить.
 
 3. **Идемпотентность.** Прочитать состояние:
    - `.env.example` содержит ли уже `COMPOSE_PROFILES=...`?
@@ -108,9 +111,9 @@ A.2/A.3, обнуление roadmap в A.5, удаление getting-started) и
 § Каскады прунинга`): «удалим X, Y, Z; никаких других ссылок на них в
 репо нет — подтверждаешь?».
 
-### A.1. Вывести `COMPOSE_PROFILES` из карты сервисов
+### A.1. Вывести `COMPOSE_PROFILES` из `stack § Service map`
 
-- Из `vision § Service map` + `services/*.md` (subtype + hosting)
+- Из `stack § Service map` + `services/*.md` (subtype + hosting)
   собрать активный набор по таблице маппинга (см.
   `phase-a-mechanics.md`).
 - Записать дефолт в `.env.example` (`COMPOSE_PROFILES=<набор>`).
@@ -141,7 +144,8 @@ A.2/A.3, обнуление roadmap в A.5, удаление getting-started) и
 
 ### A.4. Кастомить идентичность
 
-- `CLAUDE.md` — шапка/стек под имя проекта из vision; убрать
+- `CLAUDE.md` — шапка/стек под имя проекта из продуктового
+  `<org>/docs/.../vision.md § Problem` (cross-repo read); убрать
   «шаблон stit.tech», «копируется в `<client-org>/infra`», секцию «Что
   менять при копировании». Карта где-что и rules остаются.
 - `README.md` (корневой) — проектная шапка вместо «шаблон проектной
@@ -156,8 +160,8 @@ A.2/A.3, обнуление roadmap в A.5, удаление getting-started) и
 - `docs/getting-started.md` ([META] «как форкнуть шаблон») — удалить.
 - `.claude/plans/roadmap.md` — сбросить к пустому fork-start (history
   шаблона ≠ история форка): шапка + пустые `## Active` / `## Backlog`.
-- `docs/project/{vision, services/*, stack}.md` — **оставить**: это
-  продуктовые доки проекта.
+- `docs/project/{services/*, stack}.md` — **оставить**: это инфра-доки
+  проекта (карта сервисов + cross-cutting). Продуктовые доки — в `<org>/docs`.
 - `docs/project/_templates/` и deep-dive/init-project скилы — тоже
   остаются (система наследуется).
 
@@ -236,8 +240,8 @@ State — **коммитбл артефакт**, не приватная пам�
 - **Не `docker volume rm`/`down -v` при прунинге** — не нужно и
   deny-blocked в `.claude/settings.json`; удаляем только файлы
   фрагментов.
-- **Не удалять `docs/project/*`-артефакты** — это продуктовые доки
-  проекта, не scaffolding.
+- **Не удалять `docs/project/*`-артефакты** — это инфра-доки проекта
+  (карта сервисов + cross-cutting + service-doc'и), не scaffolding.
 - **Не удалять `docs/project/_templates/`** — система наследуется.
 - **Не аккумулировать журнал** в state — forward-only.
 

@@ -1,17 +1,18 @@
 #!/usr/bin/env bash
-# tools/validate-project-doc.sh — детерминированный валидатор продуктового слоя docs/project/.
+# tools/validate-project-doc.sh — детерминированный валидатор инфра-слоя docs/project/.
 #
-# 3 kind'а: vision (singleton), service (per hosted-сервис, services/<name>.md),
-# stack (singleton). frontmatter + обязательные H2-секции; при status: stable секции непусты.
-# Артефакты — вход для skill `de-template` (секция `Generates` каждого service/stack описывает,
-# что из него родится/изменится в инфре).
+# 2 kind'а: service (per hosted-сервис, services/<name>.md), stack (singleton — cross-cutting
+# инфры VPS + карта сервисов + среды). frontmatter + обязательные H2-секции; при status: stable
+# секции непусты. Артефакты — вход для skill `de-template` (`stack § Service map` выводит
+# COMPOSE_PROFILES; секция `Generates` каждого service/stack описывает, что родится в инфре).
+# Продуктовый контекст (Problem/Users/surfaces) живёт в соседнем `<org>/docs`, не здесь.
 #
 # Использование:
 #   scripts/tools/validate-project-doc.sh <path>   # файл или директория
 #   scripts/tools/validate-project-doc.sh          # вся docs/project/
 #
 # Проверяет:
-#   1. Frontmatter: id, kind, name, status (обязательные); kind ∈ {vision,service,stack}.
+#   1. Frontmatter: id, kind, name, status (обязательные); kind ∈ {service,stack}.
 #      Для kind=service дополнительно subtype ∈ {backend,frontend,datastore,infra},
 #      hosting ∈ {here,external}.
 #   2. basename == frontmatter.name; id == "project.<name>".
@@ -30,15 +31,14 @@ TARGET="${1:-docs/project}"
 ERRORS=()
 FILES_CHECKED=0
 
-VALID_KINDS=(vision service stack)
+VALID_KINDS=(service stack)
 VALID_SUBTYPES=(backend frontend datastore infra)
 VALID_HOSTING=(here external)
 
 required_sections() {
     case "$1" in
-        vision)  echo "Problem Users 'Service map' Boundaries Environments" ;;
         service) echo "Hosting Identity Secrets Route Generates" ;;
-        stack)   echo "Domains Edge Networks Backup Observability Generates" ;;
+        stack)   echo "'Service map' Domains Edge Networks Backup Observability Environments Generates" ;;
         *)       echo "" ;;
     esac
 }

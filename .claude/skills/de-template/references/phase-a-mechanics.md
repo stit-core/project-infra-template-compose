@@ -6,7 +6,7 @@ A — Phase B (печать cross-repo next-steps).
 Каждое удаление чего-либо в A.2/A.3 идёт **после показа каскада** (см.
 `gate-and-cascades.md`).
 
-## A.1. Вывести `COMPOSE_PROFILES` из карты сервисов
+## A.1. Вывести `COMPOSE_PROFILES` из `stack § Service map`
 
 ### Маппинг (канон — `docs/project/README.md`)
 
@@ -22,7 +22,7 @@ A — Phase B (печать cross-repo next-steps).
 
 ### Шаги
 
-1. Прочитать `vision.md § Service map`.
+1. Прочитать `stack.md § Service map`.
 2. Для каждой строки с `hosting: here` → определить профиль по таблице.
 3. Собрать множество профилей в детерминированном порядке (алфавит:
    `backend,postgres,storage`).
@@ -153,14 +153,17 @@ A — Phase B (печать cross-repo next-steps).
 | файл | что меняется | что НЕ трогать |
 |---|---|---|
 | `CLAUDE.md` | шапка/стек под имя проекта; убрать «шаблон stit.tech», «копируется в `<client-org>/infra`», секцию «Что менять при копировании» | Карта где-что, rules, корп-контракт, форвард-only |
-| `README.md` (корневой) | проектная шапка вместо «шаблон проектной инфры»; убрать «форкни»; короткое описание из vision `Problem` | reference-ссылки |
+| `README.md` (корневой) | проектная шапка вместо «шаблон проектной инфры»; убрать «форкни»; короткое описание из продуктового `<org>/docs/.../vision.md § Problem` (cross-repo) | reference-ссылки |
 | `docs/reference/*` | НЕ трогать (общие reference-доки) | всё |
 | `docs/contributing.md` | НЕ трогать | всё |
 
 ### Шаги
 
-1. Прочитать `vision.md § Problem` (одна-две фразы — основа шапки) и
-   `vision.md § Users` (контекст).
+1. Прочитать продуктовый контекст cross-repo из `<org>/docs`
+   (резолв пути — `docs/reference/ecosystem.md`; дефолт `../docs`):
+   `docs/projects/<slug>/vision.md § Problem` (одна-две фразы — основа
+   шапки) + `surface.md` (контекст). Sibling-репо нет — спросить имя/
+   описание проекта у оператора через `AskUserQuestion`.
 2. Прочитать текущий `CLAUDE.md` — найти и заменить шаблонные блоки на
    проектные. Маркеры шаблона:
    - «Шаблон проектной инфры stit.tech»;
@@ -191,8 +194,8 @@ A — Phase B (печать cross-repo next-steps).
    - `## Active` пуст;
    - `## Backlog` пуст;
    - удалить любые секции, унаследованные от шаблона.
-3. **Оставить** `docs/project/{vision, services/*, stack}.md` — это
-   продуктовые доки проекта.
+3. **Оставить** `docs/project/{services/*, stack}.md` — это инфра-доки
+   проекта (карта + cross-cutting). Продуктовые доки — в `<org>/docs`.
 4. **Оставить** `docs/project/_templates/` — система наследуется
    (`/add-service` использует).
 5. **Оставить** deep-dive/init-project скилы (`.claude/skills/`) —

@@ -11,18 +11,24 @@ C по секциям. B — реже, для разбора сырья (опи�
 
 ### Шаги
 
-1. Прочитать `docs/project/README.md`, `field-checklists.md`,
-   `vision.md § Service map`.
+1. Прочитать `docs/project/README.md`, `field-checklists.md`, и
+   **продуктовый контекст cross-repo** из `<org>/docs` (`docs/projects/
+   <slug>/surface.md` — кандидаты public-поверхностей; резолв пути —
+   `docs/reference/ecosystem.md`, дефолт `../docs`). `Service map` авторится
+   здесь; по surfaces только сверяемся, не падаем если sibling-репо нет.
 2. `cp docs/project/_templates/stack.md docs/project/stack.md` через
    Read+Write. Заполнить frontmatter (id=project.stack / kind=stack /
    name=stack / status=draft).
-3. Зайти на волны inside-out по 6 секциям (фундамент → производное):
-   - **Domains** (фундамент: корневой `DOMAIN` и сабдомены) →
+3. Зайти на волны inside-out по 8 секциям (фундамент → производное):
+   - **Service map** (фундамент: инвентарь сервисов name/subtype/hosting,
+     сверка с продуктовыми surfaces) →
+   - **Domains** (корневой `DOMAIN` и сабдомены) →
    - **Edge** (middleware, source-IP, rate-limit) →
    - **Networks** (имена `proxy`/`backend-net`) →
    - **Backup** (restic-репо, расписание, retention; `N/A` если нет
      storage в карте) →
    - **Observability** (otel endpoint, resource attrs) →
+   - **Environments** (среды dev/prod → VPS/домен; `N/A` если одна) →
    - **Generates** (контракт для `/de-template`).
 4. Для каждой секции — раунд 3–5 `AskUserQuestion` (≤4 за tool-call)
    по `field-checklists.md § <секция>`. После ответов **сразу** Edit'ом
@@ -59,9 +65,10 @@ oбa под `*.acme.dev`, public только backend и minio Console»).
 
 ### Шаги
 
-1. Прочитать материал внимательно. Прочитать `vision.md § Service map`
-   и `services/*.md` — что уже есть.
-2. Разнести материал по 6 секциям. Фильтр — секции `Что НЕ` из
+1. Прочитать материал внимательно. Прочитать `services/*.md` и
+   продуктовые surfaces из `<org>/docs` (cross-repo) — что уже есть.
+   `Service map` авторишь здесь из материала + surfaces.
+2. Разнести материал по 8 секциям. Фильтр — секции `Что НЕ` из
    `field-checklists.md`:
    - не относить к stack описание конкретного сервиса (это service-doc);
    - не относить always-on фундамент (траefik «есть» — не stack-факт;
@@ -95,16 +102,19 @@ oбa под `*.acme.dev`, public только backend и minio Console»).
 
 ## C. Углубление секции
 
-**Сигнал**: args = `<section>` (`domains`/`edge`/`networks`/`backup`/
-`observability`/`generates`), либо выбор из сводки.
+**Сигнал**: args = `<section>` (`service-map`/`domains`/`edge`/`networks`/
+`backup`/`observability`/`environments`/`generates`), либо выбор из сводки.
 
 ### Шаги
 
 1. Прочитать `stack.md`.
 2. Прочитать `state/stack.md`, если есть.
 3. Прочитать соседей по теме:
-   - **domains** → `vision § Service map` (какие сервисы public) +
-     `services/*.md § Route` (какие сабдомены упомянуты).
+   - **service-map** → продуктовые surfaces из `<org>/docs` (cross-repo) +
+     существующие `services/*.md` (каждый `hosting: here` = строка карты).
+   - **domains** → `stack § Service map` (свой, в этом же файле — какие
+     сервисы public) + `services/*.md § Route` (какие сабдомены упомянуты).
+   - **environments** → `.claude/rules/multi-env.md` (один VPS = один ENV).
    - **edge** → `compose/traefik.yml`, `compose/crowdsec.yml`,
      `configs/crowdsec/whitelists.yaml` (живой образец).
    - **networks** → `docker-compose.yml` + `compose/*.yml` (какие сети

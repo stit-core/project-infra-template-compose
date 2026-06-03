@@ -116,5 +116,5 @@ setup: ## git-хуки (commit-msg, pre-commit) + dev-deps (PyYAML для frontm
 plan-check: ## Валидатор структуры единого плана .claude/plans/roadmap.md (A=<file> override)
 	@bash scripts/tools/validate-plan.sh $(A)
 
-project-check: ## Валидатор продуктового слоя docs/project/ (A=<path> override)
+project-check: ## Валидатор инфра-слоя docs/project/ (stack + service-doc'и; A=<path> override)
 	@bash scripts/tools/validate-project-doc.sh $(A)

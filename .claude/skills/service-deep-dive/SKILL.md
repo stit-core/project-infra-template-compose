@@ -1,13 +1,13 @@
 ---
 name: service-deep-dive
-description: Углублённая проработка hosted-сервиса в `docs/project/services/<name>.md` (Hosting · Identity · Secrets · Route · Generates). Ведёт сессию через структурированные вопросы (AskUserQuestion), фиксирует рабочее состояние в `state/services/<name>.md`, не выдумывает решения сам. Использовать всегда, когда речь о `docs/project/services/`, заполнении 5 артефактных секций сервиса, заведении или углублении hosted-сервиса, разборе сырья (описание продукта, скрин compose, готовый сервис у соседей), переходе `status draft → stable`, удалении с каскадом, или копании связей с `vision § Service map` и инфра-фрагментами (compose/vault-agent/traefik). Также — единственная точка входа в `docs/project/services/`.
+description: Углублённая проработка hosted-сервиса в `docs/project/services/<name>.md` (Hosting · Identity · Secrets · Route · Generates). Ведёт сессию через структурированные вопросы (AskUserQuestion), фиксирует рабочее состояние в `state/services/<name>.md`, не выдумывает решения сам. Использовать всегда, когда речь о `docs/project/services/`, заполнении 5 артефактных секций сервиса, заведении или углублении hosted-сервиса, разборе сырья (описание продукта, скрин compose, готовый сервис у соседей), переходе `status draft → stable`, удалении с каскадом, или копании связей со `stack § Service map` и инфра-фрагментами (compose/vault-agent/traefik). Также — единственная точка входа в `docs/project/services/`.
 ---
 
 # service-deep-dive
 
 Проектирование одного **hosted**-сервиса проекта: доводит
-`docs/project/services/<name>.md` до `status: stable`. Где `/init-project`
-отвечает «из чего состоит продукт» (vision § Service map), этот скилл —
+`docs/project/services/<name>.md` до `status: stable`. Где `/stack-deep-dive`
+владеет картой «из чего состоит стек» (`stack § Service map`), этот скилл —
 «как именно этот сервис хостится на VPS»: хостинг/профиль, идентичность
 образа или движка, какой Vault KV нужен, как роутится, что из него родит
 `/de-template`.
@@ -31,13 +31,13 @@ description: Углублённая проработка hosted-сервиса �
 
 `subtype` ∈ {`backend`, `frontend`, `datastore`, `infra`}.
 `hosting` ∈ {`here`, `external`}. service-doc заводим **только** для
-`hosting: here`; `external` остаётся строкой в `vision § Service map`.
+`hosting: here`; `external` остаётся строкой в `stack § Service map`.
 
 ## Что делать сразу при запуске
 
 1. Прочитать `docs/project/README.md` — освежить контракт kinds и
    маппинг `subtype → профиль`.
-2. Прочитать `docs/project/vision.md § Service map` — авторитетный
+2. Прочитать `docs/project/stack.md § Service map` — авторитетный
    перечень. Из карты вычислить, какие hosted-сервисы должны иметь
    service-doc.
 3. Если args пустые — сделать сводку (см. ниже) и через
@@ -47,7 +47,7 @@ description: Углублённая проработка hosted-сервиса �
 
 ## Сводка состояния (без args)
 
-1. Прочитать `vision.md § Service map` — список с `hosting: here`.
+1. Прочитать `stack.md § Service map` — список с `hosting: here`.
 2. Прочитать все `docs/project/services/*.md` — frontmatter
    (`status`, `subtype`, `hosting`) + H2 заполненность.
 3. Сверить: карта vs файлы. Пометить расхождения как кандидатов:
@@ -151,11 +151,11 @@ State — **коммитбл артефакт**, не приватная пам�
 - Если все три пусты — заметку удалить (`git rm`).
 - Заметка не журнал: forward-only, без «было/стало».
 
-## Зеркало с `vision § Service map`
+## Зеркало со `stack § Service map`
 
-Карта сервисов в `vision.md` — **авторитетный перечень**. service-doc
-обязан быть в карте; запись в карте с `hosting: here` обязана иметь
-service-doc.
+Карта сервисов в `stack.md` — **авторитетный перечень** (владелец —
+`/stack-deep-dive`). service-doc обязан быть в карте; запись в карте с
+`hosting: here` обязана иметь service-doc.
 
 Скилл держит зеркало синхронным **автоматически после правки**:
 
@@ -166,9 +166,9 @@ service-doc.
   из карты или перевести `hosting: here → external`.
 - Правка frontmatter `subtype`/`hosting`/`name` → пересчитать карту.
 
-Если `vision.md` сам в `draft` или валидатор красный — не блокируй
+Если `stack.md` сам в `draft` или валидатор красный — не блокируй
 service-deep-dive, но напомни юзеру в конце сессии: «карта в draft,
-после неё прогони `/init-project` или допили vision вручную».
+после неё прогони `/stack-deep-dive` (он владеет картой)».
 
 ## Контракт `draft → stable`
 
@@ -219,7 +219,7 @@ service-deep-dive, но напомни юзеру в конце сессии: «
 
 ## Удаление сущности (каскад)
 
-1. Прочитать все `services/*.md` + `vision.md § Service map` + `state/`
+1. Прочитать все `services/*.md` + `stack.md § Service map` + `state/`
    — найти все ссылки на удаляемый name.
 2. Прочитать `compose/<name>.yml`, `configs/vault-agent/agent.hcl.parts/`
    и `configs/vault-agent/templates/` — что фактически развёрнуто в
@@ -231,7 +231,8 @@ service-deep-dive, но напомни юзеру в конце сессии: «
 5. По подтверждению — выполнить правки одним пакетом.
 6. Удалить `services/<name>.md`.
 7. Удалить `state/services/<name>.md`.
-8. Если карта изменилась — напомнить про `vision.md` промоушн.
+8. Если карта изменилась — напомнить про `stack.md` промоушн (через
+   `/stack-deep-dive`).
 9. Если инфра уже развёрнута — отдельный шаг через `/de-template` или
    ручной прунинг (не задача этого скилла).
 

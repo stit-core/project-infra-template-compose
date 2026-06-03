@@ -4,66 +4,89 @@
 уровне оркестратора), **выход** (признак done), **что в state**.
 
 Скилл сам не интервьюирует и не проектирует; он подсказывает оператору
-правильный slash-command и проверяет gate.
+правильный slash-command и проверяет gate. Продуктовый слой (vision,
+surfaces) живёт в соседнем `<org>/docs` и **читается** cross-repo —
+здесь не авторится.
 
-## Этап 1. Vision + карта сервисов
+## Этап 1. Продуктовый контекст (cross-repo, read-only)
 
 ### Вход
 
 - Pre-flight пройден (форк, git-хуки, не канонический шаблон).
-- `docs/project/vision.md` отсутствует ИЛИ существует и `status: draft`.
+
+### Что делает
+
+1. Резолвить путь к `<org>/docs` — `DOCS_REPO_PATH` из `.env.local` или
+   дефолт `../docs` (см. `docs/reference/ecosystem.md`).
+2. Прочитать `<org>/docs/docs/projects/<slug>/{vision,surface}.md`:
+   - `vision.md § Problem` — задача продукта (контекст для CLAUDE.md-меты
+     на этапе 4);
+   - `surface.md` — какие поверхности продукта (`web`/`api`/`admin`/…) —
+     кандидаты на `frontend`/`backend`-строки карты сервисов.
+3. Зафиксировать scope в state (`## Доменные решения` — короткой строкой).
+4. **Ничего не авторить** — продуктовые доки read-only отсюда.
+
+### Выход (done)
+
+- Продуктовый контекст прочитан, scope зафиксирован в state.
+- ЛИБО (sibling-репо нет) — записан next-step «склонируй/заполни
+  `<org>/docs`», этап не блокирует (стек ведётся по словам оператора).
+
+### state на конец этапа
+
+- В `## Текущий этап` записать «2».
+- Если `<org>/docs` недоступен — next-step «склонировать `<org>/docs`» в
+  `## Cross-repo next-steps`.
+
+---
+
+## Этап 2. Стек + карта сервисов → `/stack-deep-dive`
+
+### Вход
+
+- Этап 1 done (scope понятен или зафиксирован пробел).
+- `docs/project/stack.md` отсутствует ИЛИ существует и `status: draft`.
 
 ### Что делает
 
 1. Если файла нет:
    ```bash
-   cp docs/project/_templates/vision.md docs/project/vision.md
+   cp docs/project/_templates/stack.md docs/project/stack.md
    ```
-2. Прочитать `vision.md`. Определить, какие H2 заполнены, какие
-   placeholder `<...>`.
-3. **vision не имеет своего deep-dive скилла** — это singleton с
-   относительно простой структурой. Скилл `init-project` ведёт
-   заполнение **сам**, через AskUserQuestion.
-4. Волны вопросов inside-out (фундамент → производное):
-   - **Problem** (Other) — одно-два предложения о задаче клиента.
-   - **Users** (Other) — кто пользователи / акторы + нагрузка.
-   - **Service map** (волна на каждую строку):
-     - перечислить кандидатов через AskUserQuestion (multiSelect:
-       backend / frontend / datastore-postgres / datastore-minio /
-       другое (Other));
-     - для каждого: `subtype` (enum 4 опции), `hosting` (enum: `here` /
-       `external`), `repo / source` (Other), `назначение` (Other).
-   - **Boundaries** (Other) — что в скоупе, что non-goal.
-   - **Environments** (Other) — какие среды, чем отличаются.
-5. Edit'ом писать в md по мере ответов (не копить).
-6. После заполнения — `make project-check A=docs/project/vision.md`.
-7. Если зелёный — раунд AskUserQuestion: «Готов к stable?», по «Да»
-   — `status: draft → stable`.
+2. Сообщить оператору: «следующий шаг — `/stack-deep-dive`». Он авторит
+   `Service map` (инвентарь — из продуктовых surfaces + ответов оператора),
+   cross-cutting (Domains/Edge/Networks/Backup/Observability) и Environments.
+3. После возврата — проверить:
+   - `stack § Service map` непуст и содержит хотя бы один `hosting: here`;
+   - `stack.md status=stable` (допустимы stub-next-step'ы в Domains на
+     ещё-не-заведённые service-Routes);
+   - `make project-check A=docs/project/stack.md` зелёный.
 
 ### Выход (done)
 
-- `vision.md status=stable`.
-- `make project-check A=docs/project/vision.md` зелёный.
-- `Service map` непуст и содержит хотя бы один `hosting: here`.
+- `stack.md status=stable`, `Service map` непуст.
+- `make project-check A=docs/project/stack.md` зелёный.
 
 ### state на конец этапа
 
-- Из `## Текущий этап` удалить «1»; записать «2».
+- В `## Текущий этап` записать «3».
 - Если `Service map` содержит `hosting: external` — добавить в
   `## Cross-repo next-steps` строки «форкнуть `<repo>` для `<name>`».
+- Слить cross-repo next-steps из stack-сессии (corp-handoff для crowdsec,
+  acme через meta, otel через корп).
 
 ---
 
-## Этап 2. Hosted-сервисы → `/service-deep-dive`
+## Этап 3. Hosted-сервисы → `/service-deep-dive`
 
 ### Вход
 
-- Этап 1 done.
-- В `Service map` есть хотя бы один сервис с `hosting: here`.
+- Этап 2 done.
+- В `stack § Service map` есть хотя бы один сервис с `hosting: here`.
 
 ### Что делает
 
-1. Извлечь из `Service map` список `hosting: here` сервисов.
+1. Извлечь из `stack § Service map` список `hosting: here` сервисов.
 2. Для каждого проверить наличие `docs/project/services/<name>.md`:
    - **файла нет** → инструкция оператору: «`/service-deep-dive <name>`
      заведёт через A-режим».
@@ -76,51 +99,22 @@
    копать первым?» (опции — кандидаты).
 4. **Сам не вызывает** `/service-deep-dive` — сообщает оператору,
    ждёт возврата.
-5. После возврата (оператор пишет `/init-project`) — пересчитать
-   состояние, идти по следующему сервису.
+5. Если `stack § Domains` несли stub на service-Routes — после заведения
+   сервисов вернуть оператора в `/stack-deep-dive` финализировать
+   сабдомены.
 
 ### Выход (done)
 
 - Все `hosting: here` сервисы из карты → `status=stable`.
-- `make project-check` зелёный по `docs/project/services/`.
+- `stack.md` остаётся `stable` (Domains сверены с Routes).
+- `make project-check` зелёный по всему `docs/project/`.
 - Расхождений между картой и `services/*.md` нет (зеркало консистентно).
 
 ### state на конец этапа
 
-- Из `## Текущий этап` обновить «3».
+- В `## Текущий этап` записать «4».
 - Накопленные cross-repo next-steps от каждого `/service-deep-dive`
   (seed KV, форки) — слить в `## Cross-repo next-steps`.
-
----
-
-## Этап 3. Инфра-стек → `/stack-deep-dive`
-
-### Вход
-
-- Этап 2 done.
-
-### Что делает
-
-1. Если `docs/project/stack.md` нет:
-   ```bash
-   cp docs/project/_templates/stack.md docs/project/stack.md
-   ```
-2. Сообщить оператору: «следующий шаг — `/stack-deep-dive`».
-3. После возврата — проверить:
-   - `stack.md status=stable`;
-   - `make project-check` зелёный по всему `docs/project/`.
-
-### Выход (done)
-
-- `stack.md status=stable`.
-- `make project-check` зелёный.
-- Расхождений между stack и картой/service-doc'ами нет.
-
-### state на конец этапа
-
-- Из `## Текущий этап` обновить «4».
-- Слить cross-repo next-steps из stack-сессии (corp-handoff для
-  crowdsec, acme через meta, otel через корп).
 
 ---
 
@@ -154,7 +148,7 @@
 
 ### state на конец этапа
 
-- Из `## Текущий этап` обновить «5».
+- В `## Текущий этап` записать «5».
 
 ---
 
@@ -190,9 +184,9 @@
 
 | на этапе | признак | возврат |
 |---|---|---|
-| 2 | в карте нет сервиса, на который ссылается deep-dive | → 1 (допилить карту) |
-| 3 | stack ссылается на сабдомен сервиса, который ещё `draft` | → 2 (добить сервис) |
-| 4 | de-template обнаружил рассинхрон карты и services | → 1 или 2 |
+| 3 | в `stack § Service map` нет сервиса, на который ссылается deep-dive | → 2 (допилить карту через `/stack-deep-dive`) |
+| 3 | в карте `hosting: here` строка без service-doc | завести через `/service-deep-dive <name>` |
+| 4 | de-template обнаружил рассинхрон карты и services | → 2 или 3 |
 | 4 | de-template gate красный | → 2 или 3 (по какой артефакт красный) |
 | 5 | `make check` красный | → к источнику ошибки |
 
@@ -202,9 +196,9 @@
 
 | между | gate |
 |---|---|
-| 1 → 2 | `vision.md stable` + `make project-check A=docs/project/vision.md` зелёный + `Service map` непуст |
-| 2 → 3 | все `hosting: here` сервисы `stable` + `make project-check` зелёный по `services/` |
-| 3 → 4 | `stack.md stable` + `make project-check` зелёный по всему `docs/project/` |
+| 1 → 2 | продуктовый контекст прочитан (или next-step зафиксирован, если `<org>/docs` нет) |
+| 2 → 3 | `stack.md stable` + `make project-check A=docs/project/stack.md` зелёный + `Service map` непуст |
+| 3 → 4 | все `hosting: here` сервисы `stable` + `stack.md stable` + `make project-check` зелёный по всему `docs/project/` |
 | 4 → 5 | `make validate` зелёный + origin ≠ template + scaffolding убран |
 | финал | `make check` зелёный |
 

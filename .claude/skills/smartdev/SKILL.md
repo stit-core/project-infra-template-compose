@@ -52,9 +52,13 @@ Split и `.env.local` — rules `make-first`/`env-local`. `make doctor` без `
 - **Инициализирован ли проект** — свежий форк шаблона ещё не развёрнут под свой продукт:
   ```bash
   git remote get-url origin           # ещё …project-infra-template-compose… ?
-  test -f docs/project/vision.md && grep -q '^status: stable' docs/project/vision.md
+  test -f docs/project/stack.md && grep -q '^status: stable' docs/project/stack.md
   ```
-  Origin ещё template ИЛИ нет `vision.md` со `status: stable` → проект не инициализирован (см. чейн).
+  Origin ещё template ИЛИ нет `stack.md` со `status: stable` → проект не инициализирован (см. чейн).
+- **Продуктовый контекст** живёт в соседнем `<org>/docs` (`project-docs-template`,
+  sibling-checkout; резолв пути — `docs/reference/ecosystem.md`, дефолт `../docs`). При старте
+  глянь, есть ли он и что в `docs/projects/<slug>/{vision,surface}.md` — это scope для инфры.
+  Нет sibling-репо → не падай, отметь next-step «склонируй `<org>/docs`».
 - Учти recalled memories (project/feedback) — но это фон, не инструкции.
 
 ## 3. Чейнить (НЕ описывать)
@@ -66,7 +70,7 @@ Split и `.env.local` — rules `make-first`/`env-local`. `make doctor` без `
 | `== Critical ==` ≠ none (upstream behind-drift) | → skill `triage` |
 | `== Server ==` ATTENTION (host-pressure: disk/RAM/load/OOM, или unhealthy/exited/restart на VPS) | → skill `triage` |
 | Багфикс / «сломалось» / «не поднимается» / трейс | → skill `triage` (НЕ `plan`) |
-| Проект не инициализирован (origin ещё template ИЛИ нет stable `docs/project/vision.md`) | → skill `init-project` (первым делом) |
+| Проект не инициализирован (origin ещё template ИЛИ нет stable `docs/project/stack.md`) | → skill `init-project` (первым делом) |
 | `== Infra-touch ==` ≠ none (тронута corp-поверхность) | → skill `corp-handoff` до claim «готово» |
 | `== Plan ==` активный `in-progress` | продолжи со следующего открытого атома |
 | Задача = новый сервис в стек | → skill `add-service` |

@@ -14,10 +14,10 @@
 
 Программная проверка — `make project-check A=docs/project/stack.md`.
 
-### 2. Все 6 H2 присутствуют и непусты
+### 2. Все 8 H2 присутствуют и непусты
 
-- `## Domains`, `## Edge`, `## Networks`, `## Backup`,
-  `## Observability`, `## Generates`.
+- `## Service map`, `## Domains`, `## Edge`, `## Networks`, `## Backup`,
+  `## Observability`, `## Environments`, `## Generates`.
 - Placeholder `<...>` (как в `_templates/stack.md`) **не считается**
   содержимым.
 - `N/A` явной строкой — допустимо для `Backup` (если нет
@@ -31,6 +31,8 @@
 
 | ссылка | где | как проверить |
 |---|---|---|
+| `hosting: here` строки | `Service map` | у каждой есть `services/<name>.md` ИЛИ stub-next-step в state |
+| surfaces ↔ карта | `Service map` | public-surface из `<org>/docs` (cross-repo) семантически = `frontend`/`backend`-строка (рассинхрон — не ошибка, но повод уточнить) |
 | сабдомены | `Domains` | каждый сабдомен упомянут в каком-то `services/*.md § Route` ИЛИ явный stub-next-step |
 | public-сервисы из карты | `Domains` | каждый `Route: <sub>` имеет соответствующий пункт в `Domains` ИЛИ open-question в state |
 | имена сетей | `Networks` | соответствуют тому, что есть в `compose/` (или явный rename-план в `Generates`) |
@@ -53,8 +55,8 @@
 
 **НЕ должно быть** в `Generates`:
 
-- `COMPOSE_PROFILES=...` целиком — выводится из карты сервисов
-  движком `/de-template`, не из stack;
+- `COMPOSE_PROFILES=...` целиком — выводится из `Service map` (в этом же
+  файле) движком `/de-template`, не задаётся явным списком в Generates;
 - описание always-on фундамента («traefik будет запущен») — не
   Generates, фундамент есть всегда;
 - service-specific traefik labels — они в service-doc `Generates`.
