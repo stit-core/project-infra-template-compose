@@ -7,7 +7,7 @@ description: Сформировать `vault kv put` блок для корп-а
 
 Сформировать stdout-блок `vault kv put` для корп-админа: когда оператору нужен новый KV-объект в `kv/projects/<p>/<env>/<name>` (db, oidc, jwt, minio, backup, stripe-key, sendgrid-creds — что угодно).
 
-Skill не действует за оператора — он печатает готовую команду, которую оператор отдаёт корп-админу (out-of-band: Slack / тикет / PR в `sftbmb-infra/infra`). Засеивает корп-админ через `vault kv put` напрямую либо через `sftbmb-infra/infra/scripts/seed-project-secrets.sh` (env-like формат, идемпотентный patch). Vault-agent на проектной VPS подхватит на следующем render-цикле — на чистом дереве `make ship` без MSG триггерит force-recreate consumer'ов.
+Skill не действует за оператора — он печатает готовую команду, которую оператор отдаёт корп-админу (out-of-band: Slack / тикет / PR в `corp-infra-template`). Засеивает корп-админ через `vault kv put` напрямую либо через `corp-infra-template/scripts/seed-project-secrets.sh` (env-like формат, идемпотентный patch). Vault-agent на проектной VPS подхватит на следующем render-цикле — на чистом дереве `make ship` без MSG триггерит force-recreate consumer'ов.
 
 **Это частный случай `corp-handoff`** (seed/patch KV). Общий механизм передачи на корп-сторону (онбординг env, CrowdSec-whitelist, DNS) и железобетонное правило «тронул corp-поверхность → блок до claim готово» — skill `corp-handoff` + `.claude/rules/corp-handoff.md`. Если пришёл из `corp-handoff` с ACTION = создать/пропатчить `kv/...` — этот skill и есть твой следующий шаг.
 
@@ -22,20 +22,33 @@ Skill не действует за оператора — он печатает 
 ## Когда НЕ применять
 
 - Юзер хочет ротировать существующее поле — это `vault kv patch ... <field>=<new>` (одна строка, без скаффолда). Skill об этом упоминает в конце, но не центрит.
-- Юзер хочет seed на корп-Vault напрямую через root-token — это корп-задача, не проектная.
+- Юзер хочет seed на корп-Vault напрямую под root-привилегиями Vault — это корп-задача, не проектная.
 - Юзер хочет добавить новый сервис в стек — это `/add-service`. Этот skill активируется когда новый сервис уже добавлен и пора засеять его секрет.
 
 ## Шаги
 
 ### 1. Резолв identity
 
-Из `.env` в корне репо:
+Цепочка `.env.local → .env → AskUserQuestion`, отдельно по каждому полю. Этот skill чаще
+всего бежит **с рабочей станции** оператора, где `.env` нет вовсе (он живёт только на VPS —
+см. `.claude/rules/env-local.md`), а `.env.local` присутствует и уже хранит `PROJECT_NAME`.
+
 ```bash
-PROJECT_NAME=$(awk -F= '/^PROJECT_NAME=/{print $2; exit}' .env)
-ENV=$(awk -F= '/^ENV=/{print $2; exit}' .env)
+# 1) workstation: .env.local (gitignored). PROJECT_NAME/ENV — не секреты, grep легитимен.
+# 2) VPS / fallback: .env в корне.
+PROJECT_NAME=$(awk -F= '/^PROJECT_NAME=/{print $2; exit}' .env.local 2>/dev/null)
+[ -z "$PROJECT_NAME" ] && PROJECT_NAME=$(awk -F= '/^PROJECT_NAME=/{print $2; exit}' .env 2>/dev/null)
+ENV=$(awk -F= '/^ENV=/{print $2; exit}' .env.local 2>/dev/null)
+[ -z "$ENV" ] && ENV=$(awk -F= '/^ENV=/{print $2; exit}' .env 2>/dev/null)
 ```
 
-Если `.env` нет (запуск с laptop'а оператора в чужой проектной директории) — спроси у юзера `PROJECT_NAME` и `ENV` явно.
+`ENV` в `.env.local` — нестандартный ключ (там обычно только connection + `PROJECT_NAME`),
+так что чаще резолвится из `.env` или остаётся пустым. Любое поле, оставшееся пустым после
+обоих файлов, — спроси через `AskUserQuestion` (`PROJECT_NAME` / `ENV`), не выдумывай.
+
+Поля identity (`PROJECT_NAME`/`ENV`) — не секреты, `grep`/`awk` по ним легитимен. Сами
+**значения** секретов из `.env.local` (токены) так не вытаскивай — security-инвариант
+`env-local.md` (доступ к кредам только через tools, без эха в чат) остаётся в силе.
 
 ### 2. Определи имя KV-объекта
 
@@ -72,7 +85,7 @@ openssl rand -hex 16    # 32-char hex — S3 secret_key
 
 ```
 ================================================================================
-ОТНЕСИ ЭТО КОРП-АДМИНУ (sftbmb-infra/infra). Seed kv/projects/<p>/<env>/<name>.
+ОТНЕСИ ЭТО КОРП-АДМИНУ (corp-infra-template). Seed kv/projects/<p>/<env>/<name>.
 --------------------------------------------------------------------------------
 vault kv put kv/projects/<p>/<env>/<name> \
   field1='value1' \

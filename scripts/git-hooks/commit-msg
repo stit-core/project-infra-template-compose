@@ -3,10 +3,10 @@
 # Допустимые типы: feat, fix, refactor, docs, test, chore, meta, perf.
 # Subject ≤72 символа, scope опционален.
 
-set -e
+set -euo pipefail
 
 COMMIT_MSG_FILE="$1"
-PATTERN='^(feat|fix|refactor|docs|test|chore|meta|perf)(\([a-z0-9_/-]+\))?(!)?: .{1,72}'
+PATTERN='^(feat|fix|refactor|docs|test|chore|meta|perf)(\([a-z0-9_/-]+\))?(!)?: .{1,72}$'
 HEAD_LINE="$(head -n 1 "$COMMIT_MSG_FILE" | sed 's/[[:space:]]*$//')"
 
 case "$HEAD_LINE" in

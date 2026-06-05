@@ -40,9 +40,10 @@ processors:
 
 exporters:
   otlp_http/corp:
-    # Endpoint + TLS-mode — корп-константы (otel.sftbmb.ru). Если когда-то
-    # появятся раздельные коллекторы — переедет в meta KV-объект.
-    endpoint: https://otel.sftbmb.ru:443
+    # Upstream корп OTLP-ingest. Адрес из env OTEL_EXPORTER_OTLP_ENDPOINT
+    # (managed-дефолт otel.sftbmb.ru задаётся в compose/otel-agent.yml;
+    # self-hosted переопределяет в .env). TLS включён (insecure: false).
+    endpoint: ${env:OTEL_EXPORTER_OTLP_ENDPOINT}
     headers:
       Authorization: "Bearer ${env:OTEL_TOKEN}"
     tls:

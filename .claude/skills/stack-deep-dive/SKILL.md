@@ -200,6 +200,11 @@ stack согласуются с ним и с service-doc'ами:
   и расписание.
 - **Networks** ↔ service-doc'и: какая сеть упомянута в `Identity`
   сервисов; кастомные имена сетей (`<project>-proxy`) — здесь.
+- **Топология хостов** (single-host vs split): дефолт — single-host (всё на
+  одном VPS). Split (Postgres/MinIO на отдельных хостах, `HOST_ROLE`) спрашивается
+  в `§ Networks`, фиксируется в `state/stack.md § Host layout`; эндпоинты — в KV
+  (`db.host`, `backup.repository`), не в карте. Швы и граница (репликация/HA —
+  дело потребителя) — `references/multi-host.md`.
 - **Generates** ↔ `/de-template`: traefik dynamic routes выводятся из
   service-doc, но `DOMAIN`/acme/crowdsec-whitelist — отсюда.
 

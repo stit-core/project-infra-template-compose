@@ -12,7 +12,8 @@
 #   3. Stop backend если в стеке.
 #   4. Drop target DB.
 #   5. restic dump | gunzip | psql -d template1 → pg_dumpall script сам CREATE'ит DB + \connect + загружает данные.
-#   6. Start backend.
+#   6. Verify: целевая БД присутствует в кластере (иначе fail).
+#   7. Start backend.
 #
 # Запускать на проектном VPS из /opt/<project>-infra/. Требует backup
 # контейнер up и .runtime/secrets/postgres.env отрендеренным.
@@ -79,22 +80,35 @@ docker exec postgres psql -U "$POSTGRES_USER" -d template1 \
 
 # 3. Restore. pg_dumpall script содержит CREATE DATABASE + \connect + данные.
 #    Ошибки на existing roles (если они уже есть в cluster) — non-fatal noise.
+#    Лог — в mktemp-файл (чистится trap'ом на EXIT); на ошибке дампится в stderr,
+#    чтобы остался виден без stale-файла в /tmp.
+RESTORE_LOG=$(mktemp)
+trap 'rm -f "$RESTORE_LOG"' EXIT
 echo "→ Restore from $dumpfile (existing-role warnings — ожидаемы)..."
 docker exec backup restic dump "$target" "$dumpfile" \
   | gunzip \
   | docker exec -i postgres psql -U "$POSTGRES_USER" -d template1 \
-      >/tmp/restore-pg.log 2>&1 || {
-  echo "ERR: psql вернул non-zero. Лог: /tmp/restore-pg.log" >&2
+      >"$RESTORE_LOG" 2>&1 || {
+  echo "ERR: psql вернул non-zero. Лог рестора:" >&2
+  cat "$RESTORE_LOG" >&2
   exit 1
 }
 
-# 4. Start backend (если был остановлен).
+# 4. Авто-verify: целевая БД реально пересоздана (pg_dumpall CREATE DATABASE).
+echo "→ Verify: база $POSTGRES_DB присутствует..."
+if ! docker exec postgres psql -U "$POSTGRES_USER" -d template1 -lqt \
+     | cut -d '|' -f1 | grep -qw "$POSTGRES_DB"; then
+  echo "ERR: после restore база $POSTGRES_DB не найдена в кластере. Лог рестора:" >&2
+  cat "$RESTORE_LOG" >&2
+  exit 1
+fi
+
+# 5. Start backend (если был остановлен).
 if [ "$STARTED_BACKEND" -eq 1 ]; then
   echo "→ Start backend..."
   docker start backend >/dev/null
 fi
 
 echo
-echo "✓ Restore done."
-echo "  Verify: docker exec postgres psql -U $POSTGRES_USER -d $POSTGRES_DB -c '\\dt'"
-echo "  Log:    /tmp/restore-pg.log"
+echo "✓ Restore done и проверено: база $POSTGRES_DB пересоздана."
+echo "  Verify данных: docker exec postgres psql -U $POSTGRES_USER -d $POSTGRES_DB -c '\\dt'"

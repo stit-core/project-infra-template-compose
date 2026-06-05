@@ -110,6 +110,8 @@ services:
 
 3. Запросить seed KV-объекта через skill `/request-secret` — оно сформирует stdout-блок `vault kv put kv/projects/<p>/<env>/<svc> field=...` для корп-админа. Без seed'а vault-agent залипнет в retry-loop'е на этом template (preflight также warning'нёт).
 
+> **Corp-handoff.** Правка `configs/vault-agent/` (новый `.tpl` или блок в `agent.hcl.parts/`) — это corp-поверхность: оформи `/corp-handoff`-блок **до** claim «готово» (`make status → == Infra-touch ==` это ловит). Seed конкретного KV — частный случай handoff'а, его уже покрыл `/request-secret` выше; corp-handoff нужен ещё и когда меняется набор профилей или egress-IP под CrowdSec-whitelist.
+
 4. В compose добавь `profiles:` (если сервис opt-in), `env_file`, `depends_on`:
    ```yaml
    profiles: [<profile>]
@@ -165,6 +167,7 @@ services:
 - [ ] Если читает секреты — `env_file` на `.runtime/secrets/<svc>.env` + `depends_on: vault-agent: service_healthy` + `<svc>.env.tpl` + блок в `agent.hcl.parts/<profile>.hcl` + seed KV-объекта через `/request-secret`
 - [ ] Все `${VAR}` (bootstrap) есть в `.env.example`
 - [ ] Если новый Postgres — добавлен ещё один `pg_dumpall` блок в `containers/backup/backup-now` (с другим `-h` host'ом и `--stdin-filename`)
+- [ ] Если тронут `configs/vault-agent/` или добавлен/изменён профиль — оформлен `/corp-handoff`-блок **до** claim «готово»
 - [ ] `make validate` зелёный
 - [ ] (Если требует Vault KV seed) — указано оператору, что нужно сделать на корп-стороне
 - [ ] (Если bespoke-сигнал вне `docker ps`) — `scripts/tools/smoke.d/90-<svc>.sh` для `== Server ==`

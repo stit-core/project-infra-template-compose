@@ -14,7 +14,7 @@
 ## Reference (переезжает в проект)
 - [reference/architecture.md](reference/architecture.md) — слои, сети, профили, поток секретов,
   deploy-флоу, что НЕ в шаблоне.
-- [reference/ecosystem.md](reference/ecosystem.md) — роль проектной VPS среди 4 репо, контракты
+- [reference/ecosystem.md](reference/ecosystem.md) — роль проектной VPS среди репо экосистемы, контракты
   с корпом, указатель на канон.
 - [reference/runbook.md](reference/runbook.md) — failure modes на проектном VPS, recovery, DR-drill.
 

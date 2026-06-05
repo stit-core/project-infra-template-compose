@@ -117,7 +117,7 @@ oбa под `*.acme.dev`, public только backend и minio Console»).
    - **environments** → `.claude/rules/multi-env.md` (один VPS = один ENV).
    - **edge** → `compose/traefik.yml`, `compose/crowdsec.yml`,
      `configs/crowdsec/acquis.yaml` (живой образец; whitelist egress-IP —
-     corp-side в `sftbmb-infra/infra`, не в этом репо).
+     corp-side в `corp-infra-template`, не в этом репо).
    - **networks** → `docker-compose.yml` + `compose/*.yml` (какие сети
      реально есть).
    - **backup** → `compose/backup.yml` (если уже есть),

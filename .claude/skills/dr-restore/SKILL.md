@@ -65,7 +65,12 @@ docker exec backup restic snapshots --compact   # покажи юзеру, сп�
 make restore-pg SNAPSHOT=latest                  # либо SNAPSHOT=<id>
 ```
 
-Что скрипт делает (на каждый destructive — y/N):
+**Gate перед запуском.** `make restore-pg` останавливает backend и делает `DROP DATABASE` —
+это destructive. Перед вызовом задай `AskUserQuestion` («Запустить restore postgres из
+snapshot `<id>`? Это остановит backend и пересоздаст БД `$POSTGRES_DB`») с вариантами
+`Запустить` / `Сначала restic check` / `Отмена`. Без явного выбора `Запустить` — не вызывай.
+
+Что скрипт делает (внутри также переспрашивает y/N на каждый destructive):
 1. Resolve dump-файла в snapshot'е (`/pgdump-<UTC>.sql.gz`).
 2. Stop backend.
 3. `DROP DATABASE $POSTGRES_DB`.
@@ -90,7 +95,10 @@ make restore-pg SNAPSHOT=latest                  # либо SNAPSHOT=<id>
 1. Provision нового VPS.
 2. Skill `bootstrap-vps` (ansible-playbook + регистрация deploy-key) — поднимет Docker, склонирует репо.
 3. На новом хосте: `make new-env` — те же AppRole creds для `(project, env)` (scope'ятся к паре, не к хосту). `RESTIC_REPOSITORY` рендерится из Vault, повторно ничего не вводить.
-4. DNS cutover на новый IP.
+4. DNS cutover на новый IP. **Gate:** перед перепиской DNS-записи задай `AskUserQuestion`
+   («Переключить DNS `<domain>` на новый IP `<new-ip>`? Старый хост перестанет принимать
+   трафик») с вариантами `Переключить` / `Подождать прогрев стека` / `Отмена`. Cutover
+   до готовности стека на новом хосте уронит прод.
 5. `make ship` — стек поднимается, vault-agent рендерит секреты.
 6. Сценарий A выше — для postgres.
 7. Volume'ы (minio-data, app-uploads) — не покрыты backup'ом; восстанавливаются из external source / re-uploads / off-site mirror если настроен.
@@ -109,7 +117,10 @@ make restore-pg SNAPSHOT=latest                  # либо SNAPSHOT=<id>
 
 ## Guard'рейлы
 
-- **Каждый destructive шаг — явный OK у пользователя.** Не один общий OK на всё.
+- **Каждый destructive шаг — отдельный `AskUserQuestion`, не plain-чат и не один общий OK на всё.**
+  Destructive — это: stop backend, `DROP DATABASE`, остановка стека (`compose stop`/`down`),
+  DNS cutover, перезалив volume. Перед каждым — `AskUserQuestion` с явным описанием последствия
+  и вариантом `Отмена`. Нет ответа `Запустить`/`Переключить` — шаг не выполняется.
 - **Не делай drop database без двойной проверки** что снапшот загружен и читается.
 - **Backup creds + repository endpoint** живут в Vault (`kv/data/projects/<p>/<env>/{backup,minio}`), vault-agent рендерит в `.runtime/secrets/backup.env`. Если хост потерян целиком — пересоздаёшь `.env` с теми же AppRole для `(project, env)`, vault-agent рендерит секреты автоматически.
 - **Restic check** перед критичным restore — `restic check --read-data` (медленно, но валидирует данные).
@@ -121,3 +132,9 @@ Local-default `s3:http://minio:9000/backups` отсутствует by design �
 Для prod — `repository` в `kv/projects/<p>/<env>/backup` должен указывать на external endpoint. От local minio защищает только дисциплина корп-админа при seed'е этого KV-объекта.
 
 См. `docs/reference/runbook.md` → «Полная замена VPS» при сохранившемся репо и «Quarterly DR drill» для регулярной проверки что backup восстанавливается.
+
+## Следующий шаг
+
+- Restore прошёл, healthchecks зелёные → `/smartdev` (вернуться в cockpit) и залогировать инцидент в `docs/incidents/` (шаг 4 выше).
+- Restore не сходится (snapshot не читается, `restic check` падает, репо потерян) → `/triage` с собранным выводом `restic snapshots` / логами; разобрать корневую причину, не замазывать.
+- Тронул corp-поверхность по ходу DR (новый egress-IP под CrowdSec-whitelist, новый сабдомен, re-seed KV) → `/corp-handoff` до claim «готово».

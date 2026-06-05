@@ -5,8 +5,11 @@ services:
     restart: unless-stopped
     command: ["--config=/etc/otel/config.yaml"]
     # Bearer-token + OTEL_TENANT приходят из .runtime/secrets/otel.env —
-    # always-on vault-agent template (профильно-независимый). OTEL endpoint
-    # hardcoded в configs/otel-agent/config.yaml — корп-константа.
+    # always-on vault-agent template (профильно-независимый). Upstream-эндпоинт
+    # (agent → корп) — OTEL_EXPORTER_OTLP_ENDPOINT: managed-дефолт otel.sftbmb.ru,
+    # self-hosted задаёт свой в .env. config.yaml читает его как ${env:...}.
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-https://otel.sftbmb.ru:443}
     env_file:
       - .runtime/secrets/otel.env
     volumes:

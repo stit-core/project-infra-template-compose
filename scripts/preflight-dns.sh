@@ -19,9 +19,14 @@ cd "$(dirname "$0")/.."
 VPS_IP=$(curl -fsS --max-time 5 https://api.ipify.org 2>/dev/null \
          || hostname -I | awk '{print $1}')
 
-# Хосты, которые ждут LE-cert. Корневой — для smoketest-роутера;
-# s3/minio — для minio (s3 API + console); api — для backend (когда появится).
-hosts=("$DOMAIN" "s3.$DOMAIN" "minio.$DOMAIN" "api.$DOMAIN")
+# Хосты, которые ждут LE-cert. Корневой `$DOMAIN` — всегда (landing always-on).
+# Сабдомены — только под активные профили: s3/minio под `storage`, api под
+# `backend`. Иначе минимальный seed (без этих профилей) даёт ложный DNS-WARN на
+# ещё не маршрутизируемые хосты — их роутеры/cert'ы поднимутся только с профилем.
+hosts=("$DOMAIN")
+profiles=",${COMPOSE_PROFILES:-},"
+case "$profiles" in *,storage,*) hosts+=("s3.$DOMAIN" "minio.$DOMAIN") ;; esac
+case "$profiles" in *,backend,*) hosts+=("api.$DOMAIN") ;; esac
 
 # dig может отсутствовать на голой Debian — берём то что есть.
 resolve() {

@@ -17,6 +17,23 @@ docker info >/dev/null 2>&1 || { echo "ERR: docker not reachable" >&2; exit 1; }
 grep -qE '^PROJECT_NAME=.+' .env || { echo "ERR: PROJECT_NAME пустой в .env" >&2; exit 1; }
 grep -qE '^ENV=.+'          .env || { echo "ERR: ENV пустой в .env (dev/prod/...)" >&2; exit 1; }
 
+# MULTI-HOST: роль ЭТОГО хоста (.env). all = single-host (весь стек, дефолт).
+# Split — отдельный VPS на роль (один VPS = одна среда → несколько VPS на env);
+# project name = имя директории (хосты физически разные, коллизий томов нет).
+# Карта роль → compose-файлы; vault-agent в каждой роли (рендерит секреты).
+# Граница (cross-host сеть / репликация / HA — дело потребителя) и эндпоинты в KV —
+# docs/reference/architecture.md § Multi-host split.
+HOST_ROLE=$(sed -nE 's/^HOST_ROLE=//p' .env | tail -1)
+HOST_ROLE="${HOST_ROLE:-all}"
+declare -A ROLE_FILES=(
+  [all]="docker-compose.yml compose/*.yml"
+  [edge]="docker-compose.yml compose/traefik.yml compose/crowdsec.yml compose/vault-agent.yml compose/otel-agent.yml compose/node-exporter.yml compose/cadvisor.yml compose/landing.yml compose/backend.yml"
+  [db]="docker-compose.yml compose/vault-agent.yml compose/postgres.yml"
+  [storage]="docker-compose.yml compose/vault-agent.yml compose/minio.yml compose/backup.yml"
+)
+sel="${ROLE_FILES[$HOST_ROLE]:-}"
+[ -n "$sel" ] || { echo "ERR: unknown HOST_ROLE=$HOST_ROLE (all|edge|db|storage)" >&2; exit 1; }
+
 prev_sha=$(git rev-parse HEAD 2>/dev/null || echo "none")
 git pull --ff-only origin main || true
 new_sha=$(git rev-parse HEAD 2>/dev/null || echo "none")
@@ -39,17 +56,21 @@ chmod 0700 .runtime/secrets .runtime/secrets-bootstrap
 
 # Lazy-stack validation: storage профиль требует одновременной активации
 # postgres (backup-контейнер делает pg_dumpall, без postgres он сразу падает
-# и vault-agent залипает на kv/.../db).
-case ",${COMPOSE_PROFILES:-}," in
-  *,storage,*)
-    case ",${COMPOSE_PROFILES:-}," in
-      *,postgres,*) ;;
-      *)
-        echo "ERR: COMPOSE_PROFILES=storage требует одновременной активации postgres (backup делает pg_dumpall)." >&2
-        echo "     Правка .env: COMPOSE_PROFILES=postgres,storage[,backend]" >&2
-        exit 1 ;;
-    esac ;;
-esac
+# и vault-agent залипает на kv/.../db). Только single-host: при split postgres
+# на db-хосте, backup на storage-хосте делает pg_dumpall по сети (db.host из KV) —
+# co-location не требуется (cross-host доступ — дело потребителя).
+if [ "$HOST_ROLE" = all ]; then
+  case ",${COMPOSE_PROFILES:-}," in
+    *,storage,*)
+      case ",${COMPOSE_PROFILES:-}," in
+        *,postgres,*) ;;
+        *)
+          echo "ERR: COMPOSE_PROFILES=storage требует одновременной активации postgres (backup делает pg_dumpall)." >&2
+          echo "     Правка .env: COMPOSE_PROFILES=postgres,storage[,backend]" >&2
+          exit 1 ;;
+      esac ;;
+  esac
+fi
 
 # Touch пустых заглушек: compose валидирует EXISTENCE bind-mount'ов и env_file
 # до старта любого сервиса. На свежем bootstrap'е vault-agent ещё не отрендерил
@@ -68,10 +89,11 @@ done
   chmod +x .runtime/configs/vault-health.sh
 }
 
-args=(-f docker-compose.yml)
-for f in compose/*.yml; do
-  args+=(-f "$f")
-done
+# Compose-файлы по роли (sel из ROLE_FILES). all → docker-compose.yml + все
+# compose/*.yml (single-host, прежний набор). Намеренный word-split + glob.
+# shellcheck disable=SC2086
+args=()
+for f in $sel; do args+=(-f "$f"); done
 
 # Two-stage: vault-agent первым, чтобы он отрендерил .runtime/secrets/*.env
 # через consul-template ДО того, как docker создаст consumer-контейнеры.
@@ -87,14 +109,20 @@ docker compose "${args[@]}" up -d --wait --wait-timeout 60 vault-agent
 # роуте — плагин валидирует ключ при загрузке роута, file-watcher на
 # middlewares.yml не подхватит уже-сломанный плагин без recreate.
 # Идемпотентно: после первого прогона .env уже с ключом, блок ниже skip'ает.
-echo "→ crowdsec early (для bouncer auto-register)"
-docker compose "${args[@]}" up -d --wait --wait-timeout 60 crowdsec
+# MULTI-HOST: crowdsec/traefik — роли edge (и all). На db/storage-хостах их нет,
+# bouncer-bootstrap пропускаем (нет crowdsec-контейнера для cscli).
+crowdsec_here=0
+case "$HOST_ROLE" in all|edge) crowdsec_here=1 ;; esac
+if [ "$crowdsec_here" = 1 ]; then
+  echo "→ crowdsec early (для bouncer auto-register)"
+  docker compose "${args[@]}" up -d --wait --wait-timeout 60 crowdsec
+fi
 
 # CrowdSec bouncer auto-register. Если в .env ключ пустой — генерим сейчас,
 # ДО старта traefik (см. комментарий выше про порядок) и ДО полного --wait:
 # при set -euo pipefail partial failure в --wait (например minio-init exit 1)
 # прервал бы скрипт, не дойдя до регистрации bouncer'а.
-if grep -qE '^CROWDSEC_BOUNCER_API_KEY=$' .env; then
+if [ "$crowdsec_here" = 1 ] && grep -qE '^CROWDSEC_BOUNCER_API_KEY=$' .env; then
   echo "→ auto-registering CrowdSec bouncer (traefik)"
   if key=$(docker exec crowdsec cscli bouncers add traefik -o raw 2>/dev/null); then
     [ -n "$key" ] && {
@@ -157,17 +185,17 @@ if [ "$template_changed" -eq 1 ] || [ "$profile_changed" -eq 1 ] || [ "$composee
   for f in .runtime/secrets/*.env; do [ -e "$f" ] && : > "$f"; done
   docker compose "${args[@]}" restart vault-agent
   docker compose "${args[@]}" up -d --wait --wait-timeout 60 vault-agent
-  consumers=$(docker compose "${args[@]}" config 2>/dev/null \
+  mapfile -t consumers < <(docker compose "${args[@]}" config 2>/dev/null \
     | awk '/^  [a-z][a-z0-9_-]*:$/ {svc=$1; sub(":$","",svc)} /\.runtime\/secrets\/.*\.env/ {print svc}' \
     | sort -u)
-  if [ -n "$consumers" ]; then
+  if [ ${#consumers[@]} -gt 0 ]; then
     # Явный pull ДО force-recreate: новый image-тег (из compose.env) может
     # физически отсутствовать на хосте. Без этого pull policy=missing молча
     # оставляет старый контейнер на прежнем теге. Fail виден (RED), не тихий
     # застой. Pinned third-party теги (postgres/minio) — pull = no-op.
-    docker compose "${args[@]}" pull --quiet $consumers \
-      || { echo "ERR: docker compose pull failed for: $consumers" >&2; exit 1; }
-    docker compose "${args[@]}" up -d --no-deps --force-recreate $consumers
+    docker compose "${args[@]}" pull --quiet "${consumers[@]}" \
+      || { echo "ERR: docker compose pull failed for: ${consumers[*]}" >&2; exit 1; }
+    docker compose "${args[@]}" up -d --no-deps --force-recreate "${consumers[@]}"
   fi
 fi
 # Зафиксировать текущий profile-набор как baseline для следующего deploy.
@@ -184,19 +212,20 @@ if [ "$prev_sha" != "$new_sha" ] && [ "$prev_sha" != "none" ]; then
     [postgres]="postgres"
     [otel-agent]="otel-agent"
   )
-  changed_dirs=$(git diff --name-only "$prev_sha" "$new_sha" -- configs/ \
+  mapfile -t changed_dirs < <(git diff --name-only "$prev_sha" "$new_sha" -- configs/ \
     | awk -F/ 'NF>=2 {print $2}' | sort -u)
   to_restart=()
-  for d in $changed_dirs; do
+  for d in "${changed_dirs[@]}"; do
     [ "$d" = "vault-agent" ] && continue   # уже обработали выше
-    for s in ${configmap[$d]:-}; do to_restart+=("$s"); done
+    svc="${configmap[$d]:-}"
+    [ -n "$svc" ] && to_restart+=("$svc")
   done
   if [ ${#to_restart[@]} -gt 0 ]; then
     existing=$(docker compose "${args[@]}" ps --services 2>/dev/null || true)
-    final=$(printf '%s\n' "${to_restart[@]}" | sort -u | grep -Fxf <(echo "$existing") || true)
-    if [ -n "$final" ]; then
-      echo "Restarting services with changed configs: $(echo $final)"
-      docker compose "${args[@]}" restart $final
+    mapfile -t final < <(printf '%s\n' "${to_restart[@]}" | sort -u | grep -Fxf <(echo "$existing") || true)
+    if [ ${#final[@]} -gt 0 ]; then
+      echo "Restarting services with changed configs: ${final[*]}"
+      docker compose "${args[@]}" restart "${final[@]}"
     fi
   fi
 fi

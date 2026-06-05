@@ -1,8 +1,16 @@
 ---
+# Docker apt-репо зависит от дистрибутива и архитектуры хоста — выводим из
+# фактов, чтобы роль работала на debian/ubuntu и amd64/arm64, а не только
+# debian/amd64.
+- name: Resolve Docker apt repo distro + arch
+  ansible.builtin.set_fact:
+    docker_distro: "{{ ansible_distribution | lower }}"
+    docker_arch: "{{ {'x86_64': 'amd64', 'aarch64': 'arm64', 'armv7l': 'armhf'}[ansible_architecture] | default('amd64') }}"
+
 - name: Add Docker apt key
   ansible.builtin.shell: |
     install -m 0755 -d /etc/apt/keyrings
-    curl -fsSL https://download.docker.com/linux/debian/gpg \
+    curl -fsSL https://download.docker.com/linux/{{ docker_distro }}/gpg \
       | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
     chmod a+r /etc/apt/keyrings/docker.gpg
   args:
@@ -12,7 +20,7 @@
   ansible.builtin.copy:
     dest: /etc/apt/sources.list.d/docker.list
     content: |
-      deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian {{ ansible_distribution_release }} stable
+      deb [arch={{ docker_arch }} signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/{{ docker_distro }} {{ ansible_distribution_release }} stable
     mode: "0644"
   register: docker_repo
 

@@ -9,7 +9,7 @@ Edge (Traefik v3 + CrowdSec) · Postgres · Minio · backend · vault-agent · o
 ## Экосистема
 
 ```
-sftbmb-infra/infra            corp control plane — Vault · otel.sftbmb.ru · git.sftbmb.ru
+corp-infra-template          corp control plane — Vault · otel.sftbmb.ru · git.sftbmb.ru
       │  onboard-project.sh → AppRole projects-<p>-<env> + KV seed
       ▼
 project-infra-template-compose   ← вы здесь   (форк → <client-org>/infra, один VPS на env)
@@ -18,7 +18,7 @@ project-infra-template-compose   ← вы здесь   (форк → <client-org
 <client-org>/backend          форк go-backend-template ──► sftbmb-core/golibinfra
 ```
 
-Канон контрактов — [`sftbmb-infra/infra/docs/ecosystem.md`](https://git.sftbmb.ru/sftbmb-infra/infra/src/branch/main/docs/ecosystem.md).
+Канон контрактов — [`corp-infra-template/docs/ecosystem.md`](https://git.sftbmb.ru/sftbmb-core/corp-infra-template/src/branch/main/docs/ecosystem.md).
 
 ## Два пути: managed или self-hosted
 
@@ -54,7 +54,7 @@ Always-on поднимается на минимальном seed'е (`meta` + `
 Полный путь (corp Day-0 → bootstrap VPS → активация профилей → `/init-project` → своя инфра) —
 **[`docs/getting-started.md`](docs/getting-started.md)**. Коротко, три шага:
 
-**1. Корп-онбординг** (один раз на env, на `sftbmb-infra/infra`):
+**1. Корп-онбординг** (один раз на env, на корп control-plane `corp-infra-template`):
 ```bash
 VAULT_TOKEN=<root> bash scripts/onboard-project.sh --name acme --envs dev,prod
 ```

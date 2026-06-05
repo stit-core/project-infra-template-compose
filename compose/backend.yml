@@ -1,6 +1,6 @@
 services:
   backend:
-    image: git.sftbmb.ru/${PROJECT_NAME}/backend:${BACKEND_TAG}
+    image: ${REGISTRY_HOST:-git.sftbmb.ru}/${PROJECT_NAME}/backend:${BACKEND_TAG}
     container_name: backend
     restart: unless-stopped
     # Opt-in: COMPOSE_PROFILES=backend. Без опубликованного image'а в

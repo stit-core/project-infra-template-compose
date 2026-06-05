@@ -40,7 +40,7 @@ authoring-проверок без `.env`/docker — норма, не паден�
 
 **Роль:** шаблон проектной VPS. Один форк (`<client-org>/infra`) — один проект, один VPS на
 env (dev/staging/prod).
-**Зависит от:** `sftbmb-infra/infra` — выдаёт AppRole `projects-<p>-<env>` + KV
+**Зависит от:** `corp-infra-template` — выдаёт AppRole `projects-<p>-<env>` + KV
 `kv/projects/<p>/<env>/*` (через `onboard-project.sh`), принимает OTLP на `otel.sftbmb.ru`,
 хостит registry `git.sftbmb.ru`.
 **Обслуживает:** `<client-org>/backend` (форк `go-backend-template`) — runtime для его образа;
@@ -48,7 +48,7 @@ deploy через `vault kv patch kv/projects/<p>/<env>/meta backend_tag=<tag>` 
 **Читает:** `<client-org>/docs` (форк `project-docs-template`) — продуктовый контекст (vision,
 surfaces); sibling-checkout рядом с этим репо, read-only. Резолв пути — `docs/reference/ecosystem.md`.
 
-Карта репо и канонические контракты — `sftbmb-infra/infra/docs/ecosystem.md`.
+Карта репо и канонические контракты — `corp-infra-template/docs/ecosystem.md`.
 
 ## Стек
 
@@ -100,14 +100,14 @@ seed'а соответствующих KV. Сети: `proxy` (наружу), `ba
 | Корп-handoff (когда тронул corp-поверхность) | `.claude/rules/corp-handoff.md` + skill `/corp-handoff` |
 | Онбординг / путь потребителя | `docs/getting-started.md` |
 | Runbook / инциденты | `docs/reference/runbook.md` |
-| Экосистема репо, контракты | `docs/reference/ecosystem.md` (→ канон `sftbmb-infra/infra/docs/ecosystem.md`) |
+| Экосистема репо, контракты | `docs/reference/ecosystem.md` (→ канон `corp-infra-template/docs/ecosystem.md`) |
 
 ## Корп-контракт
 
 Проект должен быть онбоарден на корп-стороне для каждой среды (один VPS = одна среда):
 
 ```bash
-# sftbmb-infra/infra (корп-VPS), оператор с root-токеном Vault.
+# corp-infra-template (корп-VPS), оператор с root-токеном Vault.
 VAULT_TOKEN=<root> bash scripts/onboard-project.sh --name <p> --envs dev,prod
 ```
 
@@ -148,7 +148,7 @@ out-of-band. AppRole строго read-only на свой `<p>/<env>`. Подр�
 - **Изменение — через план** (planning-first; skill `/plan`). Отклонение — осознанное, проговаривается.
 - Тронул corp-поверхность (`configs/vault-agent/`, `compose/*.yml` профили, `.env.example`,
   `ansible/`) или изменение требует CrowdSec-whitelist'а egress-IP корп-side (файл живёт в
-  `sftbmb-infra/infra`, не здесь) — оформи **CORP-HANDOFF**-блок до claim «готово»
+  `corp-infra-template`, не здесь) — оформи **CORP-HANDOFF**-блок до claim «готово»
   (skill `/corp-handoff`; `make status → == Infra-touch ==` это ловит).
 - Любая новая `${VAR}` в compose/configs — в `.env.example` сразу.
 - Bumps версий образов — отдельным коммитом после явного OK.

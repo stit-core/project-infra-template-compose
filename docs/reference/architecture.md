@@ -1,6 +1,6 @@
 # Architecture
 
-Single-VPS docker-compose стек одного проекта. Все сервисы — контейнеры на одной машине, сетевая изоляция через docker networks.
+Single-VPS docker-compose стек одного проекта (дефолт). Все сервисы — контейнеры на одной машине, сетевая изоляция через docker networks. Опционально Postgres / MinIO / edge разносятся по 3-4 хостам — см. «Multi-host split (opt-in)»; single-host не меняется, пока split не выбран явно.
 
 ## Слои
 
@@ -68,7 +68,7 @@ Single-VPS docker-compose стек одного проекта. Все серв�
 
 Backup может писать в любой restic-совместимый endpoint (`RESTIC_REPOSITORY` в Vault `kv/projects/<p>/<env>/backup.repository`). Local-default отсутствует by design — на single-VPS он не даёт DR, host failure уносит и репо. Рекомендация: external managed S3 / corp Minio / bare-IP S3 на другом хосте. App-uploads bucket (`minio-data`) — **не** покрыт backup'ом; если нужен — настрой `mc mirror` job в external storage отдельно.
 
-Per-env AppRole + KV-scope (`kv/data/projects/<p>/<env>/*`) выдаёт `sftbmb-infra/infra/scripts/onboard-project.sh --name <p> --envs dev,prod [--source-ip <env>=<ip>]`. Один VPS = одна среда. Подробно — `.claude/rules/multi-env.md`. Общая карта контрактов между 4 репо — `sftbmb-infra/infra/docs/ecosystem.md`.
+Per-env AppRole + KV-scope (`kv/data/projects/<p>/<env>/*`) выдаёт `corp-infra-template/scripts/onboard-project.sh --name <p> --envs dev,prod [--source-ip <env>=<ip>]`. Один VPS = одна среда. Подробно — `.claude/rules/multi-env.md`. Общая карта контрактов между репо экосистемы — `corp-infra-template/docs/ecosystem.md`.
 
 ## Поток секретов
 
@@ -123,6 +123,46 @@ laptop оператора                          VPS
 Каждый смок-чек read-only и self-`exit 0`; проблема — строкой `ATTENTION:` в колонке 0 (её ловит
 smartdev → чейн в `triage`). Смок расширяется добавлением файла в `smoke.d/` — растёт вместе с инфрой
 (skill `add-service`).
+
+## Multi-host split (opt-in)
+
+Дефолт — single-host (`HOST_ROLE=all`, весь стек на одном VPS). **Split** — opt-in:
+Postgres / MinIO+backup / edge+app на отдельных VPS (несколько серверов на одну
+среду). Шаблон даёт **только швы**; cross-host сеть, TLS между хостами,
+репликация/HA — **дело потребителя** (граница ниже). Включается без изменения
+дефолта.
+
+**Швы:**
+
+- **Эндпоинты бэкендов — в Vault KV** (не в compose): Postgres `host`/`port` —
+  опц. поля `kv/.../db` (vault-agent рендерит `PG_DSN`; дефолт `postgres:5432`);
+  restic — `kv/.../backup.repository`; OTLP-коллектор — `OTEL_EXPORTER_OTLP_ENDPOINT`
+  в `.env`. При split наводятся на целевые хосты, compose не трогается.
+- **Таргетинг compose по ролям** (`HOST_ROLE` в `.env`, карта в `scripts/deploy.sh`):
+
+  | Роль | сервисы | профиль |
+  |---|---|---|
+  | `all` | весь стек (single-host, дефолт) | как в `.env` |
+  | `edge` | traefik, crowdsec, vault-agent, otel-agent, node-exporter, cadvisor, landing, backend | `backend` |
+  | `db` | postgres (+ vault-agent) | `postgres` |
+  | `storage` | minio, backup (+ vault-agent) | `storage` |
+
+  `vault-agent` — на каждом хосте (рендерит секреты из KV). Project name = имя
+  директории; split-хосты — физически разные VPS, коллизий томов нет.
+- **Per-host backup**: при split backup (роль `storage`) делает `pg_dumpall` к
+  Postgres на db-хосте по сети; co-location-проверка `storage⇒postgres` активна
+  только при `HOST_ROLE=all`.
+
+Раскладку `host → services` ведёт `/stack-deep-dive` (`§ Networks` → single-host vs
+split), фиксирует в `state/stack.md § Host layout`. Полная карта швов —
+`.claude/skills/stack-deep-dive/references/multi-host.md`.
+
+**Граница (дело потребителя, не шаблона):** docker service-name DNS работает только
+внутри одного хоста — при split backend (edge) ходит в Postgres (db) и MinIO
+(storage) по адресам из KV, нужна private LAN / wireguard / overlay между VPS;
+TLS/шифрование cross-host трафика; репликация / HA / failover; на каждом VPS свой
+vault-agent с той же AppRole-парой (оператор раскладывает `.env` per-host). Это
+present-state policy: split-шаблон останавливается на швах, не навязывая HA-топологию.
 
 ## Что НЕ в шаблоне (overlay-services)
 

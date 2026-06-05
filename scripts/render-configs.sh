@@ -23,6 +23,10 @@ set -a
 . ./.env
 set +a
 
+# Managed-дефолт адреса корп Vault для envsubst head.hcl (self-hosted задаёт
+# свой VAULT_ADDR в .env). Только эта переменная подставляется в agent.hcl.
+export VAULT_ADDR="${VAULT_ADDR:-https://vault.sftbmb.ru}"
+
 # ───── 1. envsubst для не-vault .tpl ─────
 while IFS= read -r tpl; do
   out="${tpl%.tpl}"
@@ -46,7 +50,9 @@ for p in "${_p_arr[@]}"; do
 done
 
 {
-  cat "$parts/head.hcl"
+  # Только ${VAULT_ADDR} подставляется (allow-list), чтобы не задеть прочие
+  # `$`-литералы в HCL; остальные parts копируются как есть.
+  envsubst '${VAULT_ADDR}' < "$parts/head.hcl"
   for p in "${active_profiles[@]}"; do
     block="$parts/$p.hcl"
     [ -f "$block" ] || continue

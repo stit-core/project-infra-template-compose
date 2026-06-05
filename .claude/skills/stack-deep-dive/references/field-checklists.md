@@ -25,6 +25,9 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
 - `hosting` — `here` (контейнер в этом репо) / `external` (свой репо/CDN).
 - `repo / source` — откуда (`<org>/backend`, «postgres в этом репо», CDN).
 - `назначение` — одна фраза.
+- `host` — **опционально, только при multi-host split**: на каком хосте живёт
+  `hosting: here` строка (`HOST_ROLE`-роль `edge`/`db`/`storage`). Single-host
+  (дефолт) — поле опускается (всё на одном VPS). См. `references/multi-host.md`.
 
 Карта — **драйвер `COMPOSE_PROFILES`** (`/de-template` выводит профили из
 неё: datastore→postgres/storage, backend→backend). Сверяется с
@@ -164,12 +167,20 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
 - Кто в какой сети — перечислить по subtype (`backend` → обе,
   `datastore postgres` → `backend-net`, `datastore minio` → обе для
   Console, инфра → `proxy`).
+- **Топология хостов** (single-host vs split): Postgres / MinIO co-located на
+  одном VPS (дефолт) или вынесены на отдельные хосты (`HOST_ROLE` db/storage).
+  При split docker service-name DNS между хостами не работает — backend
+  достаёт PG через `db.host`/`db.port` из KV (vault-agent рендерит PG_DSN),
+  restic — через `backup.repository` из KV; cross-host сеть/TLS — дело
+  потребителя. См. `references/multi-host.md`.
 
 **Опции опрашиваются как**:
 
 - Дефолтные/кастомные имена: 2 опции «дефолт `proxy`/`backend-net`» /
   «кастом» (Other → имена).
 - Сетевая раскладка: enum по subtype (`backend`, `datastore`, и т.д.).
+- Топология: 2 опции «single-host (co-located, дефолт)» / «split (postgres/
+  minio на отдельных хостах)». При split — `host` в Service map + KV host/port.
 
 **Что НЕ**:
 
@@ -199,9 +210,12 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
 **Что фиксируем**:
 
 - Backup-движок: restic (дефолт шаблона) / pgBackRest / `N/A`.
-- `RESTIC_REPOSITORY` URI (например, `s3:https://restic.<corp>/<project>/<env>`).
+- `RESTIC_REPOSITORY` URI (через KV `backup.repository`). Restic endpoint:
+  managed S3 (дефолт) или **MinIO на отдельном хосте** при split (`HOST_ROLE`
+  storage) — URI наводится на storage-хост. См. `references/multi-host.md`.
 - Что бэкапится: pg_dumpall (всегда при postgres), volume'ы (minio data,
-  vault rendered configs, etc.).
+  vault rendered configs, etc.). При split backup делает pg_dumpall к PG на
+  db-хосте по сети — cross-host доступ обеспечивает потребитель.
 - Расписание crond (`0 3 * * *` — 03:00 daily).
 - Retention: `keep-daily 7 keep-weekly 4 keep-monthly 6` или другое.
 - `N/A` если в карте нет datastore и нет важных volume'ов.
@@ -243,7 +257,10 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
 
 **Что фиксируем**:
 
-- otel-agent → endpoint (`otel.sftbmb.ru` — корп; редко project-specific).
+- otel-agent → endpoint (поле `OTEL_EXPORTER_OTLP_ENDPOINT`): корп-default
+  (managed `otel.sftbmb.ru:443`) или свой коллектор (self-hosted форк
+  corp-infra-template / project-specific). Managed-дефолт в `.env.example`/
+  compose, self-hosted переопределяет в `.env`. См. `references/multi-host.md`.
 - Resource attributes: `service.namespace=<project>` / `deployment.env`
   / `host.name`.
 - KV otel: token + accountID (через `kv/.../otel`, корп-онбординг).

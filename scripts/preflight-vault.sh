@@ -22,9 +22,10 @@ cd "$(dirname "$0")/.."
 : "${PROJECT_NAME:?PROJECT_NAME обязателен}"
 : "${ENV:?ENV обязателен (multi-env: dev/prod/...)}"
 
-# Корп-константа — Vault один на все проектные VPS. Если когда-то появятся
-# раздельные Vault-инстансы — перенесём обратно в .env / env-var.
-VAULT_ADDR="https://vault.sftbmb.ru"
+# Адрес корп Vault: managed-дефолт `vault.sftbmb.ru`, self-hosted задаёт свой
+# через VAULT_ADDR в .env (managed = инстанс sftbmb, self-hosted = форк
+# corp-infra-template).
+VAULT_ADDR="${VAULT_ADDR:-https://vault.sftbmb.ru}"
 
 PREFLIGHT_HARD="${PREFLIGHT_HARD:-0}"
 

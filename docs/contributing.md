@@ -26,8 +26,9 @@ Progressive disclosure: на холодном старте — только им
 Правило без `paths:` грузится всегда. Проверь, что новое правило path-scoped.
 
 Правила сейчас: `make-first`, `multi-env`, `compose-and-services`, `secrets-and-env`,
-`traefik-routing`, `corp-handoff`, `ansible-style`, `forward-only`. Skills: `smartdev` (cockpit),
-`plan`, `triage`, `add-service`, `request-secret`, `corp-handoff`, `dr-restore`, `bootstrap-vps`.
+`traefik-routing`, `corp-handoff`, `ansible-style`, `env-local`, `forward-only`. Skills:
+`smartdev` (cockpit), `plan`, `triage`, `add-service`, `request-secret`, `corp-handoff`,
+`dr-restore`, `bootstrap-vps`, `init-project`, `stack-deep-dive`, `service-deep-dive`, `de-template`.
 Subagent'ы: `explorer` (read-many), `reviewer` (severity-graded review) — оба read-only, sonnet.
 
 ## Цикл одной задачи

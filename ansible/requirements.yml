@@ -1,0 +1,7 @@
+---
+# Galaxy-коллекции, которые использует bootstrap.yml (base-роль:
+# ansible.posix.authorized_key / ansible.posix.sysctl).
+# Установка: ansible-galaxy collection install -r ansible/requirements.yml
+collections:
+  - name: ansible.posix
+    version: ">=1.5.0"

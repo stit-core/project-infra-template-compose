@@ -47,12 +47,24 @@ make ship  # vault-agent перерендерит traefik.yml, traefik поды�
 ## Когда НЕ применять
 
 - Re-deploy на уже работающий хост — это `make deploy` / `make ship`.
-- Onboarding пользователя в Gitea — корп-задача (skill `onboard-user` в `sftbmb-infra/infra`).
+- Onboarding пользователя в Gitea — корп-задача (skill `onboard-user` в `corp-infra-template`).
 - Bug на проде — диагностика, не bootstrap.
 
 ## Предусловия (СПРОСИ юзера)
 
-1. **Корп-сторона онбоарднула проект и нужный ENV?** На `sftbmb-infra/infra`:
+> **Где живёт корп-сторона — два пути (спроси заранее).**
+> - **managed:** control-plane держит sftbmb на `*.sftbmb.ru`; `onboard-project.sh` запускает
+>   корп-оператор sftbmb, тебе возвращают per-env блок creds. OTLP/Vault/registry-эндпоинты —
+>   managed-дефолты из `.env.example` (`otel.sftbmb.ru` / `vault.sftbmb.ru` / `git.sftbmb.ru`).
+> - **self-hosted:** ты сам держишь форк `corp-infra-template` (свой `<org>/infra`-control-plane);
+>   `onboard-project.sh` запускаешь **в нём**, эндпоинты в проектном `.env` наводишь на свой
+>   домен (`OTEL_EXPORTER_OTLP_ENDPOINT` / `VAULT_ADDR` / `REGISTRY_HOST` — см. `.env.example`).
+>
+> Шаги ниже одинаковы для обоих путей; различие — чей это control-plane и какие эндпоинты в `.env`.
+> Вендор-лока нет: managed = инстанс того же шаблона, self-hosted = твой форк.
+
+1. **Корп-сторона онбоарднула проект и нужный ENV?** На control-plane (managed sftbmb-VPS
+   **или** твой форк `corp-infra-template`), оператор с root-токеном Vault:
    ```bash
    VAULT_TOKEN=<root> bash scripts/onboard-project.sh \
      --name <p> --envs dev,prod \
@@ -60,7 +72,7 @@ make ship  # vault-agent перерендерит traefik.yml, traefik поды�
    ```
    Создаст per-env AppRole + засеит `kv/projects/<p>/<env>/{meta,otel}`. Вернёт блок `PROJECT_NAME / ENV / VAULT_ROLE_ID / VAULT_SECRET_ID` для каждого env. Без этого делать нечего.
 
-   `--source-ip` пишет egress-IP проектной VPS в корп CrowdSec whitelist. Без него otel-collector UA попадает под `crowdsecurity/http-bad-user-agent` и весь трафик с проектной VPS режется 403'ами (метрики/логи перестанут доходить до `otel.sftbmb.ru`). Можно опустить флаг, если IP заранее неизвестен — добавляется потом `echo` в `configs/crowdsec/whitelists.yaml` + `docker compose restart crowdsec` на корп-VPS (см. `sftbmb-infra/infra/.claude/rules/crowdsec-whitelist.md`).
+   `--source-ip` пишет egress-IP проектной VPS в корп CrowdSec whitelist. Без него otel-collector UA попадает под `crowdsecurity/http-bad-user-agent` и весь трафик с проектной VPS режется 403'ами (метрики/логи перестанут доходить до `otel.sftbmb.ru`). Можно опустить флаг, если IP заранее неизвестен — добавляется потом `echo` в `configs/crowdsec/whitelists.yaml` + `docker compose restart crowdsec` на корп-VPS (см. `corp-infra-template/.claude/rules/crowdsec-whitelist.md`).
 
 2. **VPS provisioned**, у тебя есть IP и root-доступ по SSH ключу (минимум один ключ в `/root/.ssh/authorized_keys`).
 

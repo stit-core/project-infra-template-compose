@@ -18,7 +18,7 @@ AppRole/онбординг, CrowdSec-whitelist, OTLP-tenant. Любое изме
 
 **Железобетонное правило:** тронул corp-поверхность → до claim «готово» / до
 коммита оформи `CORP-HANDOFF`-блок и **попроси оператора передать его корп-админу**
-(out-of-band: Slack / тикет / PR в `sftbmb-infra/infra`). Не молчи, не «потом».
+(out-of-band: Slack / тикет / PR в `corp-infra-template`). Не молчи, не «потом».
 Это soft-механизм (правило + skill, не хук) — единственная гарантия в том, что
 ты его исполняешь.
 
@@ -28,7 +28,7 @@ AppRole/онбординг, CrowdSec-whitelist, OTLP-tenant. Любое изме
 |---|---|---|
 | **Vault KV** | новый профиль в `COMPOSE_PROFILES` / новый сервис, которому нужен KV-объект (`db`/`oidc`/`jwt`/`minio`/`backup`/project-specific); новое поле в существующем объекте; новый `${VAR}` из vault-agent template | корп (Vault) — через skill `request-secret` |
 | **Env-онбординг** | новый `ENV`/проект (новый VPS) — нужен AppRole `projects-<p>-<env>` + seed `meta`+`otel` | корп (`onboard-project.sh --envs`) |
-| **CrowdSec whitelist** | новый egress-IP проектной VPS (иначе otel-collector UA ловит `http-bad-user-agent`, метрики режутся 403) | корп (whitelist corp-side в `sftbmb-infra/infra` + crowdsec restart) |
+| **CrowdSec whitelist** | новый egress-IP проектной VPS (иначе otel-collector UA ловит `http-bad-user-agent`, метрики режутся 403) | корп (whitelist corp-side в `corp-infra-template` + crowdsec restart) |
 | **DNS** | новый сабдомен `<name>.${DOMAIN}` под LE HTTP-01 | владелец DNS (A-record `*.${DOMAIN}` → VPS IP) |
 
 Не-corp: чисто локальная правка (compose-логика без нового KV/профиля, .tpl-рефактор

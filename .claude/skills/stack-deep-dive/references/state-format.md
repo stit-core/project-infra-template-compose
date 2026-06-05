@@ -37,6 +37,12 @@ ref: docs/project/stack.md
 ## Что копать дальше
 - Уточнить acme_email с заказчиком (значение пойдёт в meta KV).
 - После /service-deep-dive backend: сверить порт API в Edge.
+
+## Host layout
+- Режим: split (single-host — секцию опускаем).
+- vps-app (HOST_ROLE=edge): traefik, vault-agent, otel-agent, backend, landing.
+- vps-db (HOST_ROLE=db): postgres; backend достаёт PG через db.host/db.port из KV.
+- vps-storage (HOST_ROLE=storage): minio, backup; restic.repository → этот хост.
 ```
 
 ## Frontmatter
@@ -50,7 +56,8 @@ ref: docs/project/stack.md
 
 ## Секции
 
-Все три опциональны. Любая отсутствует, если содержимого нет.
+Все секции опциональны. Любая отсутствует, если содержимого нет. Первые три —
+рабочая память; `## Host layout` — только при multi-host split.
 
 ### `## Открытые вопросы`
 
@@ -80,6 +87,19 @@ stack'а, но важны для будущих сессий.
   «открытый вопрос» — конкретный неясный смысл.
 - При выполнении шага — удалить строку. Если стало пусто — удалить
   секцию.
+
+### `## Host layout` (опционально, multi-host split)
+
+Раскладка `host → services` при split. Single-host (дефолт, всё на одном VPS) —
+секцию **не заводим**. Появляется, когда оператор выбрал split в `§ Networks`.
+
+- Одна строка на хост: `<имя-хоста> (HOST_ROLE=<роль>): <сервисы>`.
+- Роли pinf: `edge` (traefik/vault-agent/otel-agent/backend/landing) / `db`
+  (postgres) / `storage` (minio/backup). vault-agent — на каждом хосте.
+- Эндпоинты не дублируем: PG host/port — в KV `db`, restic — в KV
+  `backup.repository`, otel — `OTEL_EXPORTER_OTLP_ENDPOINT` в `.env`.
+- Граница (репликация/HA/cross-host сеть = дело потребителя) — фиксируется как
+  факт, не проектируется здесь. Детали — `references/multi-host.md`.
 
 ## Правила жизненного цикла
 

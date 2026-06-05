@@ -5,8 +5,9 @@
 pid_file = "/tmp/vault-agent.pid"
 
 vault {
-  # Корп-константа — все проектные VPS логинятся в один Vault.
-  address = "https://vault.sftbmb.ru"
+  # Адрес корп Vault. envsubst в render-configs.sh подставляет ${VAULT_ADDR}
+  # (managed-дефолт vault.sftbmb.ru; self-hosted задаёт свой в .env).
+  address = "${VAULT_ADDR}"
 }
 
 # AppRole login. role-id / secret-id пишутся trampoline-entrypoint'ом

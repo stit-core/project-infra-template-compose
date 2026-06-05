@@ -45,3 +45,12 @@
       backend = systemd
     mode: "0644"
   notify: restart fail2ban
+
+# notify-handler рестартит только при изменении jail.local; этот task
+# гарантирует, что fail2ban включён в автозапуск и запущен и без изменений
+# конфига (idempotent: systemd enabled/started — no-op если уже так).
+- name: Ensure fail2ban enabled and started
+  ansible.builtin.systemd:
+    name: fail2ban
+    enabled: true
+    state: started

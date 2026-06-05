@@ -18,7 +18,7 @@ paths:
 | Identity | `PROJECT_NAME`, `ENV`, `DOMAIN` | `.env` (gitignored) | `scripts/new-env.sh` |
 | Bootstrap auth | `VAULT_ROLE_ID`, `VAULT_SECRET_ID` | `.env` | оператор (из корп онбординга) |
 | Local-managed | `CROWDSEC_BOUNCER_API_KEY`, `COMPOSE_PROFILES` | `.env` | auto-register / оператор |
-| Корп-константы | `VAULT_ADDR`, `OTEL endpoint` | hardcoded в шаблоне | — |
+| Корп-эндпоинты | `VAULT_ADDR`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `REGISTRY_HOST` | `.env` (managed-дефолт в `.env.example`/коде; self-hosted переопределяет) | оператор (self-hosted) |
 | Vault-managed конфиг | meta: `backend_tag`→`BACKEND_TAG` в compose.env; `acme_email`/`acme_caserver`→traefik.yml | `kv/projects/<p>/<env>/meta` (vault-agent рендерит) | корп-админ (vault kv put/patch) |
 | Vault-managed секреты | DB, OIDC, JWT, OTEL_TOKEN, MinIO, Restic + AWS | `kv/projects/<p>/<env>/{db,oidc,jwt,otel,minio,backup}` → `.runtime/secrets/*.env` | корп-админ |
 
@@ -26,7 +26,7 @@ Consumer-сервисы (postgres, backend, minio, backup, otel-agent) чита�
 
 ## Multi-env
 
-Один проект = N сред = N **отдельных VPS**, каждый со своим `ENV` в `.env` и своим AppRole для пары `(project, env)`. Контракт KV layout / AppRole / onboarding flow — `.claude/rules/multi-env.md` (плюс `sftbmb-infra/infra/docs/ecosystem.md` для общей карты). Этот документ — про **механику секретов на проектной стороне**: что в `.env` vs Vault, vault-agent template syntax, ротация через force-recreate.
+Один проект = N сред = N **отдельных VPS**, каждый со своим `ENV` в `.env` и своим AppRole для пары `(project, env)`. Контракт KV layout / AppRole / onboarding flow — `.claude/rules/multi-env.md` (плюс `corp-infra-template/docs/ecosystem.md` для общей карты). Этот документ — про **механику секретов на проектной стороне**: что в `.env` vs Vault, vault-agent template syntax, ротация через force-recreate.
 
 ## Что куда
 
@@ -102,7 +102,7 @@ make recreate SVC=<consumer>
 Источник истины — Vault на корп-стороне:
 
 ```bash
-# на корп-VPS (sftbmb-infra/infra)
+# на корп-VPS (corp-infra-template)
 vault kv patch kv/projects/<p>/<env>/db password=<new>
 ```
 

@@ -3,12 +3,18 @@
 **[META]** Этот файл — для потребителя шаблона. Описывает путь от форка до проекта, который
 ничего не помнит про шаблон. Удаляется на шаге де-темплейтизации (`/de-template`).
 
-Принцип: **подними платформу скриптами, спроектируй проект скиллами — не правь фундамент
+Принцип: **поднимите платформу скриптами, спроектируйте проект скиллами — не правьте фундамент
 руками.** Multi-env: один проект имеет N сред (`dev`, `prod`, ...) — **N отдельных VPS**, по
-одному на `ENV`. Шаги 1–8 проходишь на каждый VPS отдельно (corp-онбординг env'ов —
+одному на `ENV`. Шаги 1–8 проходите на каждый VPS отдельно (корп-онбординг env'ов —
 один раз, шаг 1).
 
-**Где ты работаешь.** Репо живёт на **рабочей станции оператора** — здесь authoring / validate /
+**Два пути control-plane.** Корп control-plane (Vault, OTLP, registry) — это либо **managed**
+sftbmb (`*.sftbmb.ru`; корп-онбординг на шаге 1 делает sftbmb), либо **self-hosted** — ваш форк
+`corp-infra-template` на своём VPS (корп-шаги делаете вы на нём). Куда смотрит проектная VPS,
+задаётся в `.env` через `VAULT_ADDR` / `OTEL_EXPORTER_OTLP_ENDPOINT` / `REGISTRY_HOST`
+(managed-дефолты в `.env.example`). Вендор-лока нет — архитектура та же, меняется только хост.
+
+**Где вы работаете.** Репо живёт на **рабочей станции оператора** — здесь authoring / validate /
 plan / ship. Живого стека локально нет: приложения и контейнеры крутятся на удалённом VPS (один
 VPS = одна среда). `make ship` пушит и триггерит remote `deploy.sh` по SSH; ops-вербы (`make ps`/
 `logs`/`restart`) ходят на VPS через `scripts/tools/ssh.sh` (хост из `ansible/inventory.ini`).
@@ -19,7 +25,8 @@ VPS = одна среда). `make ship` пушит и триггерит remote 
 - Куплены VPS (Debian 12 / Ubuntu 24.04, 2–4 GB RAM, 40+ GB disk) — по одному на env.
 - Для каждого env опубликован домен с A-записью на IP соответствующего VPS (LE HTTP-01).
   Convention — `<env>.<domain>` или `<env>-<domain>`, но это вне шаблона.
-- Доступ к корп-инфре sftbmb: Vault root token, Gitea admin.
+- Доступ к корп control-plane: на managed — выданный sftbmb; на self-hosted — Vault root token
+  и Gitea admin вашего форка `corp-infra-template`.
 - Локально: ansible 2.15+, git, ssh.
 
 ## 0. Форк
@@ -29,22 +36,25 @@ VPS = одна среда). `make ship` пушит и триггерит remote 
 2. `git clone git@git.sftbmb.ru:<org>/infra.git && cd infra`.
 3. `make setup` — ставит git-хуки (commit-msg, pre-commit на `roadmap.md`).
 
-## 1. Day-0 — corp-онбординг проекта (один раз на все env)
+На self-hosted замените `git.sftbmb.ru` на git вашего control-plane (`REGISTRY_HOST`).
 
-На корп-VPS, оператор с Vault root-токеном:
+## 1. Day-0 — корп-онбординг проекта (один раз на все env)
+
+На корп control-plane, оператор с Vault root-токеном. **Managed:** этот шаг выполняет sftbmb по
+вашему запросу. **Self-hosted:** выполняете вы на своём форке `corp-infra-template`:
 
 ```bash
-ssh root@sftbmb-corp 'cd /opt/sftbmb-infra && \
+ssh root@<corp-host> 'cd /opt/corp-infra && \
   VAULT_TOKEN=<root> bash scripts/onboard-project.sh --name acme --envs dev,prod'
 ```
 
 Создаёт per-env:
 - AppRole `projects-acme-<env>` (flat — Vault не принимает слеши в `auth/approle/role/<name>`) +
   policy read-only на `kv/data/projects/acme/<env>/*` и `kv/metadata/projects/acme/<env>/*`.
-- `kv/projects/acme/<env>/otel` — bearer token + accountID для `otel.sftbmb.ru`.
+- `kv/projects/acme/<env>/otel` — bearer token + accountID для OTLP-ingest.
 - `kv/projects/acme/<env>/meta` — дефолты (`backend_tag=latest`, `acme_email`, `acme_caserver`).
 
-Возвращает по блоку на env — **сохрани**, нужно в шаге 4:
+Возвращает по блоку на env — **сохраните**, нужно в шаге 4:
 ```
 === acme / dev ===
 PROJECT_NAME=acme
@@ -54,13 +64,14 @@ VAULT_SECRET_ID=<id>
 ```
 
 Доп. KV (`db`/`oidc`/`jwt`/`minio`/`backup`/project-specific) на этом шаге НЕ создаются —
-запросишь по мере активации сервисов (шаг 6). Подробности контракта — `.claude/rules/multi-env.md`.
+запросите по мере активации сервисов (шаг 6). Подробности контракта — `.claude/rules/multi-env.md`.
 
 ## 2. Day-1 — bootstrap чистого VPS
 
 Канон — skill `/bootstrap-vps` (ведёт весь шаг). Под капотом:
 
 ```bash
+ansible-galaxy collection install -r ansible/requirements.yml   # один раз: ansible.posix
 cp ansible/inventory.example.ini ansible/inventory.ini
 $EDITOR ansible/inventory.ini   # ansible_host, project_name, project_repo_url, operator_ssh_pubkey
 ssh-copy-id root@<vps>           # один раз — SSH-ключ на VPS
@@ -76,14 +87,15 @@ ansible-playbook -i ansible/inventory.ini ansible/bootstrap.yml
 
 ## 3. Зарегистрировать deploy key + registry login
 
-Из вывода ansible скопируй pubkey → `<org>/infra` → Settings → Deploy Keys (read-only).
-Перезапусти clone:
+Из вывода ansible скопируйте pubkey → `<org>/infra` → Settings → Deploy Keys (read-only).
+Перезапустите clone:
 
 ```bash
 ansible-playbook -i ansible/inventory.ini ansible/bootstrap.yml --tags onboard
 ```
 
-Логин в registry на VPS (PAT из Gitea → Settings → Applications):
+Логин в registry на VPS (PAT из Gitea → Settings → Applications; на self-hosted — git вашего
+control-plane):
 
 ```bash
 ssh root@<vps> 'docker login git.sftbmb.ru -u <user> -p <PAT>'
@@ -99,10 +111,11 @@ VAULT_ROLE_ID=<id> VAULT_SECRET_ID=<id> \
 make new-env
 ```
 
-Создаёт `.env` (chmod 600) с 5 переменными identity+auth. Всё остальное — в Vault
+Создаёт `.env` (chmod 600) с переменными identity+auth. Всё остальное — в Vault
 (засеивается по необходимости, шаг 6). `CROWDSEC_BOUNCER_API_KEY` заполняется автоматически на
-первом деплое. Строка `# COMPOSE_PROFILES=` закомментирована — раскомментируешь по мере
-активации сервисов.
+первом деплое. На self-hosted допишите в `.env` адреса своего control-plane (`VAULT_ADDR` /
+`OTEL_EXPORTER_OTLP_ENDPOINT` / `REGISTRY_HOST` — см. `.env.example`). Строка
+`# COMPOSE_PROFILES=` закомментирована — раскомментируете по мере активации сервисов.
 
 ## 5. Первый деплой — минимальный стек
 
@@ -127,12 +140,12 @@ make ship          # commit + check + push + (на main) ssh-deploy
 
 ## 6. Активация дополнительных профилей
 
-По мере того как нужны postgres / storage / backend — запрашиваешь seed и активируешь profile.
+По мере того как нужны postgres / storage / backend — запрашиваете seed и активируете profile.
 
 1. Skill `/request-secret` — спросит NAME (любой slug: `db`, `minio`, `backup`, `oidc`, `jwt`,
    `stripe-key`, ...), поля + значения; сгенерит случайные где нужно (`openssl rand`). Печатает
-   `vault kv put kv/projects/<p>/<env>/<name> ...` для копи-паста. Отдай корп-админу — он выполнит.
-2. После seed'а на VPS отредактируй `.env`:
+   `vault kv put kv/projects/<p>/<env>/<name> ...` для копи-паста. Отдайте корп-админу — он выполнит.
+2. После seed'а на VPS отредактируйте `.env`:
    ```
    COMPOSE_PROFILES=postgres,storage,backend
    ```

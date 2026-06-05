@@ -28,14 +28,20 @@
       {{ pubkey.stdout }}
       ──────────────────────────────────────────────────────────────────────────────
 
-- name: SSH config for git.sftbmb.ru
+# Хост git-registry выводится из project_repo_url (managed git.sftbmb.ru или
+# self-hosted git.<org>); override — git_host в inventory.
+- name: Resolve git host for deploy key
+  ansible.builtin.set_fact:
+    git_host: "{{ git_host | default(project_repo_url | regex_replace('^(?:ssh://)?[^@]+@([^:/]+).*$', '\\1'), true) }}"
+
+- name: SSH config for {{ git_host }} (deploy key)
   ansible.builtin.blockinfile:
     path: /root/.ssh/config
     create: true
     mode: "0600"
     marker: "# {mark} {{ project_name }} deploy key"
     block: |
-      Host git.sftbmb.ru
+      Host {{ git_host }}
         IdentityFile /root/.ssh/{{ project_name }}-deploy
         IdentitiesOnly yes
         StrictHostKeyChecking accept-new
@@ -62,7 +68,11 @@
   args:
     chdir: "{{ project_root }}"
   when: not (clone.failed | default(false))
-  changed_when: false
+  register: setup
+  # setup.sh печатает «installed:» при (пере)линковке git-хуков — честный
+  # changed-сигнал вместо слепого `changed_when: false`, который маскировал
+  # реальную установку. register оставляет stdout для диагностики.
+  changed_when: "'installed:' in setup.stdout"
 
 # Backup теперь self-contained — busybox crond внутри backup-контейнера
 # (см. containers/backup/). Host-cron больше не нужен; если был от старой

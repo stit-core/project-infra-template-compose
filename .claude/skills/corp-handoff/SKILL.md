@@ -15,7 +15,7 @@ description: Оформить CORP-HANDOFF-блок, когда изменени
 - Правишь `configs/vault-agent/` (`agent.hcl.parts/`, `templates/`),
   добавляешь профиль в `COMPOSE_PROFILES`/`compose/*.yml`, новый `${VAR}` в
   `.env.example`, `ansible/roles/sftbmb-onboard/`, либо нужен CrowdSec-whitelist
-  egress-IP корп-side (файл в `sftbmb-infra/infra`, не здесь)
+  egress-IP корп-side (файл в `corp-infra-template`, не здесь)
 - Юзер: «нужен seed для X», «что передать корп-админу», «новый env/VPS»
 
 ## Когда НЕ применять
@@ -33,7 +33,7 @@ description: Оформить CORP-HANDOFF-блок, когда изменени
 
 ### 2. Определить адресата
 
-- Vault KV / AppRole / OTLP / CrowdSec → **корп-админ** (`sftbmb-infra/infra`).
+- Vault KV / AppRole / OTLP / CrowdSec → **корп-админ** (`corp-infra-template`).
 - Новый сабдомен под LE → **владелец DNS** (A-record `*.${DOMAIN}` → VPS IP).
 
 ### 3. Сформировать блок
