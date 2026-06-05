@@ -20,6 +20,19 @@ project-infra-template-compose   ← вы здесь   (форк → <client-org
 
 Канон контрактов — [`sftbmb-infra/infra/docs/ecosystem.md`](https://git.sftbmb.ru/sftbmb-infra/infra/src/branch/main/docs/ecosystem.md).
 
+## Два пути: managed или self-hosted
+
+Вендор-лока на инфре sftbmb нет — control-plane может быть наш или ваш:
+
+- **Managed (sftbmb).** Наводите эндпоинты на наш контур (`vault.sftbmb.ru`, `otel.sftbmb.ru`,
+  `git.sftbmb.ru`); мы онбордим проект (`onboard-project.sh`) и держим uptime. Меньше всего возни.
+- **Self-hosted.** Поднимаете **свой** control-plane из
+  [`corp-infra-template`](https://git.sftbmb.ru/sftbmb-core/corp-infra-template) (свой Vault,
+  OTLP/Grafana, registry, онбординг) и наводите эти же эндпоинты на него — ни от кого не зависите.
+
+Технически меняется только хост Vault / OTLP / registry — он в `.env` и KV, не зашит. Стек и
+контракты одинаковы в обоих путях.
+
 ## Что внутри
 
 | Слой | Что | Активация |
