@@ -13,7 +13,7 @@ services:
       - ./configs/otel-agent/config.yaml:/etc/otel/config.yaml:ro
       - otel-agent-data:/var/lib/otel
     networks:
-      - proxy            # outbound к otel.stit.tech
+      - proxy            # outbound к otel.sftbmb.ru
       - backend-net      # принимает OTLP от backend
     depends_on:
       vault-agent:

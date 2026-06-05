@@ -40,9 +40,9 @@ processors:
 
 exporters:
   otlp_http/corp:
-    # Endpoint + TLS-mode — корп-константы (otel.stit.tech). Если когда-то
+    # Endpoint + TLS-mode — корп-константы (otel.sftbmb.ru). Если когда-то
     # появятся раздельные коллекторы — переедет в meta KV-объект.
-    endpoint: https://otel.stit.tech:443
+    endpoint: https://otel.sftbmb.ru:443
     headers:
       Authorization: "Bearer ${env:OTEL_TOKEN}"
     tls:

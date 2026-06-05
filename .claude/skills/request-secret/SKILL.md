@@ -7,7 +7,7 @@ description: Сформировать `vault kv put` блок для корп-а
 
 Сформировать stdout-блок `vault kv put` для корп-админа: когда оператору нужен новый KV-объект в `kv/projects/<p>/<env>/<name>` (db, oidc, jwt, minio, backup, stripe-key, sendgrid-creds — что угодно).
 
-Skill не действует за оператора — он печатает готовую команду, которую оператор отдаёт корп-админу (out-of-band: Slack / тикет / PR в `stit-infra/infra`). Засеивает корп-админ через `vault kv put` напрямую либо через `stit-infra/infra/scripts/seed-project-secrets.sh` (env-like формат, идемпотентный patch). Vault-agent на проектной VPS подхватит на следующем render-цикле — на чистом дереве `make ship` без MSG триггерит force-recreate consumer'ов.
+Skill не действует за оператора — он печатает готовую команду, которую оператор отдаёт корп-админу (out-of-band: Slack / тикет / PR в `sftbmb-infra/infra`). Засеивает корп-админ через `vault kv put` напрямую либо через `sftbmb-infra/infra/scripts/seed-project-secrets.sh` (env-like формат, идемпотентный patch). Vault-agent на проектной VPS подхватит на следующем render-цикле — на чистом дереве `make ship` без MSG триггерит force-recreate consumer'ов.
 
 **Это частный случай `corp-handoff`** (seed/patch KV). Общий механизм передачи на корп-сторону (онбординг env, CrowdSec-whitelist, DNS) и железобетонное правило «тронул corp-поверхность → блок до claim готово» — skill `corp-handoff` + `.claude/rules/corp-handoff.md`. Если пришёл из `corp-handoff` с ACTION = создать/пропатчить `kv/...` — этот skill и есть твой следующий шаг.
 
@@ -72,7 +72,7 @@ openssl rand -hex 16    # 32-char hex — S3 secret_key
 
 ```
 ================================================================================
-ОТНЕСИ ЭТО КОРП-АДМИНУ (stit-infra/infra). Seed kv/projects/<p>/<env>/<name>.
+ОТНЕСИ ЭТО КОРП-АДМИНУ (sftbmb-infra/infra). Seed kv/projects/<p>/<env>/<name>.
 --------------------------------------------------------------------------------
 vault kv put kv/projects/<p>/<env>/<name> \
   field1='value1' \

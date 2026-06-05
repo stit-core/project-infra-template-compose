@@ -79,7 +79,7 @@ A.2/A.3, обнуление roadmap в A.5, удаление getting-started) и
    ```bash
    git remote get-url origin
    ```
-   Если origin == `…stit-template/project-infra-template-compose…` И
+   Если origin == `…sftbmb-core/project-infra-template-compose…` И
    каталог не временная тест-копия → СТОП. Запуск на каноне сносит
    шаблонные фрагменты. Через `AskUserQuestion` явно подтвердить: «это
    форк `<client-org>/infra` или throwaway-копия?». При «нет» — выйти.
@@ -146,7 +146,7 @@ A.2/A.3, обнуление roadmap в A.5, удаление getting-started) и
 
 - `CLAUDE.md` — шапка/стек под имя проекта из продуктового
   `<org>/docs/.../vision.md § Problem` (cross-repo read); убрать
-  «шаблон stit.tech», «копируется в `<client-org>/infra`», секцию «Что
+  «шаблон sftbmb», «копируется в `<client-org>/infra`», секцию «Что
   менять при копировании». Карта где-что и rules остаются.
 - `README.md` (корневой) — проектная шапка вместо «шаблон проектной
   инфры»; убрать «форкни».
@@ -182,7 +182,7 @@ de-template **не делает** cross-repo действий — печатае
 
 - **Внешние сервисы из карты** (`hosting: external`): форкнуть
   `<org>/backend` / `<org>/frontend`; backend-образ пушится в
-  `git.stit.tech/<org>/backend`, tag → `meta.backend_tag`.
+  `git.sftbmb.ru/<org>/backend`, tag → `meta.backend_tag`.
 - **Корп-онбординг** (если ещё нет): `onboard-project.sh --name <p>
   --envs …` на корп-VPS → AppRole + otel + meta.
 - **Seed вторичных KV** под активные профили: чейн `/request-secret`

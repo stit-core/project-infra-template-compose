@@ -21,12 +21,12 @@ Single-VPS docker-compose стек одного проекта. Все серв�
         │                   │ ↑             │
         │ backend-net       │ │ scrape      │ outbound
         ↓                   ↓ │             ↓
-  ┌─────────┐       ┌────────┴────────┐ vault.stit.tech
+  ┌─────────┐       ┌────────┴────────┐ vault.sftbmb.ru
   │Postgres │       │ cadvisor +      │ (corp Vault)
   └─────────┘       │ node-exporter   │
                     └─────────────────┘
                             ↓
-                     otel.stit.tech (corp ingest)
+                     otel.sftbmb.ru (corp ingest)
 ```
 
 Дополнительно:
@@ -62,13 +62,13 @@ Single-VPS docker-compose стек одного проекта. Все серв�
 
 | Корп-сервис | Что | Адрес |
 |---|---|---|
-| Vault | Secrets backend, AppRole-логин для проекта | `https://vault.stit.tech` |
-| OTel ingest | Telemetry (logs/metrics/traces) с tenant routing | `https://otel.stit.tech` |
-| Gitea | Source + container registry | `https://git.stit.tech` |
+| Vault | Secrets backend, AppRole-логин для проекта | `https://vault.sftbmb.ru` |
+| OTel ingest | Telemetry (logs/metrics/traces) с tenant routing | `https://otel.sftbmb.ru` |
+| Gitea | Source + container registry | `https://git.sftbmb.ru` |
 
 Backup может писать в любой restic-совместимый endpoint (`RESTIC_REPOSITORY` в Vault `kv/projects/<p>/<env>/backup.repository`). Local-default отсутствует by design — на single-VPS он не даёт DR, host failure уносит и репо. Рекомендация: external managed S3 / corp Minio / bare-IP S3 на другом хосте. App-uploads bucket (`minio-data`) — **не** покрыт backup'ом; если нужен — настрой `mc mirror` job в external storage отдельно.
 
-Per-env AppRole + KV-scope (`kv/data/projects/<p>/<env>/*`) выдаёт `stit-infra/infra/scripts/onboard-project.sh --name <p> --envs dev,prod [--source-ip <env>=<ip>]`. Один VPS = одна среда. Подробно — `.claude/rules/multi-env.md`. Общая карта контрактов между 4 репо — `stit-infra/infra/docs/ecosystem.md`.
+Per-env AppRole + KV-scope (`kv/data/projects/<p>/<env>/*`) выдаёт `sftbmb-infra/infra/scripts/onboard-project.sh --name <p> --envs dev,prod [--source-ip <env>=<ip>]`. Один VPS = одна среда. Подробно — `.claude/rules/multi-env.md`. Общая карта контрактов между 4 репо — `sftbmb-infra/infra/docs/ecosystem.md`.
 
 ## Поток секретов
 
@@ -104,7 +104,7 @@ laptop оператора                          VPS
                                          (force-recreate consumers если vault-template менялся)
 ```
 
-Никаких runner'ов, push-trigger'ов, gitea-CI. Backend-images собирает разработчик локально (`docker buildx build … && docker push git.stit.tech/<client-org>/backend:<tag>`), затем `vault kv patch kv/projects/<p>/<env>/meta backend_tag=<tag>` на корп-стороне + `make ship` (без MSG) для force-recreate. `BACKEND_TAG` в `.env` не лежит — приходит из Vault `meta` через `.runtime/env/compose.env`.
+Никаких runner'ов, push-trigger'ов, gitea-CI. Backend-images собирает разработчик локально (`docker buildx build … && docker push git.sftbmb.ru/<client-org>/backend:<tag>`), затем `vault kv patch kv/projects/<p>/<env>/meta backend_tag=<tag>` на корп-стороне + `make ship` (без MSG) для force-recreate. `BACKEND_TAG` в `.env` не лежит — приходит из Vault `meta` через `.runtime/env/compose.env`.
 
 ## Cockpit-сводка и серверный смок
 

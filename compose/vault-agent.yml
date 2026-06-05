@@ -29,7 +29,7 @@ services:
       - ./.runtime/env:/env                          # compose.env для compose --env-file
       - ./.runtime/configs:/configs                  # rendered configs (traefik.yml, ...)
     networks:
-      - proxy            # outbound к vault.stit.tech
+      - proxy            # outbound к vault.sftbmb.ru
       - backend-net      # consumer'ы читают rendered-файлы через bind-mount
     healthcheck:
       # Healthy = ВСЕ expected outputs под активный COMPOSE_PROFILES непустые.

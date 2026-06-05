@@ -1,6 +1,6 @@
 # project-infra-template-compose
 
-> IaC-шаблон проектной инфры **stit.tech** — docker-compose стек одного VPS на клиентский
+> IaC-шаблон проектной инфры — docker-compose стек одного VPS на клиентский
 > проект. Форк → `<client-org>/infra`, адаптация под домен и стек, разворот за день.
 
 Edge (Traefik v3 + CrowdSec) · Postgres · Minio · backend · vault-agent · otel-agent · backup —
@@ -9,16 +9,16 @@ Edge (Traefik v3 + CrowdSec) · Postgres · Minio · backend · vault-agent · o
 ## Экосистема
 
 ```
-stit-infra/infra              corp control plane — Vault · otel.stit.tech · git.stit.tech
+sftbmb-infra/infra            corp control plane — Vault · otel.sftbmb.ru · git.sftbmb.ru
       │  onboard-project.sh → AppRole projects-<p>-<env> + KV seed
       ▼
 project-infra-template-compose   ← вы здесь   (форк → <client-org>/infra, один VPS на env)
       │  runtime для образа backend
       ▼
-<client-org>/backend          форк go-backend-template ──► stit-infra/golibinfra
+<client-org>/backend          форк go-backend-template ──► sftbmb-core/golibinfra
 ```
 
-Канон контрактов — [`stit-infra/infra/docs/ecosystem.md`](https://git.stit.tech/stit-infra/infra/src/branch/main/docs/ecosystem.md).
+Канон контрактов — [`sftbmb-infra/infra/docs/ecosystem.md`](https://git.sftbmb.ru/sftbmb-infra/infra/src/branch/main/docs/ecosystem.md).
 
 ## Что внутри
 
@@ -26,12 +26,12 @@ project-infra-template-compose   ← вы здесь   (форк → <client-org
 |---|---|---|
 | **Edge** | Traefik v3 + CrowdSec — HTTP-01 LE, WAF, IP-bans | always-on |
 | **Secrets** | vault-agent sidecar — рендерит секреты из Vault на VPS | always-on |
-| **Telemetry** | otel-agent → `otel.stit.tech` (OTLP + Bearer из Vault) · cadvisor · node-exporter | always-on |
+| **Telemetry** | otel-agent → `otel.sftbmb.ru` (OTLP + Bearer из Vault) · cadvisor · node-exporter | always-on |
 | **Landing** | заглушка корня `${DOMAIN}` под LE-cert | always-on |
 | **DB** | Postgres 17 | profile `postgres` |
 | **Storage** | Minio (S3 + Console) | profile `storage` |
 | **Backup** | restic + pg_dumpall + crond (alpine), daily → restic-репо | profile `storage` |
-| **App** | backend, образ `git.stit.tech/<client-org>/backend` | profile `backend` |
+| **App** | backend, образ `git.sftbmb.ru/<client-org>/backend` | profile `backend` |
 
 Always-on поднимается на минимальном seed'е (`meta` + `otel`); остальное — opt-in через
 `COMPOSE_PROFILES`, по мере seed'а их KV. Детали слоёв — [`docs/reference/architecture.md`](docs/reference/architecture.md).
@@ -41,7 +41,7 @@ Always-on поднимается на минимальном seed'е (`meta` + `
 Полный путь (corp Day-0 → bootstrap VPS → активация профилей → `/init-project` → своя инфра) —
 **[`docs/getting-started.md`](docs/getting-started.md)**. Коротко, три шага:
 
-**1. Корп-онбординг** (один раз на env, на `stit-infra/infra`):
+**1. Корп-онбординг** (один раз на env, на `sftbmb-infra/infra`):
 ```bash
 VAULT_TOKEN=<root> bash scripts/onboard-project.sh --name acme --envs dev,prod
 ```
@@ -87,9 +87,13 @@ make ship        # check + push + (на main) ssh-deploy. На чистом де
 
 ## Контракт с корпом
 
-- **`vault.stit.tech`** — secrets backend; AppRole per `(project, env)` от `onboard-project.sh`.
-- **`otel.stit.tech`** — observability ingest; tenant по `service.namespace=<project>-<env>` + Bearer из KV.
-- **`git.stit.tech`** — registry для backend/worker/frontend образов.
+- **`vault.sftbmb.ru`** — secrets backend; AppRole per `(project, env)` от `onboard-project.sh`.
+- **`otel.sftbmb.ru`** — observability ingest; tenant по `service.namespace=<project>-<env>` + Bearer из KV.
+- **`git.sftbmb.ru`** — registry для backend/worker/frontend образов.
 
 KV-layout, onboarding-флоу и multi-env — [`.claude/rules/multi-env.md`](.claude/rules/multi-env.md).
 Restore из backup'а — `make restore-pg SNAPSHOT=latest` ([`docs/reference/runbook.md`](docs/reference/runbook.md)).
+
+## Лицензия
+
+Apache-2.0 — см. [`LICENSE`](LICENSE).

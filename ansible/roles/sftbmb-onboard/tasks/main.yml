@@ -28,14 +28,14 @@
       {{ pubkey.stdout }}
       ──────────────────────────────────────────────────────────────────────────────
 
-- name: SSH config for git.stit.tech
+- name: SSH config for git.sftbmb.ru
   ansible.builtin.blockinfile:
     path: /root/.ssh/config
     create: true
     mode: "0600"
     marker: "# {mark} {{ project_name }} deploy key"
     block: |
-      Host git.stit.tech
+      Host git.sftbmb.ru
         IdentityFile /root/.ssh/{{ project_name }}-deploy
         IdentitiesOnly yes
         StrictHostKeyChecking accept-new

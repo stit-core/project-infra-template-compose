@@ -19,14 +19,14 @@ VPS = одна среда). `make ship` пушит и триггерит remote 
 - Куплены VPS (Debian 12 / Ubuntu 24.04, 2–4 GB RAM, 40+ GB disk) — по одному на env.
 - Для каждого env опубликован домен с A-записью на IP соответствующего VPS (LE HTTP-01).
   Convention — `<env>.<domain>` или `<env>-<domain>`, но это вне шаблона.
-- Доступ к корп-инфре stit.tech: Vault root token, Gitea admin.
+- Доступ к корп-инфре sftbmb: Vault root token, Gitea admin.
 - Локально: ansible 2.15+, git, ssh.
 
 ## 0. Форк
 
-1. Gitea (`https://git.stit.tech`) → `stit-template/project-infra-template-compose` →
+1. Gitea (`https://git.sftbmb.ru`) → `sftbmb-core/project-infra-template-compose` →
    **Use this template** → `<org>/infra`.
-2. `git clone git@git.stit.tech:<org>/infra.git && cd infra`.
+2. `git clone git@git.sftbmb.ru:<org>/infra.git && cd infra`.
 3. `make setup` — ставит git-хуки (commit-msg, pre-commit на `roadmap.md`).
 
 ## 1. Day-0 — corp-онбординг проекта (один раз на все env)
@@ -34,14 +34,14 @@ VPS = одна среда). `make ship` пушит и триггерит remote 
 На корп-VPS, оператор с Vault root-токеном:
 
 ```bash
-ssh root@stit-corp 'cd /opt/stit-infra && \
+ssh root@sftbmb-corp 'cd /opt/sftbmb-infra && \
   VAULT_TOKEN=<root> bash scripts/onboard-project.sh --name acme --envs dev,prod'
 ```
 
 Создаёт per-env:
 - AppRole `projects-acme-<env>` (flat — Vault не принимает слеши в `auth/approle/role/<name>`) +
   policy read-only на `kv/data/projects/acme/<env>/*` и `kv/metadata/projects/acme/<env>/*`.
-- `kv/projects/acme/<env>/otel` — bearer token + accountID для `otel.stit.tech`.
+- `kv/projects/acme/<env>/otel` — bearer token + accountID для `otel.sftbmb.ru`.
 - `kv/projects/acme/<env>/meta` — дефолты (`backend_tag=latest`, `acme_email`, `acme_caserver`).
 
 Возвращает по блоку на env — **сохрани**, нужно в шаге 4:
@@ -71,7 +71,7 @@ ansible-playbook -i ansible/inventory.ini ansible/bootstrap.yml
 1. `base` — apt update, swap 2G, journald limits, sysctl tuning.
 2. `ssh-hardening` — no password auth, root key-only, fail2ban на `:22`.
 3. `docker` — docker-ce + compose-plugin.
-4. `stit-onboard` — `/opt/<project>-infra/`, ed25519 deploy key (печатает pubkey), clone из
+4. `sftbmb-onboard` — `/opt/<project>-infra/`, ed25519 deploy key (печатает pubkey), clone из
    `<org>/infra` (упадёт на первом запуске — нет ключа в Gitea, см. шаг 3).
 
 ## 3. Зарегистрировать deploy key + registry login
@@ -86,7 +86,7 @@ ansible-playbook -i ansible/inventory.ini ansible/bootstrap.yml --tags onboard
 Логин в registry на VPS (PAT из Gitea → Settings → Applications):
 
 ```bash
-ssh root@<vps> 'docker login git.stit.tech -u <user> -p <PAT>'
+ssh root@<vps> 'docker login git.sftbmb.ru -u <user> -p <PAT>'
 ```
 
 ## 4. Заполнить `.env` на VPS

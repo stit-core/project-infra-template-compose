@@ -1,29 +1,29 @@
 # Ecosystem — место проектной VPS среди репо
 
 Этот репо — **шаблон проектной инфры**: один форк (`<org>/infra`) = один клиентский проект,
-один VPS на среду (`dev`/`prod`/...). Экосистема: 4 форкаемых шаблона `stit-template/*`
+один VPS на среду (`dev`/`prod`/...). Экосистема: 4 форкаемых шаблона `sftbmb-core/*`
 (go-backend-template, spa-frontend-template, project-docs-template, project-infra-template-compose)
-+ корп control-plane (`stit-infra/infra`, `stit-infra/golibinfra`) + дизайн-система `stit-design`.
-Канон карты контрактов живёт в `stit-infra/infra/docs/ecosystem.md` — здесь только роль *этого*
++ корп control-plane (`sftbmb-infra/infra`) + open-lib `sftbmb-core/golibinfra` + дизайн-система `sftbmb-core/ui-lib`.
+Канон карты контрактов живёт в `sftbmb-infra/infra/docs/ecosystem.md` — здесь только роль *этого*
 репо и его контракты.
 
 ## Репо
 
 | Репо | Роль |
 |---|---|
-| `stit-infra/infra` | Корп-VPS: Vault, OTel ingest, Gitea registry, CrowdSec. Source of truth контрактов. |
-| `stit-template/go-backend-template` | Шаблон Go-бэкенда. Форк `<org>/backend` собирает образ в `git.stit.tech`. |
-| `stit-template/project-docs-template` | Шаблон продуктовой аналитики (business → projects: vision/persona/**surface** → interface → screens). Форк `<org>/docs`. |
-| `stit-template/project-infra-template-compose` | **Этот.** Шаблон проектной VPS — runtime стека одного проекта. Форк `<org>/infra`. |
+| `sftbmb-infra/infra` | Корп-VPS: Vault, OTel ingest, Gitea registry, CrowdSec. Source of truth контрактов. |
+| `sftbmb-core/go-backend-template` | Шаблон Go-бэкенда. Форк `<org>/backend` собирает образ в `git.sftbmb.ru`. |
+| `sftbmb-core/project-docs-template` | Шаблон продуктовой аналитики (business → projects: vision/persona/**surface** → interface → screens). Форк `<org>/docs`. |
+| `sftbmb-core/project-infra-template-compose` | **Этот.** Шаблон проектной VPS — runtime стека одного проекта. Форк `<org>/infra`. |
 | `<org>/infra` + `<org>/docs` + `<org>/backend` + ... | Клиентские форки. Один `<org>/infra` обслуживает N сервис-форков и читает `<org>/docs`. |
 
-## Зависит от `stit-infra/infra` (корп)
+## Зависит от `sftbmb-infra/infra` (корп)
 
 | Что корп выдаёт | Как | Адрес |
 |---|---|---|
-| AppRole `projects-<p>-<env>` + KV `kv/projects/<p>/<env>/*` (read-only) | `onboard-project.sh --name <p> --envs ...` | `vault.stit.tech` |
-| Telemetry ingest (OTLP, tenant routing) | otel-token в `kv/.../otel` | `otel.stit.tech` |
-| Source + container registry | deploy-key + PAT login | `git.stit.tech` |
+| AppRole `projects-<p>-<env>` + KV `kv/projects/<p>/<env>/*` (read-only) | `onboard-project.sh --name <p> --envs ...` | `vault.sftbmb.ru` |
+| Telemetry ingest (OTLP, tenant routing) | otel-token в `kv/.../otel` | `otel.sftbmb.ru` |
+| Source + container registry | deploy-key + PAT login | `git.sftbmb.ru` |
 | CrowdSec whitelist egress-IP проектной VPS | `--source-ip <env>=<ip>` при онбординге | corp-side |
 
 Один VPS = одна среда, своя AppRole-пара. Детали проектной стороны контракта (KV-layout,
@@ -31,7 +31,7 @@ lazy-seed, profile-opt-in) — `.claude/rules/multi-env.md`.
 
 ## Обслуживает `<org>/backend`
 
-Runtime для клиентского образа `git.stit.tech/<org>/backend:<tag>`. Deploy нового тега —
+Runtime для клиентского образа `git.sftbmb.ru/<org>/backend:<tag>`. Deploy нового тега —
 корп патчит `vault kv patch kv/projects/<p>/<env>/meta backend_tag=<tag>`, оператор делает
 `make ship` (без MSG) → vault-agent перерендерит `meta`, deploy.sh force-recreate'нет backend.
 `BACKEND_TAG` в `.env` не лежит — приходит из Vault.

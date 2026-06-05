@@ -81,7 +81,7 @@ oбa под `*.acme.dev`, public только backend и minio Console»).
    - Edge: crowdsec@file (дефолт), source-IP — TBD;
    - Networks: дефолтные proxy/backend-net;
    - Backup: restic репо `s3://restic.acme.dev/<env>`, расписание TBD;
-   - Observability: дефолтный otel.stit.tech (KV otel из корп-онбординга);
+   - Observability: дефолтный otel.sftbmb.ru (KV otel из корп-онбординга);
    - Generates: traefik dynamic для api/minio, DOMAIN в .env.example.
    ```
 4. Раунд `AskUserQuestion` — подтвердить разнос / попросить корректировку
@@ -117,7 +117,7 @@ oбa под `*.acme.dev`, public только backend и minio Console»).
    - **environments** → `.claude/rules/multi-env.md` (один VPS = один ENV).
    - **edge** → `compose/traefik.yml`, `compose/crowdsec.yml`,
      `configs/crowdsec/acquis.yaml` (живой образец; whitelist egress-IP —
-     corp-side в `stit-infra/infra`, не в этом репо).
+     corp-side в `sftbmb-infra/infra`, не в этом репо).
    - **networks** → `docker-compose.yml` + `compose/*.yml` (какие сети
      реально есть).
    - **backup** → `compose/backup.yml` (если уже есть),

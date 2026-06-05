@@ -243,7 +243,7 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
 
 **Что фиксируем**:
 
-- otel-agent → endpoint (`otel.stit.tech` — корп; редко project-specific).
+- otel-agent → endpoint (`otel.sftbmb.ru` — корп; редко project-specific).
 - Resource attributes: `service.namespace=<project>` / `deployment.env`
   / `host.name`.
 - KV otel: token + accountID (через `kv/.../otel`, корп-онбординг).
@@ -252,7 +252,7 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
 
 **Опции опрашиваются как**:
 
-- otel endpoint: 2 опции (`otel.stit.tech` (default корп) / другой
+- otel endpoint: 2 опции (`otel.sftbmb.ru` (default корп) / другой
   Other).
 - Resource attrs: Other (свободная форма).
 - Логи: 2 опции («через otel-agent» / «local-only»).
@@ -266,7 +266,7 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
 
 **Тест-критерий**:
 
-- ✅ «`otel.stit.tech`; resource attrs `service.namespace=acme,
+- ✅ «`otel.sftbmb.ru`; resource attrs `service.namespace=acme,
   deployment.env=${ENV}`; KV otel (через корп-онбординг); cadvisor +
   node-exporter (дефолт)».
 - ❌ «Без resource attrs» — телеметрия безымянная.

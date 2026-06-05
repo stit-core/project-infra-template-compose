@@ -61,7 +61,7 @@ services:
       - backend-net   # internal-only
       # - proxy       # если публичный
     healthcheck:
-      # Для Go-сервисов на stit-infra/golibinfra (форк stit-template/go-backend-template):
+      # Для Go-сервисов на sftbmb-core/golibinfra (форк sftbmb-core/go-backend-template):
       # httpkit регистрирует /health (liveness) и /ready (с probes). Для
       # docker compose depends_on достаточно /health.
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:<port>/health"]

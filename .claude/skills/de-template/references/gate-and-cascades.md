@@ -14,7 +14,7 @@ de-template — однократный движок, который меняет
 
 ### 1. Не канонический шаблон
 
-Запуск `/de-template` на каноне `…stit-template/project-infra-template-compose`
+Запуск `/de-template` на каноне `…sftbmb-core/project-infra-template-compose`
 сносит его шаблонные фрагменты. Защита:
 
 ```bash
@@ -23,8 +23,8 @@ git remote get-url origin
 
 | origin | действие |
 |---|---|
-| содержит `stit-template/project-infra-template-compose` | СТОП. Через `AskUserQuestion`: «это форк `<client-org>/infra` или throwaway-копия?» (опции «Да, форк» / «Да, throwaway тест-копия» / «Нет, канон» / Other). При «Нет» — выйти, объяснить почему. |
-| любое другое (включая `git.stit.tech/<org>/infra`) | OK, идти дальше |
+| содержит `sftbmb-core/project-infra-template-compose` | СТОП. Через `AskUserQuestion`: «это форк `<client-org>/infra` или throwaway-копия?» (опции «Да, форк» / «Да, throwaway тест-копия» / «Нет, канон» / Other). При «Нет» — выйти, объяснить почему. |
+| любое другое (включая `git.sftbmb.ru/<org>/infra`) | OK, идти дальше |
 | origin не настроен (`origin: no upstream`) | через `AskUserQuestion`: «нет origin — это локальный throwaway?» (опции «Да» / «Нет, настроить origin сначала») |
 
 ### 2. Артефакты stable
@@ -60,7 +60,7 @@ make project-check
 | A.1 — `COMPOSE_PROFILES` | `.env.example` содержит непустой `COMPOSE_PROFILES=...` строкой |
 | A.2 — прунинг compose | в `compose/` нет `<name>.yml` для профилей, которых нет в карте |
 | A.3 — прунинг vault-agent | в `configs/vault-agent/agent.hcl.parts/` и `templates/` нет «лишних» имён |
-| A.4 — идентичность | `CLAUDE.md` не содержит «Шаблон проектной инфры stit.tech» / `README.md` не «шаблон проектной инфры» |
+| A.4 — идентичность | `CLAUDE.md` не содержит «Шаблон проектной инфры sftbmb» / `README.md` не «шаблон проектной инфры» |
 | A.5 — scaffolding | `docs/getting-started.md` нет; `.claude/plans/roadmap.md` пуст |
 
 Прочитать `state/de-template.md`, если есть — он отражает применённые

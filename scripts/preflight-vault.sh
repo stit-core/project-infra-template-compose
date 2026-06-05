@@ -24,7 +24,7 @@ cd "$(dirname "$0")/.."
 
 # Корп-константа — Vault один на все проектные VPS. Если когда-то появятся
 # раздельные Vault-инстансы — перенесём обратно в .env / env-var.
-VAULT_ADDR="https://vault.stit.tech"
+VAULT_ADDR="https://vault.sftbmb.ru"
 
 PREFLIGHT_HARD="${PREFLIGHT_HARD:-0}"
 

@@ -1,6 +1,6 @@
 # project-infra-template-compose — гайд для агентов
 
-Шаблон проектной инфры stit.tech: docker-compose стек одного VPS на клиентский
+Шаблон проектной инфры sftbmb: docker-compose стек одного VPS на клиентский
 проект. Edge (Traefik v3 + CrowdSec) + Postgres + Minio + backend + vault-agent +
 otel-agent + backup. Копируется в `<client-org>/infra`, адаптируется под домен/стек.
 
@@ -40,15 +40,15 @@ authoring-проверок без `.env`/docker — норма, не паден�
 
 **Роль:** шаблон проектной VPS. Один форк (`<client-org>/infra`) — один проект, один VPS на
 env (dev/staging/prod).
-**Зависит от:** `stit-infra/infra` — выдаёт AppRole `projects-<p>-<env>` + KV
-`kv/projects/<p>/<env>/*` (через `onboard-project.sh`), принимает OTLP на `otel.stit.tech`,
-хостит registry `git.stit.tech`.
+**Зависит от:** `sftbmb-infra/infra` — выдаёт AppRole `projects-<p>-<env>` + KV
+`kv/projects/<p>/<env>/*` (через `onboard-project.sh`), принимает OTLP на `otel.sftbmb.ru`,
+хостит registry `git.sftbmb.ru`.
 **Обслуживает:** `<client-org>/backend` (форк `go-backend-template`) — runtime для его образа;
 deploy через `vault kv patch kv/projects/<p>/<env>/meta backend_tag=<tag>` + `make ship`.
 **Читает:** `<client-org>/docs` (форк `project-docs-template`) — продуктовый контекст (vision,
 surfaces); sibling-checkout рядом с этим репо, read-only. Резолв пути — `docs/reference/ecosystem.md`.
 
-Карта репо и канонические контракты — `stit-infra/infra/docs/ecosystem.md`.
+Карта репо и канонические контракты — `sftbmb-infra/infra/docs/ecosystem.md`.
 
 ## Стек
 
@@ -56,9 +56,9 @@ surfaces); sibling-checkout рядом с этим репо, read-only. Резо
 |---|---|---|
 | Edge | Traefik v3 + CrowdSec | `compose/traefik.yml`, `compose/crowdsec.yml` |
 | DB | Postgres 17 | `compose/postgres.yml` |
-| App | Backend (`git.stit.tech/<client-org>/backend`) | `compose/backend.yml` |
+| App | Backend (`git.sftbmb.ru/<client-org>/backend`) | `compose/backend.yml` |
 | Secrets | vault-agent sidecar | `compose/vault-agent.yml` |
-| Telemetry | otel-agent → `otel.stit.tech` (OTLP + Prom-scrape host-метрик) | `compose/otel-agent.yml` |
+| Telemetry | otel-agent → `otel.sftbmb.ru` (OTLP + Prom-scrape host-метрик) | `compose/otel-agent.yml` |
 | Host metrics | cadvisor + node-exporter | `compose/cadvisor.yml`, `compose/node-exporter.yml` |
 | Storage | Minio (S3 + Console) на `s3.${DOMAIN}` / `minio.${DOMAIN}` | `compose/minio.yml` |
 | Backup | restic + pg_dumpall + crond в alpine, пишет в `$RESTIC_REPOSITORY` | `compose/backup.yml`, `containers/backup/` |
@@ -100,14 +100,14 @@ seed'а соответствующих KV. Сети: `proxy` (наружу), `ba
 | Корп-handoff (когда тронул corp-поверхность) | `.claude/rules/corp-handoff.md` + skill `/corp-handoff` |
 | Онбординг / путь потребителя | `docs/getting-started.md` |
 | Runbook / инциденты | `docs/reference/runbook.md` |
-| Экосистема репо, контракты | `docs/reference/ecosystem.md` (→ канон `stit-infra/infra/docs/ecosystem.md`) |
+| Экосистема репо, контракты | `docs/reference/ecosystem.md` (→ канон `sftbmb-infra/infra/docs/ecosystem.md`) |
 
 ## Корп-контракт
 
 Проект должен быть онбоарден на корп-стороне для каждой среды (один VPS = одна среда):
 
 ```bash
-# stit-infra/infra (корп-VPS), оператор с root-токеном Vault.
+# sftbmb-infra/infra (корп-VPS), оператор с root-токеном Vault.
 VAULT_TOKEN=<root> bash scripts/onboard-project.sh --name <p> --envs dev,prod
 ```
 
@@ -148,7 +148,7 @@ out-of-band. AppRole строго read-only на свой `<p>/<env>`. Подр�
 - **Изменение — через план** (planning-first; skill `/plan`). Отклонение — осознанное, проговаривается.
 - Тронул corp-поверхность (`configs/vault-agent/`, `compose/*.yml` профили, `.env.example`,
   `ansible/`) или изменение требует CrowdSec-whitelist'а egress-IP корп-side (файл живёт в
-  `stit-infra/infra`, не здесь) — оформи **CORP-HANDOFF**-блок до claim «готово»
+  `sftbmb-infra/infra`, не здесь) — оформи **CORP-HANDOFF**-блок до claim «готово»
   (skill `/corp-handoff`; `make status → == Infra-touch ==` это ловит).
 - Любая новая `${VAR}` в compose/configs — в `.env.example` сразу.
 - Bumps версий образов — отдельным коммитом после явного OK.

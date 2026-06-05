@@ -30,5 +30,5 @@
       tags: [ssh]
     - role: docker
       tags: [docker]
-    - role: stit-onboard
+    - role: sftbmb-onboard
       tags: [onboard]

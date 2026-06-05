@@ -27,15 +27,15 @@ ship-поверхность. Приложения и живого стека л�
   `SMOKE_LOAD_FACTOR` / `SMOKE_RAM_MIN_PCT` / `SMOKE_DISK_PCT` (дефолты в коде). Если понадобится
   per-VPS тюнинг — добавить их в `.env.local.example` + прокинуть через `ssh.sh smoke`. Опционально,
   low-priority (дефолты годятся).
-- **Corp: ecosystem.md entry-point.** `stit-infra/infra/docs/ecosystem.md` зовёт entry-point
+- **Corp: ecosystem.md entry-point.** `sftbmb-infra/infra/docs/ecosystem.md` зовёт entry-point
   этого репо как «AGENTS.md» → заменить на `CLAUDE.md` (строка про `project-infra-template-compose`).
   Косметика, следующий corp-PR.
 - **Corp: ecosystem.md skill index.** Индекс скилов репо не содержит `/init-project`,
   `/service-deep-dive`, `/stack-deep-dive`, `/de-template` — дописать. Документация.
 - **Corp: ecosystem.md 5-й репо `project-docs-template`.** Корп source-of-truth карты репо
-  (`stit-infra/infra/docs/ecosystem.md`) знает 4 репо — добавить `project-docs-template` 5-м +
+  (`sftbmb-infra/infra/docs/ecosystem.md`) знает 4 репо — добавить `project-docs-template` 5-м +
   конвенцию sibling infra↔docs (продуктовый слой переехал туда; этот репо читает его cross-repo).
-  DECIDE: каноническое имя (`stit-infra/project-docs-template`?). Doc-only, low-risk; дробится с
+  DECIDE: каноническое имя (`sftbmb-core/project-docs-template`?). Doc-only, low-risk; дробится с
   двумя corp-ecosystem.md-айтемами выше — одним корп-PR.
 - **Corp: backport validate-plan.sh dep-check fix.** Эталонный `go-backend-template/scripts/tools/`
   `validate-plan.sh` проверяет `kk[2]` (cur, всегда валиден) вместо `kk[3]` (dep) — мёртвая

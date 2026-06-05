@@ -6,7 +6,7 @@ pid_file = "/tmp/vault-agent.pid"
 
 vault {
   # Корп-константа — все проектные VPS логинятся в один Vault.
-  address = "https://vault.stit.tech"
+  address = "https://vault.sftbmb.ru"
 }
 
 # AppRole login. role-id / secret-id пишутся trampoline-entrypoint'ом
