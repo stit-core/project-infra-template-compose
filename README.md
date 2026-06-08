@@ -9,7 +9,7 @@ Postgres, MinIO, backend, vault-agent, otel-agent, backup — декларати
 секреты из Vault, телеметрия в control-plane. Форк → `<org>/infra`, разворот за день.
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-2563eb)](LICENSE)
-[![Часть stit](https://img.shields.io/badge/stit-открытые_шаблоны-6366f1)](https://git.stit.tech/stit-core/sftbmb-public)
+[![Часть stit](https://img.shields.io/badge/stit-открытые_шаблоны-6366f1)](https://git.stit.tech/stit-core/stit-public)
 [![Stack](https://img.shields.io/badge/stack-Docker_Compose-0ea5e9)](#что-внутри)
 [![Edge](https://img.shields.io/badge/edge-Traefik_v3_%2B_CrowdSec-22c55e)](#что-внутри)
 [![Secrets](https://img.shields.io/badge/secrets-vault--agent-000000)](#контракт-с-control-plane)
@@ -133,7 +133,7 @@ Restore из backup'а — `make restore-pg SNAPSHOT=latest`
 
 Это один из открытых шаблонов stit (Apache-2.0) — фундамент «-1 уровня»,
 берите бесплатно и владейте. Карта всех шаблонов и точка входа —
-**[витрина stit](https://git.stit.tech/stit-core/sftbmb-public)**. Нужна
+**[витрина stit](https://git.stit.tech/stit-core/stit-public)**. Нужна
 команда, стандарт или поддержка — **[наш подход и контакты (vision)](https://git.stit.tech/stit/vision)**.
 
 ## Лицензия
