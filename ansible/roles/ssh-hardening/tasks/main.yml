@@ -14,7 +14,7 @@
 
 - name: Configure sshd
   ansible.builtin.copy:
-    dest: /etc/ssh/sshd_config.d/10-sftbmb-hardening.conf
+    dest: /etc/ssh/sshd_config.d/10-stit-hardening.conf
     content: |
       PermitRootLogin prohibit-password
       PasswordAuthentication no

@@ -60,7 +60,7 @@ make project-check
 | A.1 — `COMPOSE_PROFILES` | `.env.example` содержит непустой `COMPOSE_PROFILES=...` строкой |
 | A.2 — прунинг compose | в `compose/` нет `<name>.yml` для профилей, которых нет в карте |
 | A.3 — прунинг vault-agent | в `configs/vault-agent/agent.hcl.parts/` и `templates/` нет «лишних» имён |
-| A.4 — идентичность | `CLAUDE.md` не содержит «Шаблон проектной инфры sftbmb» / `README.md` не «шаблон проектной инфры» |
+| A.4 — идентичность | `CLAUDE.md` не содержит «Шаблон проектной инфры stit» / `README.md` не «шаблон проектной инфры» |
 | A.5 — scaffolding | `docs/getting-started.md` нет; `.claude/plans/roadmap.md` пуст |
 
 Прочитать `state/de-template.md`, если есть — он отражает применённые

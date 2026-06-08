@@ -1,6 +1,6 @@
 ---
 name: ansible-style
-description: Инварианты ansible-bootstrap нового VPS — идемпотентность тасков (re-run safe), один концерн = одна роль (base/ssh-hardening/docker/sftbmb-onboard), assert required-vars в pre_tasks, секреты НЕ в playbook'е (оператор кладёт .env руками), fail-fast перед disable password auth. Грузится при работе с ansible/.
+description: Инварианты ansible-bootstrap нового VPS — идемпотентность тасков (re-run safe), один концерн = одна роль (base/ssh-hardening/docker/stit-onboard), assert required-vars в pre_tasks, секреты НЕ в playbook'е (оператор кладёт .env руками), fail-fast перед disable password auth. Грузится при работе с ansible/.
 paths:
   - "ansible/**"
 ---
@@ -18,7 +18,7 @@ paths:
 | `base` | Системные пакеты, swap, timezone, базовый sysctl |
 | `ssh-hardening` | Disable password auth, root login policy, fail2ban-style |
 | `docker` | Docker engine + compose plugin, daemon.json (log driver, log rotation) |
-| `sftbmb-onboard` | Клонирование `<client-org>/infra`, deploy-key вывод, директории `/opt/<project>-infra` |
+| `stit-onboard` | Клонирование `<client-org>/infra`, deploy-key вывод, директории `/opt/<project>-infra` |
 
 Правило: один концерн = одна роль. Если в `base` появляется что-то про docker — переноси в `docker`.
 

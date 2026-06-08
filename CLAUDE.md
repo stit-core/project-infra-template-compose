@@ -1,6 +1,6 @@
 # project-infra-template-compose — гайд для агентов
 
-Шаблон проектной инфры sftbmb: docker-compose стек одного VPS на клиентский
+Шаблон проектной инфры stit: docker-compose стек одного VPS на клиентский
 проект. Edge (Traefik v3 + CrowdSec) + Postgres + Minio + backend + vault-agent +
 otel-agent + backup. Копируется в `<client-org>/infra`, адаптируется под домен/стек.
 

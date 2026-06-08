@@ -23,7 +23,7 @@ cd "$(dirname "$0")/.."
 : "${ENV:?ENV обязателен (multi-env: dev/prod/...)}"
 
 # Адрес корп Vault: managed-дефолт `vault.stit.tech`, self-hosted задаёт свой
-# через VAULT_ADDR в .env (managed = инстанс sftbmb, self-hosted = форк
+# через VAULT_ADDR в .env (managed = инстанс stit, self-hosted = форк
 # corp-infra-template).
 VAULT_ADDR="${VAULT_ADDR:-https://vault.stit.tech}"
 

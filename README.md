@@ -9,7 +9,7 @@ Postgres, MinIO, backend, vault-agent, otel-agent, backup — декларати
 секреты из Vault, телеметрия в control-plane. Форк → `<org>/infra`, разворот за день.
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-2563eb)](LICENSE)
-[![Часть sftbmb](https://img.shields.io/badge/sftbmb-открытые_шаблоны-6366f1)](https://git.stit.tech/stit-core/sftbmb-public)
+[![Часть stit](https://img.shields.io/badge/stit-открытые_шаблоны-6366f1)](https://git.stit.tech/stit-core/sftbmb-public)
 [![Stack](https://img.shields.io/badge/stack-Docker_Compose-0ea5e9)](#что-внутри)
 [![Edge](https://img.shields.io/badge/edge-Traefik_v3_%2B_CrowdSec-22c55e)](#что-внутри)
 [![Secrets](https://img.shields.io/badge/secrets-vault--agent-000000)](#контракт-с-control-plane)
@@ -40,7 +40,7 @@ project-infra-template-compose   ← вы здесь   (форк → <org>/infra
 
 Вендор-лока нет — control-plane может быть наш или ваш:
 
-- **Managed (sftbmb).** Наводите эндпоинты на наш контур (`vault.stit.tech`,
+- **Managed (stit).** Наводите эндпоинты на наш контур (`vault.stit.tech`,
   `otel.stit.tech`, `git.stit.tech`); мы онбордим проект (`onboard-project.sh`) и
   держим uptime. Меньше всего возни.
 - **Self-hosted.** Поднимаете **свой** control-plane из
@@ -129,12 +129,12 @@ Restore из backup'а — `make restore-pg SNAPSHOT=latest`
 | [`CLAUDE.md`](CLAUDE.md) | точка входа для агента (ядро + роутер); дневной флоу — `/smartdev` |
 | `make help` | полный словарь команд |
 
-## Часть экосистемы sftbmb
+## Часть экосистемы stit
 
-Это один из открытых шаблонов sftbmb (Apache-2.0) — фундамент «-1 уровня»,
+Это один из открытых шаблонов stit (Apache-2.0) — фундамент «-1 уровня»,
 берите бесплатно и владейте. Карта всех шаблонов и точка входа —
-**[витрина sftbmb](https://git.stit.tech/stit-core/sftbmb-public)**. Нужна
-команда, стандарт или поддержка — **[наш подход и контакты (vision)](https://git.stit.tech/sftbmb/vision)**.
+**[витрина stit](https://git.stit.tech/stit-core/sftbmb-public)**. Нужна
+команда, стандарт или поддержка — **[наш подход и контакты (vision)](https://git.stit.tech/stit/vision)**.
 
 ## Лицензия
 

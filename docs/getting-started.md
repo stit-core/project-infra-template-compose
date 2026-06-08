@@ -9,7 +9,7 @@
 один раз, шаг 1).
 
 **Два пути control-plane.** Корп control-plane (Vault, OTLP, registry) — это либо **managed**
-sftbmb (`*.stit.tech`; корп-онбординг на шаге 1 делает sftbmb), либо **self-hosted** — ваш форк
+stit (`*.stit.tech`; корп-онбординг на шаге 1 делает stit), либо **self-hosted** — ваш форк
 `corp-infra-template` на своём VPS (корп-шаги делаете вы на нём). Куда смотрит проектная VPS,
 задаётся в `.env` через `VAULT_ADDR` / `OTEL_EXPORTER_OTLP_ENDPOINT` / `REGISTRY_HOST`
 (managed-дефолты в `.env.example`). Вендор-лока нет — архитектура та же, меняется только хост.
@@ -25,7 +25,7 @@ VPS = одна среда). `make ship` пушит и триггерит remote 
 - Куплены VPS (Debian 12 / Ubuntu 24.04, 2–4 GB RAM, 40+ GB disk) — по одному на env.
 - Для каждого env опубликован домен с A-записью на IP соответствующего VPS (LE HTTP-01).
   Convention — `<env>.<domain>` или `<env>-<domain>`, но это вне шаблона.
-- Доступ к корп control-plane: на managed — выданный sftbmb; на self-hosted — Vault root token
+- Доступ к корп control-plane: на managed — выданный stit; на self-hosted — Vault root token
   и Gitea admin вашего форка `corp-infra-template`.
 - Локально: ansible 2.15+, git, ssh.
 
@@ -40,7 +40,7 @@ VPS = одна среда). `make ship` пушит и триггерит remote 
 
 ## 1. Day-0 — корп-онбординг проекта (один раз на все env)
 
-На корп control-plane, оператор с Vault root-токеном. **Managed:** этот шаг выполняет sftbmb по
+На корп control-plane, оператор с Vault root-токеном. **Managed:** этот шаг выполняет stit по
 вашему запросу. **Self-hosted:** выполняете вы на своём форке `corp-infra-template`:
 
 ```bash
@@ -82,7 +82,7 @@ ansible-playbook -i ansible/inventory.ini ansible/bootstrap.yml
 1. `base` — apt update, swap 2G, journald limits, sysctl tuning.
 2. `ssh-hardening` — no password auth, root key-only, fail2ban на `:22`.
 3. `docker` — docker-ce + compose-plugin.
-4. `sftbmb-onboard` — `/opt/<project>-infra/`, ed25519 deploy key (печатает pubkey), clone из
+4. `stit-onboard` — `/opt/<project>-infra/`, ed25519 deploy key (печатает pubkey), clone из
    `<org>/infra` (упадёт на первом запуске — нет ключа в Gitea, см. шаг 3).
 
 ## 3. Зарегистрировать deploy key + registry login

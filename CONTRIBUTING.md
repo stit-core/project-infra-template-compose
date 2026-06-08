@@ -26,7 +26,7 @@
   `make validate`.
 - **Multi-env через KV-dimension.** Один шаблон, N VPS, у каждого свой `ENV` и
   scope в Vault.
-- **Без вендор-лока.** Control-plane может быть managed (sftbmb) или self-hosted —
+- **Без вендор-лока.** Control-plane может быть managed (stit) или self-hosted —
   меняется только хост Vault/OTLP/registry в `.env` и KV, не зашит. Не вшивай
   зависимость от одного провайдера там, где это мешает self-host.
 - **Forward-only документация.** Текст описывает текущее состояние, без «было/стало» —

@@ -53,8 +53,8 @@ make ship  # vault-agent перерендерит traefik.yml, traefik поды�
 ## Предусловия (СПРОСИ юзера)
 
 > **Где живёт корп-сторона — два пути (спроси заранее).**
-> - **managed:** control-plane держит sftbmb на `*.stit.tech`; `onboard-project.sh` запускает
->   корп-оператор sftbmb, тебе возвращают per-env блок creds. OTLP/Vault/registry-эндпоинты —
+> - **managed:** control-plane держит stit на `*.stit.tech`; `onboard-project.sh` запускает
+>   корп-оператор stit, тебе возвращают per-env блок creds. OTLP/Vault/registry-эндпоинты —
 >   managed-дефолты из `.env.example` (`otel.stit.tech` / `vault.stit.tech` / `git.stit.tech`).
 > - **self-hosted:** ты сам держишь форк `corp-infra-template` (свой `<org>/infra`-control-plane);
 >   `onboard-project.sh` запускаешь **в нём**, эндпоинты в проектном `.env` наводишь на свой
@@ -63,7 +63,7 @@ make ship  # vault-agent перерендерит traefik.yml, traefik поды�
 > Шаги ниже одинаковы для обоих путей; различие — чей это control-plane и какие эндпоинты в `.env`.
 > Вендор-лока нет: managed = инстанс того же шаблона, self-hosted = твой форк.
 
-1. **Корп-сторона онбоарднула проект и нужный ENV?** На control-plane (managed sftbmb-VPS
+1. **Корп-сторона онбоарднула проект и нужный ENV?** На control-plane (managed stit-VPS
    **или** твой форк `corp-infra-template`), оператор с root-токеном Vault:
    ```bash
    VAULT_TOKEN=<root> bash scripts/onboard-project.sh \
@@ -107,7 +107,7 @@ Verify connectivity: `ansible -i ansible/inventory.ini project_vps -m ping`.
 ansible-playbook -i ansible/inventory.ini ansible/bootstrap.yml --skip-tags onboard
 ```
 
-Roles `base` → `ssh-hardening` → `docker` (skip'аем `sftbmb-onboard` до регистрации deploy-key). По итогам — VPS с Docker engine, ssh-hardened, системные пакеты.
+Roles `base` → `ssh-hardening` → `docker` (skip'аем `stit-onboard` до регистрации deploy-key). По итогам — VPS с Docker engine, ssh-hardened, системные пакеты.
 
 ### 3. Onboard: deploy-key + clone
 

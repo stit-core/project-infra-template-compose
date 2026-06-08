@@ -5,7 +5,7 @@ paths:
   - "configs/vault-agent/**"
   - "compose/*.yml"
   - ".env.example"
-  - "ansible/roles/sftbmb-onboard/**"
+  - "ansible/roles/stit-onboard/**"
 ---
 
 # Corp-handoff

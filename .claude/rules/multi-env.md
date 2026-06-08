@@ -5,7 +5,7 @@ paths:
   - ".env*"
   - "configs/vault-agent/**"
   - "compose/*.yml"
-  - "ansible/roles/sftbmb-onboard/**"
+  - "ansible/roles/stit-onboard/**"
 ---
 
 # Multi-environment
