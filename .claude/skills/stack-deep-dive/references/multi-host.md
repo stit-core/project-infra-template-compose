@@ -18,7 +18,7 @@ vault-agent) — при split их наводят на целевой хост, 
 |---|---|---|---|
 | Postgres host/port | KV `kv/.../db` поля `host`/`port` (опц.) | `postgres` / `5432` | db-хост |
 | restic-репозиторий | KV `kv/.../backup.repository` | MinIO на этом VPS | storage-хост / managed S3 |
-| OTLP-коллектор | `.env` `OTEL_EXPORTER_OTLP_ENDPOINT` | managed `otel.sftbmb.ru:443` | свой коллектор |
+| OTLP-коллектор | `.env` `OTEL_EXPORTER_OTLP_ENDPOINT` | managed `otel.stit.tech:443` | свой коллектор |
 
 `backend.env.tpl` рендерит `PG_DSN` через `{{ or .Data.data.host "postgres" }}:{{
 or .Data.data.port "5432" }}` — существующие KV `db` без `host`/`port` дают

@@ -24,7 +24,7 @@ Vault — единственный источник правды по конфи
 |---|---|---|
 | Identity | `.env` | `PROJECT_NAME`, `ENV`, `DOMAIN` |
 | Bootstrap auth | `.env` | `VAULT_ROLE_ID`, `VAULT_SECRET_ID` |
-| Корп-эндпоинты | `.env` (managed-дефолт в коде; self-hosted override) | `VAULT_ADDR=https://vault.sftbmb.ru`, `OTEL_EXPORTER_OTLP_ENDPOINT=https://otel.sftbmb.ru:443`, `REGISTRY_HOST=git.sftbmb.ru` |
+| Корп-эндпоинты | `.env` (managed-дефолт в коде; self-hosted override) | `VAULT_ADDR=https://vault.stit.tech`, `OTEL_EXPORTER_OTLP_ENDPOINT=https://otel.stit.tech:443`, `REGISTRY_HOST=git.stit.tech` |
 | Локально-сгенерированные | `.env` (auto после первого deploy) | `CROWDSEC_BOUNCER_API_KEY` |
 | Оператор-управление | `.env` | `COMPOSE_PROFILES` |
 | Non-secret конфиг | **Vault** `kv/projects/<p>/<env>/meta` | `backend_tag`, `acme_email`, `acme_caserver` |

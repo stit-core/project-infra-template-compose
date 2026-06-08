@@ -258,7 +258,7 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
 **Что фиксируем**:
 
 - otel-agent → endpoint (поле `OTEL_EXPORTER_OTLP_ENDPOINT`): корп-default
-  (managed `otel.sftbmb.ru:443`) или свой коллектор (self-hosted форк
+  (managed `otel.stit.tech:443`) или свой коллектор (self-hosted форк
   corp-infra-template / project-specific). Managed-дефолт в `.env.example`/
   compose, self-hosted переопределяет в `.env`. См. `references/multi-host.md`.
 - Resource attributes: `service.namespace=<project>` / `deployment.env`
@@ -269,7 +269,7 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
 
 **Опции опрашиваются как**:
 
-- otel endpoint: 2 опции (`otel.sftbmb.ru` (default корп) / другой
+- otel endpoint: 2 опции (`otel.stit.tech` (default корп) / другой
   Other).
 - Resource attrs: Other (свободная форма).
 - Логи: 2 опции («через otel-agent» / «local-only»).
@@ -283,7 +283,7 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
 
 **Тест-критерий**:
 
-- ✅ «`otel.sftbmb.ru`; resource attrs `service.namespace=acme,
+- ✅ «`otel.stit.tech`; resource attrs `service.namespace=acme,
   deployment.env=${ENV}`; KV otel (через корп-онбординг); cadvisor +
   node-exporter (дефолт)».
 - ❌ «Без resource attrs» — телеметрия безымянная.

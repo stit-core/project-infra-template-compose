@@ -1,10 +1,10 @@
 services:
   backend:
-    image: ${REGISTRY_HOST:-git.sftbmb.ru}/${PROJECT_NAME}/backend:${BACKEND_TAG}
+    image: ${REGISTRY_HOST:-git.stit.tech}/${PROJECT_NAME}/backend:${BACKEND_TAG}
     container_name: backend
     restart: unless-stopped
     # Opt-in: COMPOSE_PROFILES=backend. Без опубликованного image'а в
-    # git.sftbmb.ru/<project>/backend `compose up --wait` упадёт на pull'е,
+    # git.stit.tech/<project>/backend `compose up --wait` упадёт на pull'е,
     # поэтому стартуем только когда image реально доступен.
     profiles: [backend]
     # OTEL_TENANT, OTEL_TOKEN, PG_DSN, OIDC_*, JWT_SECRET — из vault-agent
@@ -12,7 +12,7 @@ services:
     environment:
       APP_ENV: ${ENV}
       OTEL_SERVICE_NAME: backend
-      # Backend → local otel-agent → корп otel.sftbmb.ru.
+      # Backend → local otel-agent → корп otel.stit.tech.
       OTEL_EXPORTER_OTLP_ENDPOINT: otel-agent:4318
       OTEL_EXPORTER_OTLP_INSECURE: "true"
     env_file:

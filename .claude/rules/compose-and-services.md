@@ -18,7 +18,7 @@ paths:
 
 | Сеть | external | internal | Кто |
 |---|---|---|---|
-| `proxy` | — | нет | Traefik + публичные сервисы (backend) + outbound (vault-agent → vault.sftbmb.ru, otel-agent → otel.sftbmb.ru) |
+| `proxy` | — | нет | Traefik + публичные сервисы (backend) + outbound (vault-agent → vault.stit.tech, otel-agent → otel.stit.tech) |
 | `backend-net` | — | да | postgres, backend, vault-agent (для bind-mount consumer'ов на одном хосте сеть формальна, но держим internal=true) |
 
 Если новый сервис нужен только внутрь — `backend-net`. Если публичный — `proxy + backend-net` (backend-net чтобы видеть БД), не складывай только в `proxy`.

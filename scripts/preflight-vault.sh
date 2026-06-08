@@ -22,10 +22,10 @@ cd "$(dirname "$0")/.."
 : "${PROJECT_NAME:?PROJECT_NAME обязателен}"
 : "${ENV:?ENV обязателен (multi-env: dev/prod/...)}"
 
-# Адрес корп Vault: managed-дефолт `vault.sftbmb.ru`, self-hosted задаёт свой
+# Адрес корп Vault: managed-дефолт `vault.stit.tech`, self-hosted задаёт свой
 # через VAULT_ADDR в .env (managed = инстанс sftbmb, self-hosted = форк
 # corp-infra-template).
-VAULT_ADDR="${VAULT_ADDR:-https://vault.sftbmb.ru}"
+VAULT_ADDR="${VAULT_ADDR:-https://vault.stit.tech}"
 
 PREFLIGHT_HARD="${PREFLIGHT_HARD:-0}"
 

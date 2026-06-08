@@ -31,7 +31,7 @@ ref: docs/project/stack.md
 - minio Console и S3 разнесены на `minio.` и `s3.`, потому что
   S3-клиенты не понимают subpath; Console на отдельном сабдомене для
   ясности доступа.
-- otel endpoint = корп `otel.sftbmb.ru`, не project-specific, потому
+- otel endpoint = корп `otel.stit.tech`, не project-specific, потому
   что project-specific OTel-stack для одного проекта нерентабелен.
 
 ## Что копать дальше

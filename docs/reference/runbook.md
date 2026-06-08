@@ -13,7 +13,7 @@ docker logs vault-agent --tail=50
 Возможные причины:
 - **AppRole creds невалидны** — `Code: 400. Errors: invalid role or secret ID`. Проверь в `.env` что `VAULT_ROLE_ID`/`VAULT_SECRET_ID` совпадают с тем что вернул `onboard-project.sh`. Если оператор крутил `secret-id` — нужно обновить в `.env` + перезапустить vault-agent.
 - **Vault корп-стороны sealed** — `* error performing token check: vault is sealed`. Ничего не починишь с проектной стороны. Эскалировать на корп: оператор делает `vault operator unseal <key>`.
-- **Network unreachable** — `dial tcp: lookup vault.sftbmb.ru: no such host`. Проверь DNS на VPS, проверь outbound-доступ к корпу.
+- **Network unreachable** — `dial tcp: lookup vault.stit.tech: no such host`. Проверь DNS на VPS, проверь outbound-доступ к корпу.
 - **Path не существует в KV** — `* permission denied` на `kv/data/projects/<p>/<env>/<name>`. Значит корп-сторона не засеяла этот KV-объект (онбординг создаёт только `meta` + `otel`; `db` / `oidc` / `jwt` / `minio` / `backup` запрашиваются по мере включения profile'ов). Запроси seed через skill `/request-secret` — он сформирует `vault kv put` блок для корп-админа.
 
 **Recovery:** после исправления — `make restart SVC=vault-agent`, дальше healthcheck подтянется и зависимые сервисы стартуют сами.
@@ -89,7 +89,7 @@ docker exec backup restic check
 Backend rollback (image tag):
 
 ```bash
-# На корп-стороне (vault.sftbmb.ru):
+# На корп-стороне (vault.stit.tech):
 vault kv patch kv/projects/<p>/<env>/meta backend_tag=v0.1.0
 # На проектной (laptop / VPS):
 make ship   # без MSG, deploy.sh детектит template-change и force-recreate'нёт backend
@@ -142,7 +142,7 @@ Backup, который ни разу не тестировался, не раб�
 ## Когда эскалировать на корп
 
 - Vault sealed.
-- otel.sftbmb.ru не принимает данные (tenant 401).
-- git.sftbmb.ru registry pull fails.
+- otel.stit.tech не принимает данные (tenant 401).
+- git.stit.tech registry pull fails.
 
-Эскалация в `#corp-infra` Slack или ntfy.sftbmb.ru.
+Эскалация в `#corp-infra` Slack или ntfy.stit.tech.

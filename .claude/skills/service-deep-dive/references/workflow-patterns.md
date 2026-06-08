@@ -24,7 +24,7 @@
    - **container_name** (Other) — обычно равен `<name>`, но иногда нужен
      суффикс (`<name>-app`). Подсказка: «дефолт == name; нужен другой?».
    - **образ vs движок** — две опции: «свой образ
-     `git.sftbmb.ru/<org>/<name>:<tag>`» / «public engine (postgres /
+     `git.stit.tech/<org>/<name>:<tag>`» / «public engine (postgres /
      minio / redis / …)». Через Other — тег/версия конкретно.
 4. `cp docs/project/_templates/service.md docs/project/services/<name>.md`
    через Read+Write. Заполнить frontmatter (id/kind/subtype/hosting/
@@ -163,7 +163,7 @@
 | тест-критерий из `field-checklists` | опции из примеров ✅/❌, архитектор соотносит свой случай |
 | выбор существующего соседа (KV-kind в templates, профиль из карты, существующий compose-образец) | по опции на каждый существующий + «нужен новый» (Other) |
 | структурный выбор (`entrypoint: true/false`, `public/internal`) | две опции |
-| источник образа (свой `git.sftbmb.ru/<org>/...` vs public engine) | две опции |
+| источник образа (свой `git.stit.tech/<org>/...` vs public engine) | две опции |
 
 ### Когда не давать опции, только Other
 

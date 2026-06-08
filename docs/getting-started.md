@@ -9,7 +9,7 @@
 один раз, шаг 1).
 
 **Два пути control-plane.** Корп control-plane (Vault, OTLP, registry) — это либо **managed**
-sftbmb (`*.sftbmb.ru`; корп-онбординг на шаге 1 делает sftbmb), либо **self-hosted** — ваш форк
+sftbmb (`*.stit.tech`; корп-онбординг на шаге 1 делает sftbmb), либо **self-hosted** — ваш форк
 `corp-infra-template` на своём VPS (корп-шаги делаете вы на нём). Куда смотрит проектная VPS,
 задаётся в `.env` через `VAULT_ADDR` / `OTEL_EXPORTER_OTLP_ENDPOINT` / `REGISTRY_HOST`
 (managed-дефолты в `.env.example`). Вендор-лока нет — архитектура та же, меняется только хост.
@@ -31,12 +31,12 @@ VPS = одна среда). `make ship` пушит и триггерит remote 
 
 ## 0. Форк
 
-1. Gitea (`https://git.sftbmb.ru`) → `sftbmb-core/project-infra-template-compose` →
+1. Gitea (`https://git.stit.tech`) → `stit-core/project-infra-template-compose` →
    **Use this template** → `<org>/infra`.
-2. `git clone git@git.sftbmb.ru:<org>/infra.git && cd infra`.
+2. `git clone git@git.stit.tech:<org>/infra.git && cd infra`.
 3. `make setup` — ставит git-хуки (commit-msg, pre-commit на `roadmap.md`).
 
-На self-hosted замените `git.sftbmb.ru` на git вашего control-plane (`REGISTRY_HOST`).
+На self-hosted замените `git.stit.tech` на git вашего control-plane (`REGISTRY_HOST`).
 
 ## 1. Day-0 — корп-онбординг проекта (один раз на все env)
 
@@ -98,7 +98,7 @@ ansible-playbook -i ansible/inventory.ini ansible/bootstrap.yml --tags onboard
 control-plane):
 
 ```bash
-ssh root@<vps> 'docker login git.sftbmb.ru -u <user> -p <PAT>'
+ssh root@<vps> 'docker login git.stit.tech -u <user> -p <PAT>'
 ```
 
 ## 4. Заполнить `.env` на VPS

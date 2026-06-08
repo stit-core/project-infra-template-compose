@@ -68,7 +68,7 @@ cross-repo (форки backend/frontend, seed секретов, правка п�
 - [ ] Форк создан (Gitea → **Use this template** → `<org>/infra`),
   склонирован локально.
 - [ ] `make setup` прогнан (git-хуки commit-msg + pre-commit).
-- [ ] Origin — не канонический `…sftbmb-core/project-infra-template-compose`
+- [ ] Origin — не канонический `…stit-core/project-infra-template-compose`
   (это форк или throwaway). Канонический шаблон → СТОП, объяснить
   почему.
 

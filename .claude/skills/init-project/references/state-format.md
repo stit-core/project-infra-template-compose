@@ -34,7 +34,7 @@ kind: init-project-journey
 
 ## Cross-repo next-steps
 - Форкнуть `<org>/backend` из `go-backend-template`, образ
-  `git.sftbmb.ru/<org>/backend`, tag → `meta.backend_tag`.
+  `git.stit.tech/<org>/backend`, tag → `meta.backend_tag`.
 - Корп-онбординг: `onboard-project.sh --name acme --envs dev,prod`
   (AppRole + meta + otel).
 - Seed `kv/projects/acme/dev/db` (user/password/database) через

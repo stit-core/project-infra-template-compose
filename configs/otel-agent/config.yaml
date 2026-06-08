@@ -41,7 +41,7 @@ processors:
 exporters:
   otlp_http/corp:
     # Upstream корп OTLP-ingest. Адрес из env OTEL_EXPORTER_OTLP_ENDPOINT
-    # (managed-дефолт otel.sftbmb.ru задаётся в compose/otel-agent.yml;
+    # (managed-дефолт otel.stit.tech задаётся в compose/otel-agent.yml;
     # self-hosted переопределяет в .env). TLS включён (insecure: false).
     endpoint: ${env:OTEL_EXPORTER_OTLP_ENDPOINT}
     headers:

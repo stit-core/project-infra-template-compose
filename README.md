@@ -9,7 +9,7 @@ Postgres, MinIO, backend, vault-agent, otel-agent, backup — декларати
 секреты из Vault, телеметрия в control-plane. Форк → `<org>/infra`, разворот за день.
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-2563eb)](LICENSE)
-[![Часть sftbmb](https://img.shields.io/badge/sftbmb-открытые_шаблоны-6366f1)](https://git.sftbmb.ru/sftbmb-core/sftbmb-public)
+[![Часть sftbmb](https://img.shields.io/badge/sftbmb-открытые_шаблоны-6366f1)](https://git.stit.tech/stit-core/sftbmb-public)
 [![Stack](https://img.shields.io/badge/stack-Docker_Compose-0ea5e9)](#что-внутри)
 [![Edge](https://img.shields.io/badge/edge-Traefik_v3_%2B_CrowdSec-22c55e)](#что-внутри)
 [![Secrets](https://img.shields.io/badge/secrets-vault--agent-000000)](#контракт-с-control-plane)
@@ -28,23 +28,23 @@ corp-infra-template          control plane — Vault · OTLP · registry
 project-infra-template-compose   ← вы здесь   (форк → <org>/infra, один VPS на среду)
       │  runtime для образа backend
       ▼
-<org>/backend                форк go-backend-template ──► sftbmb-core/golibinfra
+<org>/backend                форк go-backend-template ──► stit-core/golibinfra
 ```
 
 Продуктовый контекст (vision, surfaces) — в соседнем `<org>/docs` (форк
-[`project-docs-template`](https://git.sftbmb.ru/sftbmb-core/project-docs-template)),
+[`project-docs-template`](https://git.stit.tech/stit-core/project-docs-template)),
 читается cross-repo. Канон контрактов —
-[`corp-infra-template/docs/ecosystem.md`](https://git.sftbmb.ru/sftbmb-core/corp-infra-template/src/branch/main/docs/ecosystem.md).
+[`corp-infra-template/docs/ecosystem.md`](https://git.stit.tech/stit-core/corp-infra-template/src/branch/main/docs/ecosystem.md).
 
 ## Два пути: managed или self-hosted
 
 Вендор-лока нет — control-plane может быть наш или ваш:
 
-- **Managed (sftbmb).** Наводите эндпоинты на наш контур (`vault.sftbmb.ru`,
-  `otel.sftbmb.ru`, `git.sftbmb.ru`); мы онбордим проект (`onboard-project.sh`) и
+- **Managed (sftbmb).** Наводите эндпоинты на наш контур (`vault.stit.tech`,
+  `otel.stit.tech`, `git.stit.tech`); мы онбордим проект (`onboard-project.sh`) и
   держим uptime. Меньше всего возни.
 - **Self-hosted.** Поднимаете **свой** control-plane из
-  [`corp-infra-template`](https://git.sftbmb.ru/sftbmb-core/corp-infra-template)
+  [`corp-infra-template`](https://git.stit.tech/stit-core/corp-infra-template)
   (свой Vault, OTLP/Grafana, registry, онбординг) и наводите эти же эндпоинты на
   него — ни от кого не зависите.
 
@@ -133,8 +133,8 @@ Restore из backup'а — `make restore-pg SNAPSHOT=latest`
 
 Это один из открытых шаблонов sftbmb (Apache-2.0) — фундамент «-1 уровня»,
 берите бесплатно и владейте. Карта всех шаблонов и точка входа —
-**[витрина sftbmb](https://git.sftbmb.ru/sftbmb-core/sftbmb-public)**. Нужна
-команда, стандарт или поддержка — **[наш подход и контакты (vision)](https://git.sftbmb.ru/sftbmb/vision)**.
+**[витрина sftbmb](https://git.stit.tech/stit-core/sftbmb-public)**. Нужна
+команда, стандарт или поддержка — **[наш подход и контакты (vision)](https://git.stit.tech/sftbmb/vision)**.
 
 ## Лицензия
 

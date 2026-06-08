@@ -53,9 +53,9 @@ make ship  # vault-agent перерендерит traefik.yml, traefik поды�
 ## Предусловия (СПРОСИ юзера)
 
 > **Где живёт корп-сторона — два пути (спроси заранее).**
-> - **managed:** control-plane держит sftbmb на `*.sftbmb.ru`; `onboard-project.sh` запускает
+> - **managed:** control-plane держит sftbmb на `*.stit.tech`; `onboard-project.sh` запускает
 >   корп-оператор sftbmb, тебе возвращают per-env блок creds. OTLP/Vault/registry-эндпоинты —
->   managed-дефолты из `.env.example` (`otel.sftbmb.ru` / `vault.sftbmb.ru` / `git.sftbmb.ru`).
+>   managed-дефолты из `.env.example` (`otel.stit.tech` / `vault.stit.tech` / `git.stit.tech`).
 > - **self-hosted:** ты сам держишь форк `corp-infra-template` (свой `<org>/infra`-control-plane);
 >   `onboard-project.sh` запускаешь **в нём**, эндпоинты в проектном `.env` наводишь на свой
 >   домен (`OTEL_EXPORTER_OTLP_ENDPOINT` / `VAULT_ADDR` / `REGISTRY_HOST` — см. `.env.example`).
@@ -72,7 +72,7 @@ make ship  # vault-agent перерендерит traefik.yml, traefik поды�
    ```
    Создаст per-env AppRole + засеит `kv/projects/<p>/<env>/{meta,otel}`. Вернёт блок `PROJECT_NAME / ENV / VAULT_ROLE_ID / VAULT_SECRET_ID` для каждого env. Без этого делать нечего.
 
-   `--source-ip` пишет egress-IP проектной VPS в корп CrowdSec whitelist. Без него otel-collector UA попадает под `crowdsecurity/http-bad-user-agent` и весь трафик с проектной VPS режется 403'ами (метрики/логи перестанут доходить до `otel.sftbmb.ru`). Можно опустить флаг, если IP заранее неизвестен — добавляется потом `echo` в `configs/crowdsec/whitelists.yaml` + `docker compose restart crowdsec` на корп-VPS (см. `corp-infra-template/.claude/rules/crowdsec-whitelist.md`).
+   `--source-ip` пишет egress-IP проектной VPS в корп CrowdSec whitelist. Без него otel-collector UA попадает под `crowdsecurity/http-bad-user-agent` и весь трафик с проектной VPS режется 403'ами (метрики/логи перестанут доходить до `otel.stit.tech`). Можно опустить флаг, если IP заранее неизвестен — добавляется потом `echo` в `configs/crowdsec/whitelists.yaml` + `docker compose restart crowdsec` на корп-VPS (см. `corp-infra-template/.claude/rules/crowdsec-whitelist.md`).
 
 2. **VPS provisioned**, у тебя есть IP и root-доступ по SSH ключу (минимум один ключ в `/root/.ssh/authorized_keys`).
 
@@ -90,7 +90,7 @@ make ship  # vault-agent перерендерит traefik.yml, traefik поды�
 
 ```ini
 [project_vps]
-prod ansible_host=<IP> ansible_user=root project_name=<p> project_repo_url=git@git.sftbmb.ru:<client-org>/infra.git
+prod ansible_host=<IP> ansible_user=root project_name=<p> project_repo_url=git@git.stit.tech:<client-org>/infra.git
 
 [project_vps:vars]
 ansible_python_interpreter=/usr/bin/python3
@@ -118,7 +118,7 @@ ansible-playbook -i ansible/inventory.ini ansible/bootstrap.yml --tags onboard
 Сгенерит deploy-key в `/root/.ssh/<project>-deploy`, напечатает pubkey, попробует склонировать репо. **Первый запуск ожидаемо падает на clone** — deploy-key ещё не в Gitea.
 
 Скопируй pubkey → **попроси оператора зарегистрировать в Gitea**:
-- `git.sftbmb.ru/<client-org>/infra` → Settings → Deploy Keys → Add → paste pubkey, **read-only**
+- `git.stit.tech/<client-org>/infra` → Settings → Deploy Keys → Add → paste pubkey, **read-only**
 
 ### 4. Re-run onboard (после регистрации deploy-key)
 
@@ -214,7 +214,7 @@ make ship MSG="feat(foo): bar"   # add -A + commit + push + (на main) ssh-depl
 - `make ps` — always-on сервисы healthy.
 - `https://${DOMAIN}/` — landing отдаётся через traefik + LE.
 - `docker exec vault-agent ls -la /secrets/ /env /configs` — rendered файлы (`ls` внутри контейнера — make-first исключение).
-- `make logs SVC=otel-agent` — нет auth-ошибок при экспорте в `otel.sftbmb.ru`.
+- `make logs SVC=otel-agent` — нет auth-ошибок при экспорте в `otel.stit.tech`.
 - `make logs SVC=vault-agent` — successful render, нет re-auth циклов.
 
 ### Backup smoke-test (после активации storage профиля)

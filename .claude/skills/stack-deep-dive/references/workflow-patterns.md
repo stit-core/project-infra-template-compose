@@ -81,7 +81,7 @@ oбa под `*.acme.dev`, public только backend и minio Console»).
    - Edge: crowdsec@file (дефолт), source-IP — TBD;
    - Networks: дефолтные proxy/backend-net;
    - Backup: restic репо `s3://restic.acme.dev/<env>`, расписание TBD;
-   - Observability: дефолтный otel.sftbmb.ru (KV otel из корп-онбординга);
+   - Observability: дефолтный otel.stit.tech (KV otel из корп-онбординга);
    - Generates: traefik dynamic для api/minio, DOMAIN в .env.example.
    ```
 4. Раунд `AskUserQuestion` — подтвердить разнос / попросить корректировку

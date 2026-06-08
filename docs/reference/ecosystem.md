@@ -1,11 +1,11 @@
 # Ecosystem — место проектной VPS среди репо
 
 Этот репо — **шаблон проектной инфры**: один форк (`<org>/infra`) = один клиентский проект,
-один VPS на среду (`dev`/`prod`/...). Экосистема — 5 форкаемых шаблонов `sftbmb-core/`
+один VPS на среду (`dev`/`prod`/...). Экосистема — 5 форкаемых шаблонов `stit-core/`
 (`corp-infra-template`, `go-backend-template`, `spa-frontend-template`,
 `project-docs-template`, `project-infra-template-compose`) + 2 общие библиотеки
-`sftbmb-core/golibinfra` (Go) и `sftbmb-core/ui-lib` (`@sftbmb/ui`, frontend design-system).
-Корп control-plane — это репо `corp-infra-template` (managed = инстанс на `*.sftbmb.ru`;
+`stit-core/golibinfra` (Go) и `stit-core/ui-lib` (`@stit-design/ui`, frontend design-system).
+Корп control-plane — это репо `corp-infra-template` (managed = инстанс на `*.stit.tech`;
 self-hosted = ваш форк). Канон карты контрактов живёт в
 `corp-infra-template/docs/ecosystem.md` — здесь только роль *этого* репо и его контракты.
 
@@ -13,22 +13,22 @@ self-hosted = ваш форк). Канон карты контрактов жи�
 
 | Репо | Роль |
 |---|---|
-| `sftbmb-core/corp-infra-template` | Корп control-plane: Vault, OTel ingest, Gitea registry, CrowdSec, SSO. Source of truth контрактов. Managed = инстанс на `*.sftbmb.ru`, self-hosted = ваш форк. |
-| `sftbmb-core/go-backend-template` | Шаблон Go-бэкенда. Форк `<org>/backend` собирает образ в `git.sftbmb.ru`. |
-| `sftbmb-core/project-docs-template` | Шаблон продуктовой аналитики (business → projects: vision/persona/**surface** → interface → screens). Форк `<org>/docs`. |
-| `sftbmb-core/project-infra-template-compose` | **Этот.** Шаблон проектной VPS — runtime стека одного проекта. Форк `<org>/infra`. |
+| `stit-core/corp-infra-template` | Корп control-plane: Vault, OTel ingest, Gitea registry, CrowdSec, SSO. Source of truth контрактов. Managed = инстанс на `*.stit.tech`, self-hosted = ваш форк. |
+| `stit-core/go-backend-template` | Шаблон Go-бэкенда. Форк `<org>/backend` собирает образ в `git.stit.tech`. |
+| `stit-core/project-docs-template` | Шаблон продуктовой аналитики (business → projects: vision/persona/**surface** → interface → screens). Форк `<org>/docs`. |
+| `stit-core/project-infra-template-compose` | **Этот.** Шаблон проектной VPS — runtime стека одного проекта. Форк `<org>/infra`. |
 | `<org>/infra` + `<org>/docs` + `<org>/backend` + ... | Клиентские форки. Один `<org>/infra` обслуживает N сервис-форков и читает `<org>/docs`. |
 
 ## Зависит от корп control-plane (`corp-infra-template`)
 
 | Что корп выдаёт | Как | Адрес |
 |---|---|---|
-| AppRole `projects-<p>-<env>` + KV `kv/projects/<p>/<env>/*` (read-only) | `onboard-project.sh --name <p> --envs ...` | `vault.sftbmb.ru` |
-| Telemetry ingest (OTLP, tenant routing) | otel-token в `kv/.../otel` | `otel.sftbmb.ru` |
-| Source + container registry | deploy-key + PAT login | `git.sftbmb.ru` |
+| AppRole `projects-<p>-<env>` + KV `kv/projects/<p>/<env>/*` (read-only) | `onboard-project.sh --name <p> --envs ...` | `vault.stit.tech` |
+| Telemetry ingest (OTLP, tenant routing) | otel-token в `kv/.../otel` | `otel.stit.tech` |
+| Source + container registry | deploy-key + PAT login | `git.stit.tech` |
 | CrowdSec whitelist egress-IP проектной VPS | `--source-ip <env>=<ip>` при онбординге | corp-side |
 
-Адреса `vault.sftbmb.ru` / `otel.sftbmb.ru` / `git.sftbmb.ru` — managed-инстанс; на
+Адреса `vault.stit.tech` / `otel.stit.tech` / `git.stit.tech` — managed-инстанс; на
 self-hosted это адреса вашего форка `corp-infra-template`, задаются через `VAULT_ADDR` /
 `OTEL_EXPORTER_OTLP_ENDPOINT` / `REGISTRY_HOST` (см. `.env.example`). Вендор-лока нет.
 
@@ -37,7 +37,7 @@ lazy-seed, profile-opt-in) — `.claude/rules/multi-env.md`.
 
 ## Обслуживает `<org>/backend`
 
-Runtime для клиентского образа `git.sftbmb.ru/<org>/backend:<tag>`. Deploy нового тега —
+Runtime для клиентского образа `git.stit.tech/<org>/backend:<tag>`. Deploy нового тега —
 корп патчит `vault kv patch kv/projects/<p>/<env>/meta backend_tag=<tag>`, оператор делает
 `make ship` (без MSG) → vault-agent перерендерит `meta`, deploy.sh force-recreate'нет backend.
 `BACKEND_TAG` в `.env` не лежит — приходит из Vault.

@@ -27,7 +27,7 @@ Identity / Secrets / Route / Generates. По разделу на каждую с
   - `infra` → обычно always-on, не профильное.
 - Источник: для `backend` — внешний source-репо `<org>/backend`, но
   контейнер `here`; для движков (postgres/minio) — official image; для
-  кастомного образа — `git.sftbmb.ru/<org>/<name>`.
+  кастомного образа — `git.stit.tech/<org>/<name>`.
 
 **Опции опрашиваются как**:
 
@@ -45,7 +45,7 @@ Identity / Secrets / Route / Generates. По разделу на каждую с
 **Тест-критерий**:
 
 - ✅ «Сервис `here`, профиль `postgres`, образ движок `postgres:17.X`».
-- ✅ «Сервис `here`, профиль `backend`, образ `git.sftbmb.ru/<org>/backend:<sha>`».
+- ✅ «Сервис `here`, профиль `backend`, образ `git.stit.tech/<org>/backend:<sha>`».
 - ❌ «Сервис `external` с service-doc» (это рассинхрон, такого быть не должно).
 - ❌ «Дублирован полный набор `COMPOSE_PROFILES=postgres,storage,backend`».
 
@@ -89,7 +89,7 @@ Identity / Secrets / Route / Generates. По разделу на каждую с
 
 - ✅ «`image: postgres:17.4`, `container_name: db`, healthcheck
   `pg_isready -U postgres`, сеть `backend-net`».
-- ✅ «`image: git.sftbmb.ru/acme/backend:abc1234`, healthcheck
+- ✅ «`image: git.stit.tech/acme/backend:abc1234`, healthcheck
   `wget -qO- http://localhost:8080/healthz`, сети `proxy + backend-net`».
 - ❌ «`image: minio/minio:latest`» — pinned обязательно.
 - ❌ «public сервис без сети `proxy`».

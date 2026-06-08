@@ -6,7 +6,7 @@ pid_file = "/tmp/vault-agent.pid"
 
 vault {
   # Адрес корп Vault. envsubst в render-configs.sh подставляет ${VAULT_ADDR}
-  # (managed-дефолт vault.sftbmb.ru; self-hosted задаёт свой в .env).
+  # (managed-дефолт vault.stit.tech; self-hosted задаёт свой в .env).
   address = "${VAULT_ADDR}"
 }
 

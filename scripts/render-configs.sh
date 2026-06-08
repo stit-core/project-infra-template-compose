@@ -25,7 +25,7 @@ set +a
 
 # Managed-дефолт адреса корп Vault для envsubst head.hcl (self-hosted задаёт
 # свой VAULT_ADDR в .env). Только эта переменная подставляется в agent.hcl.
-export VAULT_ADDR="${VAULT_ADDR:-https://vault.sftbmb.ru}"
+export VAULT_ADDR="${VAULT_ADDR:-https://vault.stit.tech}"
 
 # ───── 1. envsubst для не-vault .tpl ─────
 while IFS= read -r tpl; do

@@ -41,8 +41,8 @@ authoring-проверок без `.env`/docker — норма, не паден�
 **Роль:** шаблон проектной VPS. Один форк (`<client-org>/infra`) — один проект, один VPS на
 env (dev/staging/prod).
 **Зависит от:** `corp-infra-template` — выдаёт AppRole `projects-<p>-<env>` + KV
-`kv/projects/<p>/<env>/*` (через `onboard-project.sh`), принимает OTLP на `otel.sftbmb.ru`,
-хостит registry `git.sftbmb.ru`.
+`kv/projects/<p>/<env>/*` (через `onboard-project.sh`), принимает OTLP на `otel.stit.tech`,
+хостит registry `git.stit.tech`.
 **Обслуживает:** `<client-org>/backend` (форк `go-backend-template`) — runtime для его образа;
 deploy через `vault kv patch kv/projects/<p>/<env>/meta backend_tag=<tag>` + `make ship`.
 **Читает:** `<client-org>/docs` (форк `project-docs-template`) — продуктовый контекст (vision,
@@ -56,9 +56,9 @@ surfaces); sibling-checkout рядом с этим репо, read-only. Резо
 |---|---|---|
 | Edge | Traefik v3 + CrowdSec | `compose/traefik.yml`, `compose/crowdsec.yml` |
 | DB | Postgres 17 | `compose/postgres.yml` |
-| App | Backend (`git.sftbmb.ru/<client-org>/backend`) | `compose/backend.yml` |
+| App | Backend (`git.stit.tech/<client-org>/backend`) | `compose/backend.yml` |
 | Secrets | vault-agent sidecar | `compose/vault-agent.yml` |
-| Telemetry | otel-agent → `otel.sftbmb.ru` (OTLP + Prom-scrape host-метрик) | `compose/otel-agent.yml` |
+| Telemetry | otel-agent → `otel.stit.tech` (OTLP + Prom-scrape host-метрик) | `compose/otel-agent.yml` |
 | Host metrics | cadvisor + node-exporter | `compose/cadvisor.yml`, `compose/node-exporter.yml` |
 | Storage | Minio (S3 + Console) на `s3.${DOMAIN}` / `minio.${DOMAIN}` | `compose/minio.yml` |
 | Backup | restic + pg_dumpall + crond в alpine, пишет в `$RESTIC_REPOSITORY` | `compose/backup.yml`, `containers/backup/` |

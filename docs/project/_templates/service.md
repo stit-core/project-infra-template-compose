@@ -12,10 +12,10 @@ status: draft
 ## Hosting
 <here — контейнер в этом репо (compose/<name>.yml, профиль); external — свой репо/CDN, здесь
 только роут/контекст. Для backend: source-репо внешний, НО контейнер хостится here
-(hosting: here, образ из git.sftbmb.ru/<org>/backend). Какой профиль COMPOSE_PROFILES активирует.>
+(hosting: here, образ из git.stit.tech/<org>/backend). Какой профиль COMPOSE_PROFILES активирует.>
 
 ## Identity
-<Что это: образ (`git.sftbmb.ru/<org>/<name>:<tag>`, закреплённая версия) или движок
+<Что это: образ (`git.stit.tech/<org>/<name>:<tag>`, закреплённая версия) или движок
 (postgres 17 / minio). container_name, healthcheck (path/команда), сети (proxy / backend-net).>
 
 ## Secrets

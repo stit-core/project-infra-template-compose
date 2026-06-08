@@ -240,7 +240,7 @@ A — Phase B (печать cross-repo next-steps).
 
 ### 1. Внешние сервисы
 - [ ] Форкнуть `<org>/backend` из `go-backend-template`,
-      собрать образ `git.sftbmb.ru/<org>/backend:<tag>`.
+      собрать образ `git.stit.tech/<org>/backend:<tag>`.
 - [ ] Форкнуть `<org>/frontend` (если есть external).
 
 ### 2. Корп-онбординг (если ещё нет)
