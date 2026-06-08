@@ -4,7 +4,7 @@
 один VPS на среду (`dev`/`prod`/...). Экосистема — 5 форкаемых шаблонов `stit-core/`
 (`corp-infra-template`, `go-backend-template`, `spa-frontend-template`,
 `project-docs-template`, `project-infra-template-compose`) + 2 общие библиотеки
-`stit-core/golibinfra` (Go) и `stit-core/ui-lib` (`@stit-design/ui`, frontend design-system).
+`stit-core/golibinfra` (Go) и `stit-core/ui-lib` (`@stit/ui`, frontend design-system).
 Корп control-plane — это репо `corp-infra-template` (managed = инстанс на `*.stit.tech`;
 self-hosted = ваш форк). Канон карты контрактов живёт в
 `corp-infra-template/docs/ecosystem.md` — здесь только роль *этого* репо и его контракты.
