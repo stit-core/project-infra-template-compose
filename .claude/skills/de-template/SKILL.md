@@ -1,6 +1,6 @@
 ---
 name: de-template
-description: Развернуть форк `project-infra-template-compose` в самостоятельную проектную инфру по stable-артефактам `docs/project` — вывести `COMPOSE_PROFILES` из `stack § Service map`, прунить неиспользуемые `compose/*.yml` + vault-agent parts/templates, кастомить `CLAUDE.md`/`README.md` под проект (продуктовый контекст читает cross-repo из `<org>/docs`), печатать cross-repo next-steps. Активируй когда юзер форкнул шаблон и говорит "/de-template", "разверни инфру", "де-темплейтизируй", "убери шаблонную мету", или когда `/init-project` дошёл до развёртывания (стек+сервисы stable). Движок skill-only — reviewable edits по фазам с показом каскадов перед прунингом. НЕ запускать на каноническом шаблоне.
+description: Развернуть форк `project-infra-template-compose` в самостоятельную проектную инфру по stable-артефактам `docs/project` — вывести `COMPOSE_PROFILES` из `stack § Service map`, прунить неиспользуемые `compose/*.yml` + vault-agent parts/templates, кастомить `CLAUDE.md`/`README.md` под проект (продуктовый контекст читает cross-repo из `<org>/strategy`), печатать cross-repo next-steps. Активируй когда юзер форкнул шаблон и говорит "/de-template", "разверни инфру", "де-темплейтизируй", "убери шаблонную мету", или когда `/init-project` дошёл до развёртывания (стек+сервисы stable). Движок skill-only — reviewable edits по фазам с показом каскадов перед прунингом. НЕ запускать на каноническом шаблоне.
 ---
 
 # de-template — движок развёртывания инфры
@@ -8,7 +8,7 @@ description: Развернуть форк `project-infra-template-compose` в �
 Превращает форк `project-infra-template-compose` в проектную инфру,
 которая ничего не помнит про шаблон. Читает **stable** инфра-артефакты
 `docs/project/{services/*, stack}` (+ продуктовый контекст cross-repo из
-`<org>/docs` для кастомизации идентичности) и:
+`<org>/strategy` для кастомизации идентичности) и:
 
 1. Выводит `COMPOSE_PROFILES` из `stack § Service map`.
 2. Прунит неиспользуемые compose/vault-agent-фрагменты (с показом
@@ -62,7 +62,7 @@ A.2/A.3, обнуление roadmap в A.5, удаление getting-started) и
 2. Прогнать **Gate** (см. ниже).
 3. Прочитать stable-артефакты: `docs/project/stack.md` (§ Service map +
    § Generates) + все `services/*.md`. Для A.4 — продуктовый
-   `<org>/docs/.../vision.md § Problem` (cross-repo; резолв пути —
+   `<org>/strategy/.../vision.md § Problem` (cross-repo; резолв пути —
    `docs/reference/ecosystem.md`).
 4. Если args = `status` — только сводка + `AskUserQuestion` «что
    делать?» (продолжить / пропустить фазу X / выход).
@@ -145,7 +145,7 @@ A.2/A.3, обнуление roadmap в A.5, удаление getting-started) и
 ### A.4. Кастомить идентичность
 
 - `CLAUDE.md` — шапка/стек под имя проекта из продуктового
-  `<org>/docs/.../vision.md § Problem` (cross-repo read); убрать
+  `<org>/strategy/.../vision.md § Problem` (cross-repo read); убрать
   «шаблон stit», «копируется в `<client-org>/infra`», секцию «Что
   менять при копировании». Карта где-что и rules остаются.
 - `README.md` (корневой) — проектная шапка вместо «шаблон проектной
@@ -161,7 +161,7 @@ A.2/A.3, обнуление roadmap в A.5, удаление getting-started) и
 - `.claude/plans/roadmap.md` — сбросить к пустому fork-start (history
   шаблона ≠ история форка): шапка + пустые `## Active` / `## Backlog`.
 - `docs/project/{services/*, stack}.md` — **оставить**: это инфра-доки
-  проекта (карта сервисов + cross-cutting). Продуктовые доки — в `<org>/docs`.
+  проекта (карта сервисов + cross-cutting). Продуктовые доки — в `<org>/strategy`.
 - `docs/project/_templates/` и deep-dive/init-project скилы — тоже
   остаются (система наследуется).
 

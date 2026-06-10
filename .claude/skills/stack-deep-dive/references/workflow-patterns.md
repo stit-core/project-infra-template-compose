@@ -12,9 +12,9 @@ C по секциям. B — реже, для разбора сырья (опи�
 ### Шаги
 
 1. Прочитать `docs/project/README.md`, `field-checklists.md`, и
-   **продуктовый контекст cross-repo** из `<org>/docs` (`docs/projects/
+   **продуктовый контекст cross-repo** из `<org>/strategy` (`docs/projects/
    <slug>/surface.md` — кандидаты public-поверхностей; резолв пути —
-   `docs/reference/ecosystem.md`, дефолт `../docs`). `Service map` авторится
+   `docs/reference/ecosystem.md`, дефолт `../strategy`). `Service map` авторится
    здесь; по surfaces только сверяемся, не падаем если sibling-репо нет.
 2. `cp docs/project/_templates/stack.md docs/project/stack.md` через
    Read+Write. Заполнить frontmatter (id=project.stack / kind=stack /
@@ -66,7 +66,7 @@ oбa под `*.acme.dev`, public только backend и minio Console»).
 ### Шаги
 
 1. Прочитать материал внимательно. Прочитать `services/*.md` и
-   продуктовые surfaces из `<org>/docs` (cross-repo) — что уже есть.
+   продуктовые surfaces из `<org>/strategy` (cross-repo) — что уже есть.
    `Service map` авторишь здесь из материала + surfaces.
 2. Разнести материал по 8 секциям. Фильтр — секции `Что НЕ` из
    `field-checklists.md`:
@@ -110,7 +110,7 @@ oбa под `*.acme.dev`, public только backend и minio Console»).
 1. Прочитать `stack.md`.
 2. Прочитать `state/stack.md`, если есть.
 3. Прочитать соседей по теме:
-   - **service-map** → продуктовые surfaces из `<org>/docs` (cross-repo) +
+   - **service-map** → продуктовые surfaces из `<org>/strategy` (cross-repo) +
      существующие `services/*.md` (каждый `hosting: here` = строка карты).
    - **domains** → `stack § Service map` (свой, в этом же файле — какие
      сервисы public) + `services/*.md § Route` (какие сабдомены упомянуты).

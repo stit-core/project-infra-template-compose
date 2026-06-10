@@ -2,7 +2,7 @@
 
 Инфра-слой проектной VPS — **source of truth для `de-template`**: из чего стек состоит и как
 этот VPS его хостит. **Продуктовый контекст** (проблема, пользователи, поверхности продукта)
-живёт в соседнем репо `project-docs-template` (форк `<org>/docs`, `docs/projects/<slug>/`) и
+живёт в соседнем репо `business-strategy-template` (форк `<org>/strategy`, `docs/projects/<slug>/`) и
 читается **cross-repo** — здесь не дублируется. См. `docs/reference/ecosystem.md § sibling-docs`.
 
 Заполняется через `/init-project` (оркестратор) → `/stack-deep-dive` + `/service-deep-dive`,
@@ -87,19 +87,20 @@ Always-on edge/телеметрия (`traefik`/`crowdsec`/`vault-agent`/`otel-ag
 
 ## Cross-repo: продуктовый контекст
 
-Продуктовая аналитика (vision / persona / surface / capability) живёт в `<org>/docs`
-(`project-docs-template`), склонированном **рядом** с `<org>/infra` (sibling-checkout). Скиллы
-читают её при старте, чтобы привязать инфру к продукту:
+Продуктовый слой (vision / surface / capability) живёт в `<org>/strategy`
+(`business-strategy-template` — репо бизнес-стратегии; продукт в `docs/projects/<slug>/`),
+склонированном **рядом** с `<org>/infra` (sibling-checkout). Скиллы читают его при старте,
+чтобы привязать инфру к продукту:
 
-- `stack-deep-dive` читает `<org>/docs/.../surface.md` — какие поверхности public (нужны сабдомены).
-- `de-template` читает `<org>/docs/.../vision.md § Problem` — кастомизировать `CLAUDE.md` под проект.
+- `stack-deep-dive` читает `<org>/strategy/.../surface.md` — какие поверхности public (нужны сабдомены).
+- `de-template` читает `<org>/strategy/.../vision.md § Problem` — кастомизировать `CLAUDE.md` под проект.
 
-Авторская сторона продуктовых артефактов — **только** `<org>/docs`; здесь их не редактируем.
+Авторская сторона продуктовых артефактов — **только** `<org>/strategy`; здесь их не редактируем.
 Конвенция расположения и pointer — `docs/reference/ecosystem.md`.
 
 ## Workflow
 
-1. `/init-project` читает продуктовый контекст из `<org>/docs` (vision + surfaces) как scope.
+1. `/init-project` читает продуктовый контекст из `<org>/strategy` (vision + surfaces) как scope.
 2. `cp _templates/stack.md docs/project/stack.md` → `/stack-deep-dive` — волны вопросов до
    заполненной `Service map` + cross-cutting + Environments, до `status: stable`.
 3. Per hosted-сервис из карты (`hosting: here`): `cp _templates/service.md
@@ -120,7 +121,7 @@ domain/stack-gate эталона. `scripts/git-hooks/pre-commit` гонит ва
   только в `stack § Service map`. service-doc — для **hosted** контейнеров этого VPS.
 - ❌ Дублировать `COMPOSE_PROFILES` явным списком в `stack.md` — профили выводит `de-template` из
   `Service map`.
-- ❌ Дублировать продуктовую аналитику (Problem / Users / surfaces) здесь — она в `<org>/docs`,
+- ❌ Дублировать продуктовую аналитику (Problem / Users / surfaces) здесь — она в `<org>/strategy`,
   читается cross-repo.
 - ❌ Оставлять `Generates` пустым — движку `de-template` не из чего разворачивать.
 - ❌ Промоутить `status: stable` руками без зелёного валидатора.

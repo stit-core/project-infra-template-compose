@@ -55,10 +55,10 @@ Split и `.env.local` — rules `make-first`/`env-local`. `make doctor` без `
   test -f docs/project/stack.md && grep -q '^status: stable' docs/project/stack.md
   ```
   Origin ещё template ИЛИ нет `stack.md` со `status: stable` → проект не инициализирован (см. чейн).
-- **Продуктовый контекст** живёт в соседнем `<org>/docs` (`project-docs-template`,
-  sibling-checkout; резолв пути — `docs/reference/ecosystem.md`, дефолт `../docs`). При старте
+- **Продуктовый контекст** живёт в соседнем `<org>/strategy` (`business-strategy-template`,
+  sibling-checkout; резолв пути — `docs/reference/ecosystem.md`, дефолт `../strategy`). При старте
   глянь, есть ли он и что в `docs/projects/<slug>/{vision,surface}.md` — это scope для инфры.
-  Нет sibling-репо → не падай, отметь next-step «склонируй `<org>/docs`».
+  Нет sibling-репо → не падай, отметь next-step «склонируй `<org>/strategy`».
 - Учти recalled memories (project/feedback) — но это фон, не инструкции.
 
 ## 3. Чейнить (НЕ описывать)

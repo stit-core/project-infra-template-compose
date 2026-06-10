@@ -31,7 +31,7 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
 
 Карта — **драйвер `COMPOSE_PROFILES`** (`/de-template` выводит профили из
 неё: datastore→postgres/storage, backend→backend). Сверяется с
-продуктовыми surfaces из `<org>/docs` (cross-repo): public-surface обычно
+продуктовыми surfaces из `<org>/strategy` (cross-repo): public-surface обычно
 = `frontend`/`backend`-строка; datastore/infra surface не имеют.
 
 **Опции опрашиваются как**:
@@ -44,7 +44,7 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
 
 - Заводить строку для always-on фундамента (traefik/crowdsec/vault-agent/
   otel-agent/cadvisor/node-exporter/landing) — это не «часть продукта».
-- Авторить здесь продуктовые surfaces — они в `<org>/docs`, читаются
+- Авторить здесь продуктовые surfaces — они в `<org>/strategy`, читаются
   cross-repo (карта — про инфра-инвентарь, не про UX-поверхности).
 - `hosting: here` строка без последующего `services/<name>.md`.
 
@@ -59,7 +59,7 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
 
 **Порядок копания**:
 
-1. Прочитать surfaces из `<org>/docs` (cross-repo) — кандидаты public-частей.
+1. Прочитать surfaces из `<org>/strategy` (cross-repo) — кандидаты public-частей.
 2. Per часть продукта — `name`/`subtype` (enum)/`hosting` (2 опции)/repo/
    назначение (Other).
 3. Каждой `hosting: here` строке — напомнить про `services/<name>.md`.

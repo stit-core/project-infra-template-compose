@@ -31,8 +31,8 @@ project-infra-template-compose   ← вы здесь   (форк → <org>/infra
 <org>/backend                форк go-backend-template ──► stit-core/golibinfra
 ```
 
-Продуктовый контекст (vision, surfaces) — в соседнем `<org>/docs` (форк
-[`project-docs-template`](https://git.stit.tech/stit-core/project-docs-template)),
+Продуктовый контекст (vision, surfaces) — в соседнем `<org>/strategy` (форк
+[`business-strategy-template`](https://git.stit.tech/stit-core/business-strategy-template)),
 читается cross-repo. Канон контрактов —
 [`corp-infra-template/docs/ecosystem.md`](https://git.stit.tech/stit-core/corp-infra-template/src/branch/main/docs/ecosystem.md).
 

@@ -9,7 +9,7 @@ status: draft
 
 Cross-cutting инфры одного VPS под этот проект + **карта сервисов** (авторитетный инвентарь, из
 которого `de-template` выводит `COMPOSE_PROFILES`) + среды. Продуктовый контекст (Problem / Users /
-surfaces) живёт в соседнем `<org>/docs` (`docs/projects/<slug>/`) — здесь не дублируется, читается
+surfaces) живёт в соседнем `<org>/strategy` (`docs/projects/<slug>/`) — здесь не дублируется, читается
 cross-repo.
 
 ## Service map

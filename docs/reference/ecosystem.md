@@ -1,9 +1,9 @@
 # Ecosystem — место проектной VPS среди репо
 
 Этот репо — **шаблон проектной инфры**: один форк (`<org>/infra`) = один клиентский проект,
-один VPS на среду (`dev`/`prod`/...). Экосистема — 5 форкаемых шаблонов `stit-core/`
+один VPS на среду (`dev`/`prod`/...). Экосистема — 6 форкаемых шаблонов `stit-core/`
 (`corp-infra-template`, `go-backend-template`, `spa-frontend-template`,
-`project-docs-template`, `project-infra-template-compose`) + 2 общие библиотеки
+`telegram-bot-template`, `business-strategy-template`, `project-infra-template-compose`) + 2 общие библиотеки
 `stit-core/golibinfra` (Go) и `stit-core/ui-lib` (`@stit/ui`, frontend design-system).
 Корп control-plane — это репо `corp-infra-template` (managed = инстанс на `*.stit.tech`;
 self-hosted = ваш форк). Канон карты контрактов живёт в
@@ -15,9 +15,9 @@ self-hosted = ваш форк). Канон карты контрактов жи�
 |---|---|
 | `stit-core/corp-infra-template` | Корп control-plane: Vault, OTel ingest, Gitea registry, CrowdSec, SSO. Source of truth контрактов. Managed = инстанс на `*.stit.tech`, self-hosted = ваш форк. |
 | `stit-core/go-backend-template` | Шаблон Go-бэкенда. Форк `<org>/backend` собирает образ в `git.stit.tech`. |
-| `stit-core/project-docs-template` | Шаблон продуктовой аналитики (business → projects: vision/persona/**surface** → interface → screens). Форк `<org>/docs`. |
+| `stit-core/business-strategy-template` | Шаблон бизнес-стратегии (business → ajtbd → swot → hypothesis-map → опц. продукт `projects/<slug>/`: vision/**surface** → interface → screens). Форк `<org>/strategy`. |
 | `stit-core/project-infra-template-compose` | **Этот.** Шаблон проектной VPS — runtime стека одного проекта. Форк `<org>/infra`. |
-| `<org>/infra` + `<org>/docs` + `<org>/backend` + ... | Клиентские форки. Один `<org>/infra` обслуживает N сервис-форков и читает `<org>/docs`. |
+| `<org>/infra` + `<org>/strategy` + `<org>/backend` + ... | Клиентские форки. Один `<org>/infra` обслуживает N сервис-форков и читает `<org>/strategy`. |
 
 ## Зависит от корп control-plane (`corp-infra-template`)
 
@@ -42,29 +42,30 @@ Runtime для клиентского образа `git.stit.tech/<org>/backend:
 `make ship` (без MSG) → vault-agent перерендерит `meta`, deploy.sh force-recreate'нет backend.
 `BACKEND_TAG` в `.env` не лежит — приходит из Vault.
 
-## Sibling `<org>/docs` — продуктовый контекст
+## Sibling `<org>/strategy` — продуктовый контекст
 
-Продуктовая аналитика (vision, persona, **surface**, capability) живёт в `<org>/docs` (форк
-`project-docs-template`), а инфра — здесь. Граница чистая и **односторонняя**: инфра-репо
-**читает** продуктовый контекст, чтобы привязать стек к продукту, но **не редактирует** его;
-авторская сторона продукта — только `<org>/docs` (через его deep-dive-скиллы).
+Продуктовый слой (vision, **surface**, capability) одного продукта живёт в `<org>/strategy` (форк
+`business-strategy-template` — репо бизнес-стратегии, в `docs/projects/<slug>/`), а инфра — здесь.
+Граница чистая и **односторонняя**: инфра-репо **читает** продуктовый контекст, чтобы привязать
+стек к продукту, но **не редактирует** его; авторская сторона продукта — только `<org>/strategy`
+(через его deep-dive-скиллы).
 
-**Конвенция размещения — sibling-checkout:** `<org>/docs` склонирован **рядом** с `<org>/infra`
-(`../docs` относительно корня этого репо). Путь резолвится так:
-1. `DOCS_REPO_PATH` из `.env.local`, если задан (override; см. `.claude/rules/env-local.md`);
-2. иначе дефолт `../docs`.
+**Конвенция размещения — sibling-checkout:** `<org>/strategy` склонирован **рядом** с `<org>/infra`
+(`../strategy` относительно корня этого репо). Путь резолвится так:
+1. `STRATEGY_REPO_PATH` из `.env.local`, если задан (override; см. `.claude/rules/env-local.md`);
+2. иначе дефолт `../strategy`.
 
 **Кто что читает** (cross-repo, read-only):
 
-| Скилл | Читает из `<org>/docs` | Зачем |
+| Скилл | Читает из `<org>/strategy` | Зачем |
 |---|---|---|
 | `init-project` | `docs/projects/<slug>/{vision,surface}.md` | scope продукта на старте онбординга |
 | `stack-deep-dive` | `docs/projects/<slug>/surface.md` | какие поверхности public → сабдомены/edge |
 | `de-template` | `docs/projects/<slug>/vision.md § Problem` | кастомизация `CLAUDE.md` под проект |
-| `smartdev` | наличие `<org>/docs` + `vision.md` | sanity при старте сессии |
+| `smartdev` | наличие `<org>/strategy` + `vision.md` | sanity при старте сессии |
 
-`<slug>` — папка продукта в `<org>/docs/docs/projects/`. Если sibling-репо не склонирован —
-скиллы деградируют gracefully (печатают next-step «склонируй `<org>/docs` рядом»), не падают.
+`<slug>` — папка продукта в `<org>/strategy/docs/projects/`. Если sibling-репо не склонирован —
+скиллы деградируют gracefully (печатают next-step «склонируй `<org>/strategy` рядом»), не падают.
 
 ## Что меняешь, тронув корп-контракт
 

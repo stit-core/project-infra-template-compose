@@ -32,7 +32,7 @@
 | ссылка | где | как проверить |
 |---|---|---|
 | `hosting: here` строки | `Service map` | у каждой есть `services/<name>.md` ИЛИ stub-next-step в state |
-| surfaces ↔ карта | `Service map` | public-surface из `<org>/docs` (cross-repo) семантически = `frontend`/`backend`-строка (рассинхрон — не ошибка, но повод уточнить) |
+| surfaces ↔ карта | `Service map` | public-surface из `<org>/strategy` (cross-repo) семантически = `frontend`/`backend`-строка (рассинхрон — не ошибка, но повод уточнить) |
 | сабдомены | `Domains` | каждый сабдомен упомянут в каком-то `services/*.md § Route` ИЛИ явный stub-next-step |
 | public-сервисы из карты | `Domains` | каждый `Route: <sub>` имеет соответствующий пункт в `Domains` ИЛИ open-question в state |
 | имена сетей | `Networks` | соответствуют тому, что есть в `compose/` (или явный rename-план в `Generates`) |

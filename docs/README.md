@@ -21,7 +21,7 @@
 ## Infra design source-of-truth
 - `docs/project/` — инфра-артефакты (`stack.md` с картой сервисов + `services/<name>.md`), вход
   для `/init-project` и `/de-template`. Контракт — `docs/project/README.md`.
-- Продуктовый контекст (vision / surfaces) — в соседнем `<org>/docs` (форк `project-docs-template`),
+- Продуктовый контекст (vision / surfaces) — в соседнем `<org>/strategy` (форк `business-strategy-template`),
   читается cross-repo; конвенция размещения — `docs/reference/ecosystem.md`.
 
 Точка входа агента в репо — `CLAUDE.md` (ядро + роутер). Дневной флоу — skill `/smartdev`.

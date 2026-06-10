@@ -159,13 +159,13 @@ make ship          # commit + check + push + (на main) ssh-deploy
 ## 7. `/init-project` — спроектировать инфру под продукт
 
 Skill-оркестратор `/init-project` ведёт онбординг инфры: читает продуктовый контекст из соседнего
-`<org>/docs` (vision / surfaces — форк `project-docs-template`, sibling-checkout) → проектирование
+`<org>/strategy` (vision / surface продукта `docs/projects/<slug>/` — форк `business-strategy-template`, sibling-checkout) → проектирование
 стека и **карты сервисов** (`/stack-deep-dive`) → hosted-сервисы (`/service-deep-dive`) →
 `/de-template`. Сам не проектирует — чейнит специализированные скиллы и наполняет `docs/project/*`
 (`stack.md` + `services/<name>.md`) до `status: stable`, затем чейнит развёртку.
 
-Продуктовый слой (vision / surfaces / personas) **не авторится здесь** — он живёт в `<org>/docs` и
-проектируется его скиллами. Этот шаг читает его как scope. Резолв пути — `docs/reference/ecosystem.md`.
+Продуктовый слой (vision / surface) **не авторится здесь** — он живёт в `<org>/strategy` (продукт
+в `docs/projects/<slug>/`) и проектируется его скиллами. Этот шаг читает его как scope. Резолв пути — `docs/reference/ecosystem.md`.
 
 ## 8. `/de-template` — своя инфра
 

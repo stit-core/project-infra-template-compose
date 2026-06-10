@@ -5,7 +5,7 @@
 # инфры VPS + карта сервисов + среды). frontmatter + обязательные H2-секции; при status: stable
 # секции непусты. Артефакты — вход для skill `de-template` (`stack § Service map` выводит
 # COMPOSE_PROFILES; секция `Generates` каждого service/stack описывает, что родится в инфре).
-# Продуктовый контекст (Problem/Users/surfaces) живёт в соседнем `<org>/docs`, не здесь.
+# Продуктовый контекст (Problem/Users/surfaces) живёт в соседнем `<org>/strategy`, не здесь.
 #
 # Использование:
 #   scripts/tools/validate-project-doc.sh <path>   # файл или директория

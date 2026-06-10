@@ -153,14 +153,14 @@ A — Phase B (печать cross-repo next-steps).
 | файл | что меняется | что НЕ трогать |
 |---|---|---|
 | `CLAUDE.md` | шапка/стек под имя проекта; убрать «шаблон stit», «копируется в `<client-org>/infra`», секцию «Что менять при копировании» | Карта где-что, rules, корп-контракт, форвард-only |
-| `README.md` (корневой) | проектная шапка вместо «шаблон проектной инфры»; убрать «форкни»; короткое описание из продуктового `<org>/docs/.../vision.md § Problem` (cross-repo) | reference-ссылки |
+| `README.md` (корневой) | проектная шапка вместо «шаблон проектной инфры»; убрать «форкни»; короткое описание из продуктового `<org>/strategy/.../vision.md § Problem` (cross-repo) | reference-ссылки |
 | `docs/reference/*` | НЕ трогать (общие reference-доки) | всё |
 | `docs/contributing.md` | НЕ трогать | всё |
 
 ### Шаги
 
-1. Прочитать продуктовый контекст cross-repo из `<org>/docs`
-   (резолв пути — `docs/reference/ecosystem.md`; дефолт `../docs`):
+1. Прочитать продуктовый контекст cross-repo из `<org>/strategy`
+   (резолв пути — `docs/reference/ecosystem.md`; дефолт `../strategy`):
    `docs/projects/<slug>/vision.md § Problem` (одна-две фразы — основа
    шапки) + `surface.md` (контекст). Sibling-репо нет — спросить имя/
    описание проекта у оператора через `AskUserQuestion`.
@@ -195,7 +195,7 @@ A — Phase B (печать cross-repo next-steps).
    - `## Backlog` пуст;
    - удалить любые секции, унаследованные от шаблона.
 3. **Оставить** `docs/project/{services/*, stack}.md` — это инфра-доки
-   проекта (карта + cross-cutting). Продуктовые доки — в `<org>/docs`.
+   проекта (карта + cross-cutting). Продуктовые доки — в `<org>/strategy`.
 4. **Оставить** `docs/project/_templates/` — система наследуется
    (`/add-service` использует).
 5. **Оставить** deep-dive/init-project скилы (`.claude/skills/`) —

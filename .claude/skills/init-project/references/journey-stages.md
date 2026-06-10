@@ -5,7 +5,7 @@
 
 Скилл сам не интервьюирует и не проектирует; он подсказывает оператору
 правильный slash-command и проверяет gate. Продуктовый слой (vision,
-surfaces) живёт в соседнем `<org>/docs` и **читается** cross-repo —
+surfaces) живёт в соседнем `<org>/strategy` и **читается** cross-repo —
 здесь не авторится.
 
 ## Этап 1. Продуктовый контекст (cross-repo, read-only)
@@ -16,9 +16,9 @@ surfaces) живёт в соседнем `<org>/docs` и **читается** cr
 
 ### Что делает
 
-1. Резолвить путь к `<org>/docs` — `DOCS_REPO_PATH` из `.env.local` или
-   дефолт `../docs` (см. `docs/reference/ecosystem.md`).
-2. Прочитать `<org>/docs/docs/projects/<slug>/{vision,surface}.md`:
+1. Резолвить путь к `<org>/strategy` — `STRATEGY_REPO_PATH` из `.env.local` или
+   дефолт `../strategy` (см. `docs/reference/ecosystem.md`).
+2. Прочитать `<org>/strategy/docs/projects/<slug>/{vision,surface}.md`:
    - `vision.md § Problem` — задача продукта (контекст для CLAUDE.md-меты
      на этапе 4);
    - `surface.md` — какие поверхности продукта (`web`/`api`/`admin`/…) —
@@ -30,12 +30,12 @@ surfaces) живёт в соседнем `<org>/docs` и **читается** cr
 
 - Продуктовый контекст прочитан, scope зафиксирован в state.
 - ЛИБО (sibling-репо нет) — записан next-step «склонируй/заполни
-  `<org>/docs`», этап не блокирует (стек ведётся по словам оператора).
+  `<org>/strategy`», этап не блокирует (стек ведётся по словам оператора).
 
 ### state на конец этапа
 
 - В `## Текущий этап` записать «2».
-- Если `<org>/docs` недоступен — next-step «склонировать `<org>/docs`» в
+- Если `<org>/strategy` недоступен — next-step «склонировать `<org>/strategy`» в
   `## Cross-repo next-steps`.
 
 ---
@@ -196,7 +196,7 @@ surfaces) живёт в соседнем `<org>/docs` и **читается** cr
 
 | между | gate |
 |---|---|
-| 1 → 2 | продуктовый контекст прочитан (или next-step зафиксирован, если `<org>/docs` нет) |
+| 1 → 2 | продуктовый контекст прочитан (или next-step зафиксирован, если `<org>/strategy` нет) |
 | 2 → 3 | `stack.md stable` + `make project-check A=docs/project/stack.md` зелёный + `Service map` непуст |
 | 3 → 4 | все `hosting: here` сервисы `stable` + `stack.md stable` + `make project-check` зелёный по всему `docs/project/` |
 | 4 → 5 | `make validate` зелёный + origin ≠ template + scaffolding убран |

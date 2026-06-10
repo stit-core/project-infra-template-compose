@@ -1,6 +1,6 @@
 ---
 name: init-project
-description: Оркестратор онбординга проектной инфры из форка `project-infra-template-compose` — ведёт путь продуктовый контекст из соседнего `<org>/docs` → проектирование инфра-стека и карты сервисов (`/stack-deep-dive`) → проектирование hosted-сервисов (`/service-deep-dive`) → `/de-template`, пока форк не перестанет помнить про шаблон. Активируй когда юзер форкнул шаблон и говорит "/init-project", "инициализируй проект", "развернуть инфру из шаблона", "с чего начать новый проект", или когда видишь свежий форк (origin ещё template, нет stable `docs/project/stack.md`). Сам не проектирует и не де-темплейтит — чейнит специализированные скиллы по порядку. Фиксирует прогресс в `state/journey.md` (где остановились, что решено, что осталось).
+description: Оркестратор онбординга проектной инфры из форка `project-infra-template-compose` — ведёт путь продуктовый контекст из соседнего `<org>/strategy` → проектирование инфра-стека и карты сервисов (`/stack-deep-dive`) → проектирование hosted-сервисов (`/service-deep-dive`) → `/de-template`, пока форк не перестанет помнить про шаблон. Активируй когда юзер форкнул шаблон и говорит "/init-project", "инициализируй проект", "развернуть инфру из шаблона", "с чего начать новый проект", или когда видишь свежий форк (origin ещё template, нет stable `docs/project/stack.md`). Сам не проектирует и не де-темплейтит — чейнит специализированные скиллы по порядку. Фиксирует прогресс в `state/journey.md` (где остановились, что решено, что осталось).
 ---
 
 # init-project — онбординг-оркестратор
@@ -17,9 +17,9 @@ description: Оркестратор онбординга проектной ин
 
 Полное описание пути для человека — `docs/getting-started.md`. Этот
 скилл его исполняет на слое `docs/project/` (инфра-слой). **Продуктовый
-контекст** (vision, surfaces) живёт в соседнем `<org>/docs`
-(`project-docs-template`) и **читается** cross-repo — здесь не авторится;
-резолв пути — `docs/reference/ecosystem.md` (дефолт `../docs`). Граница:
+контекст** (vision, surfaces) живёт в соседнем `<org>/strategy`
+(`business-strategy-template`) и **читается** cross-repo — здесь не авторится;
+резолв пути — `docs/reference/ecosystem.md` (дефолт `../strategy`). Граница:
 cross-repo (форки backend/frontend, seed секретов, правка продуктовых
 доков) — только next-steps, не выполнение.
 
@@ -43,7 +43,7 @@ cross-repo (форки backend/frontend, seed секретов, правка п�
 
 - Сводка состояния идёт в чат как **преамбула** перед
   `AskUserQuestion`, всегда сразу следует раунд «куда дальше?».
-- Этап 1 — **чтение** продуктового контекста из `<org>/docs` (не
+- Этап 1 — **чтение** продуктового контекста из `<org>/strategy` (не
   авторинг); карта сервисов авторится в `/stack-deep-dive` (этап 2).
 - «Готов к stable?», «Восстановить с этапа N?», «Restart?» — всё
   `AskUserQuestion`.
@@ -56,8 +56,8 @@ cross-repo (форки backend/frontend, seed секретов, правка п�
 2. Прочитать `state/journey.md`, если есть — что зафиксировано.
 3. Прочитать `docs/project/{stack.md, services/*.md}` — реальное
    состояние инфра-артефактов. Прочитать продуктовый контекст cross-repo
-   из `<org>/docs` (`docs/projects/<slug>/{vision,surface}.md`) — scope.
-   Sibling-репо нет — не падать, отметить next-step «склонируй `<org>/docs`».
+   из `<org>/strategy` (`docs/projects/<slug>/{vision,surface}.md`) — scope.
+   Sibling-репо нет — не падать, отметить next-step «склонируй `<org>/strategy`».
 4. Сделать сводку «где мы на пути» (см. ниже) — короткой таблицей.
 5. **Сразу** `AskUserQuestion` (без ожидания свободного ответа): опции
    — «продолжить текущий этап», «перейти к следующему», «показать
@@ -83,7 +83,7 @@ ls -la .git/hooks/commit-msg .git/hooks/pre-commit 2>/dev/null
 
 | этап | признак `done` |
 |---|---|
-| **1. Продуктовый контекст** | `<org>/docs/.../{vision,surface}.md` прочитаны, scope зафиксирован в state (или next-step «склонируй/заполни `<org>/docs`», если sibling нет) |
+| **1. Продуктовый контекст** | `<org>/strategy/.../{vision,surface}.md` прочитаны, scope зафиксирован в state (или next-step «склонируй/заполни `<org>/strategy`», если sibling нет) |
 | **2. Стек + карта сервисов** | `stack.md status=stable`, валидатор зелёный, `Service map` непуст |
 | **3. Hosted-сервисы** | каждый `services/<name>.md` (по `stack § Service map`, `hosting: here`) → `status=stable`, валидатор зелёный |
 | **4. Развёртывание** | `de-template` отработал: `COMPOSE_PROFILES` в `.env.example`, шаблонная мета зачищена (`CLAUDE.md` / `README.md` / `getting-started.md`), origin ≠ template |
@@ -111,12 +111,12 @@ ls -la .git/hooks/commit-msg .git/hooks/pre-commit 2>/dev/null
 
 ### 1. Продуктовый контекст (cross-repo, read-only)
 
-- Прочитать `<org>/docs/docs/projects/<slug>/{vision,surface}.md` (резолв
-  пути — `docs/reference/ecosystem.md`; дефолт `../docs`). Зафиксировать в
+- Прочитать `<org>/strategy/docs/projects/<slug>/{vision,surface}.md` (резолв
+  пути — `docs/reference/ecosystem.md`; дефолт `../strategy`). Зафиксировать в
   state scope: проблема продукта, какие поверхности (surfaces) и части он
   имеет — это вход для карты сервисов на этапе 2.
-- Sibling-репо `<org>/docs` нет → **не блокировать**: записать next-step
-  «склонируй `<org>/docs` рядом» и вести стек по тому, что назовёт
+- Sibling-репо `<org>/strategy` нет → **не блокировать**: записать next-step
+  «склонируй `<org>/strategy` рядом» и вести стек по тому, что назовёт
   оператор (карта будет беднее, но проходима).
 - **Здесь ничего не авторим** — продуктовые доки read-only из этого репо.
 - Выход к этапу 2 — scope понятен (или зафиксирован пробел в state).
@@ -162,7 +162,7 @@ ls -la .git/hooks/commit-msg .git/hooks/pre-commit 2>/dev/null
 - `make check` зелёный.
 - Сообщить оператору: онбординг закрыт.
 - Перечислить накопленные cross-repo next-steps (из state):
-  - склонировать/заполнить `<org>/docs` (продуктовый слой), если не сделан;
+  - склонировать/заполнить `<org>/strategy` (продуктовый слой), если не сделан;
   - форки бэкенда/фронта (`hosting: external` из карты);
   - корп-онбординг через `onboard-project.sh`, если не сделан;
   - seed вторичных KV под активные профили (`/request-secret`);
@@ -199,7 +199,7 @@ State — **коммитбл артефакт**, не приватная пам�
   - `## Текущий этап` — номер этапа + что сейчас blocking;
   - `## Открытые вопросы` (`**blocker**` для блокирующих);
   - `## Доменные решения` (для пути — обычно почти нет; ключевые
-    инфра-решения лежат в `stack`, продуктовые — в `<org>/docs`);
+    инфра-решения лежат в `stack`, продуктовые — в `<org>/strategy`);
   - `## Cross-repo next-steps` — накопленные next-step'ы для финала
     (форки, seed, корп-handoff).
 - Forward-only, без истории. После закрытия этапа — запись о нём
@@ -269,7 +269,7 @@ State — **коммитбл артефакт**, не приватная пам�
   next-steps в state и финале (граница продуктового слоя).
 - Не заводить service-doc для `hosting: external` — он только в карте.
 - Не авторить продуктовые доки (`vision`/`surface`) в этом репо — они в
-  `<org>/docs`, читаются cross-repo (этап 1 — read-only).
+  `<org>/strategy`, читаются cross-repo (этап 1 — read-only).
 - Не пропускать карту сервисов (`stack § Service map`) ради «быстро
   прунить compose» — карта первична, иначе движку не из чего выводить
   профили.

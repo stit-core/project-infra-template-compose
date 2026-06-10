@@ -45,7 +45,7 @@ env (dev/staging/prod).
 хостит registry `git.stit.tech`.
 **Обслуживает:** `<client-org>/backend` (форк `go-backend-template`) — runtime для его образа;
 deploy через `vault kv patch kv/projects/<p>/<env>/meta backend_tag=<tag>` + `make ship`.
-**Читает:** `<client-org>/docs` (форк `project-docs-template`) — продуктовый контекст (vision,
+**Читает:** `<client-org>/strategy` (форк `business-strategy-template`) — продуктовый контекст (vision,
 surfaces); sibling-checkout рядом с этим репо, read-only. Резолв пути — `docs/reference/ecosystem.md`.
 
 Карта репо и канонические контракты — `corp-infra-template/docs/ecosystem.md`.
@@ -93,7 +93,7 @@ seed'а соответствующих KV. Сети: `proxy` (наружу), `ba
 |---|---|
 | Архитектура, сети, профили, non-goals | `docs/reference/architecture.md` |
 | Инфра-слой проекта (stack + карта сервисов + service-doc'и) | `docs/project/README.md` (вход для `/init-project` + `/de-template`) |
-| Продуктовый контекст (vision/surfaces) | соседний `<org>/docs` (форк `project-docs-template`), читается cross-repo |
+| Продуктовый контекст (vision/surfaces) | соседний `<org>/strategy` (форк `business-strategy-template`), читается cross-repo |
 | KV-layout, AppRole, multi-env, lazy-seed | `.claude/rules/multi-env.md` |
 | Compose-инварианты сервиса | `.claude/rules/compose-and-services.md` |
 | Секреты и `.env` | `.claude/rules/secrets-and-env.md` |
@@ -174,9 +174,10 @@ out-of-band. AppRole строго read-only на свой `<p>/<env>`. Подр�
 4. `configs/vault-agent/templates/backend.env.tpl` — project-specific env, если backend читает сверх контракта.
 5. `configs/traefik/dynamic/` — клиент-специфичные routers/middlewares (опц.).
 
-Продуктовый слой проекта (vision / surfaces / personas) — в соседнем `<org>/docs` (форк
-`project-docs-template`), проектируется его скиллами; здесь инфру под него ведёт `/init-project`
-(читает `<org>/docs` cross-repo → стек+карта сервисов → service-doc'и → `/de-template`).
+Продуктовый слой проекта (vision / surface) — в соседнем `<org>/strategy` (форк
+`business-strategy-template` — репо бизнес-стратегии; продукт в `docs/projects/<slug>/`),
+проектируется его скиллами; здесь инфру под него ведёт `/init-project` (читает
+`<org>/strategy` cross-repo → стек+карта сервисов → service-doc'и → `/de-template`).
 
 Полный путь потребителя — `docs/getting-started.md`.
 

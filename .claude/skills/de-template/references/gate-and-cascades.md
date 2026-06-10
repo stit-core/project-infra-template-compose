@@ -162,7 +162,7 @@ make project-check
 
 Ссылки в репо:
 - README.md ссылается на docs/getting-started.md в секции
-  «Развёртывание» — заменю на «см. stack.md / docs/project/ / <org>/docs».
+  «Развёртывание» — заменю на «см. stack.md / docs/project/ / <org>/strategy».
 - CLAUDE.md ссылается на docs/getting-started.md в «Корп-контракт» —
   заменю на «см. corp-handoff и init-project».
 

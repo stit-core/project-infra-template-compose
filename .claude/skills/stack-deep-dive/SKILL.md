@@ -1,6 +1,6 @@
 ---
 name: stack-deep-dive
-description: Углублённая проработка cross-cutting инфры VPS в singleton `docs/project/stack.md` (Service map · Domains · Edge · Networks · Backup · Observability · Environments · Generates). Ведёт сессию через структурированные вопросы (AskUserQuestion), фиксирует рабочее состояние в `state/stack.md`, не выдумывает решения сам. Использовать всегда, когда речь о `docs/project/stack.md`, заполнении 8 артефактных секций, проектировании cross-cutting (домены/edge/сети/бэкап/телеметрия), владении картой сервисов (Service map — драйвер COMPOSE_PROFILES), переходе `status draft → stable`, или копании связей с продуктовыми surfaces в соседнем `<org>/docs` и service-doc'ами. Также — единственная точка входа в `docs/project/stack.md`. Профили `COMPOSE_PROFILES` явным списком НЕ перечисляет — их выводит `/de-template` из `stack § Service map`.
+description: Углублённая проработка cross-cutting инфры VPS в singleton `docs/project/stack.md` (Service map · Domains · Edge · Networks · Backup · Observability · Environments · Generates). Ведёт сессию через структурированные вопросы (AskUserQuestion), фиксирует рабочее состояние в `state/stack.md`, не выдумывает решения сам. Использовать всегда, когда речь о `docs/project/stack.md`, заполнении 8 артефактных секций, проектировании cross-cutting (домены/edge/сети/бэкап/телеметрия), владении картой сервисов (Service map — драйвер COMPOSE_PROFILES), переходе `status draft → stable`, или копании связей с продуктовыми surfaces в соседнем `<org>/strategy` и service-doc'ами. Также — единственная точка входа в `docs/project/stack.md`. Профили `COMPOSE_PROFILES` явным списком НЕ перечисляет — их выводит `/de-template` из `stack § Service map`.
 ---
 
 # stack-deep-dive
@@ -13,8 +13,8 @@ description: Углублённая проработка cross-cutting инфр�
 среды, контракт `Generates` для `/de-template`.
 
 `stack.md` — единственный инфра-singleton. **Продуктовый контекст**
-(проблема, пользователи, поверхности) живёт в соседнем `<org>/docs`
-(`project-docs-template`) и читается **cross-repo** — здесь не дублируется.
+(проблема, пользователи, поверхности) живёт в соседнем `<org>/strategy`
+(`business-strategy-template`) и читается **cross-repo** — здесь не дублируется.
 Резолв пути к sibling-репо — `docs/reference/ecosystem.md`.
 
 Канон секций — `docs/project/README.md`. Скилл ведёт сеанс через
@@ -47,11 +47,11 @@ stack — singleton, режим B используется реже (типич�
 ## Что делать сразу при запуске
 
 1. Прочитать `docs/project/README.md` — освежить контракт kinds.
-2. Прочитать **продуктовый контекст cross-repo** из `<org>/docs`
-   (резолв пути — `ecosystem.md`; дефолт `../docs`): `docs/projects/<slug>/
+2. Прочитать **продуктовый контекст cross-repo** из `<org>/strategy`
+   (резолв пути — `ecosystem.md`; дефолт `../strategy`): `docs/projects/<slug>/
    surface.md` — какие поверхности продукта public (кандидаты на сабдомены
    и edge-роуты), `vision.md § Problem` — общий контекст. Если sibling-репо
-   не склонирован — не падать, отметить next-step «склонируй `<org>/docs`».
+   не склонирован — не падать, отметить next-step «склонируй `<org>/strategy`».
 3. Прочитать `docs/project/stack.md`, если есть. Если нет — `cp
    _templates/stack.md stack.md`, заполнить frontmatter. `Service map`
    авторится здесь — сверить с продуктовыми surfaces (public-поверхность
@@ -105,7 +105,7 @@ stack — singleton, режим B используется реже (типич�
   inside-out: Service map (инвентарь — фундамент) → Domains → Edge →
   Networks → Backup → Observability → Environments → Generates
   (фундамент → производное). Service map сверяется с продуктовыми
-  surfaces из `<org>/docs`.
+  surfaces из `<org>/strategy`.
 - **B. Сырьё**. Args = свободный текст / описание инфры. Извлечь
   кандидатов по секциям, показать план, по подтверждению заполнить
   stub'ы и зайти в C-режим по каждой.
@@ -186,7 +186,7 @@ stack согласуются с ним и с service-doc'ами:
   карты (новая `hosting: here` строка) — напомнить оператору завести
   service-doc через `/service-deep-dive <name>`. external-строки
   service-doc НЕ имеют (только контекст для cross-repo next-step).
-- **Service map ↔ продуктовые surfaces** (`<org>/docs`, cross-repo):
+- **Service map ↔ продуктовые surfaces** (`<org>/strategy`, cross-repo):
   public-поверхность продукта (`surface.md` type `web`/`api`/`admin`)
   обычно соответствует `frontend`/`backend`-строке карты. datastore/infra
   surface не имеют. Рассинхрон (surface без сервиса или наоборот) — не
@@ -301,7 +301,7 @@ stack-сессии. Если видит рассинхрон (Route сабдом
 - Не дублировать `COMPOSE_PROFILES` явным списком в `stack.md` — их
   выводит `/de-template` из `stack § Service map` (subtype+hosting), не из
   захардкоженного списка.
-- Не редактировать продуктовые артефакты в `<org>/docs` из stack-сессии —
+- Не редактировать продуктовые артефакты в `<org>/strategy` из stack-сессии —
   они read-only отсюда; рассинхрон surface↔карта фикси через
   `AskUserQuestion`/state, а не правкой соседнего репо.
 - Не описывать always-on сервисы (traefik/crowdsec/vault-agent/

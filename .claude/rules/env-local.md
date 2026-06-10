@@ -50,5 +50,5 @@ runtime-секреты приложения и **не** серверный `.env
 | `SSH_HOST` / `SSH_PORT` / `SSH_USER` | `scripts/tools/ssh.sh` (ops-вербы, `make ssh`, серверный смок `make status`) | куда ходить; ключ — на машине |
 | `HOST` | `ssh.sh` (override `user@ip`) | разовая сессия на другой хост |
 | `PROJECT_NAME` | `ssh.sh` (`REMOTE_DIR=/opt/<p>-infra`) | имя проекта на VPS |
-| `DOCS_REPO_PATH` | скиллы (init-project/stack-deep-dive/de-template/smartdev) | путь к sibling `<org>/docs`; дефолт `../docs`; **не секрет** (путь, читается grep'ом) |
+| `STRATEGY_REPO_PATH` | скиллы (init-project/stack-deep-dive/de-template/smartdev) | путь к sibling `<org>/strategy`; дефолт `../strategy`; **не секрет** (путь, читается grep'ом) |
 | `<TOKEN>` | по мере необходимости | токены, присланные оператором (registry/API/…) |
