@@ -3,7 +3,7 @@
 Инфра-слой проектной VPS — **source of truth для `de-template`**: из чего стек состоит и как
 этот VPS его хостит. **Продуктовый контекст** (проблема, пользователи, поверхности продукта)
 живёт в соседнем репо `business-strategy-template` (форк `<org>/strategy`, `docs/projects/<slug>/`) и
-читается **cross-repo** — здесь не дублируется. См. `docs/reference/ecosystem.md § sibling-docs`.
+читается **cross-repo** — здесь не дублируется. См. `docs/reference/ecosystem.md § Sibling <org>/strategy`.
 
 Заполняется через `/init-project` (оркестратор) → `/stack-deep-dive` + `/service-deep-dive`,
 валидируется `scripts/tools/validate-project-doc.sh`, разворачивается `/de-template`.

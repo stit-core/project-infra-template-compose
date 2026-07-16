@@ -217,7 +217,8 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
   vault rendered configs, etc.). При split backup делает pg_dumpall к PG на
   db-хосте по сети — cross-host доступ обеспечивает потребитель.
 - Расписание crond (`0 3 * * *` — 03:00 daily).
-- Retention: `keep-daily 7 keep-weekly 4 keep-monthly 6` или другое.
+- Retention: `keep-daily 7 keep-weekly 4 keep-monthly 3` (дефолт
+  `containers/backup/backup-now`) или другое.
 - `N/A` если в карте нет datastore и нет важных volume'ов.
 
 **Опции опрашиваются как**:
@@ -239,7 +240,7 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
 **Тест-критерий**:
 
 - ✅ «restic → `s3:…/acme/dev`; pg_dumpall + minio-volume; daily 03:00;
-  retention 7-4-6».
+  retention 7-4-3».
 - ✅ «`N/A` — в карте только backend без datastore».
 - ❌ «`N/A`, при этом в карте есть `datastore` postgres».
 - ❌ «restic без `RESTIC_REPOSITORY`».

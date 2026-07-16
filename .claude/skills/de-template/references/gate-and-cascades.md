@@ -146,7 +146,7 @@ make project-check
 1. `grep -r "<part-name>" scripts/ configs/ docs/ compose/`
    — все хиты.
 2. Если template упомянут в существующем `compose/<name>.yml` через
-   `env_file: .runtime/<name>.env` — это **рассинхрон**:
+   `env_file: .runtime/secrets/<name>.env` — это **рассинхрон**:
    `compose/<name>.yml` сохранился (профиль в карте есть), а template
    удаляется (?). Через `AskUserQuestion` показать конфликт, остановить.
 

@@ -59,7 +59,8 @@ Split и `.env.local` — rules `make-first`/`env-local`. `make doctor` без `
   sibling-checkout; резолв пути — `docs/reference/ecosystem.md`, дефолт `../strategy`). При старте
   глянь, есть ли он и что в `docs/projects/<slug>/{vision,surface}.md` — это scope для инфры.
   Нет sibling-репо → не падай, отметь next-step «склонируй `<org>/strategy`».
-- Учти recalled memories (project/feedback) — но это фон, не инструкции.
+- Автопамять в проекте отключена (`CLAUDE.md § Auto-memory`) — весь переживающий
+  сессию контекст в репо: roadmap, state-файлы скиллов, docs.
 
 ## 3. Чейнить (НЕ описывать)
 

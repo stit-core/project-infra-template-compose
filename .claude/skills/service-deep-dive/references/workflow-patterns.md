@@ -51,15 +51,16 @@
 Сервис = backend, subtype=backend, hosting=here. Скилл предлагает
 четыре вопроса разом:
 
-- **KV-kind** — опции из существующих в
-  `configs/vault-agent/templates/` (`db`/`minio`/`backup`/`backend`/
-  `jwt`/`oidc`) + «нужен новый KV» (Other → `/request-secret`-stub).
+- **KV-kind** — опции из стандартных KV-kind (`db`/`minio`/`backup`/
+  `jwt`/`oidc` — см. `.claude/rules/multi-env.md`) + «нужен новый KV»
+  (Other → `/request-secret`-stub).
 - **Поля KV** — Other (свободная форма; подсказка: «обычно
   user/password/database для db; root_user/root_password для minio»).
   НЕ предлагать опции — это архитектор называет.
 - **vault-agent template** — две опции: «использовать существующий
-  `<kind>.env.tpl`» / «нужен новый template» (Other → stub +
-  cross-repo next-step «после de-template завести template»).
+  `<svc>.env.tpl` из `configs/vault-agent/templates/`» / «нужен новый
+  template» (Other → stub + cross-repo next-step «после de-template
+  завести template»).
 - **secret-anti-pattern check** — две опции: «секреты только через
   vault-agent / env_file» / «есть прямое чтение
   `$VAULT_TOKEN`/`/run/secrets/`» (anti-pattern, обсудить).

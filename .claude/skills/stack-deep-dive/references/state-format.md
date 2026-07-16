@@ -24,7 +24,7 @@ ref: docs/project/stack.md
 ---
 
 ## Открытые вопросы
-- Retention для restic — 7-4-6 или другое? (не блокирует, дефолт 7-4-6)
+- Retention для restic — 7-4-3 или другое? (не блокирует, дефолт 7-4-3)
 - crowdsec source-IP whitelist: нужен ли (нет central-LAPI пока)? (**blocker**)
 
 ## Доменные решения
@@ -94,7 +94,7 @@ stack'а, но важны для будущих сессий.
 секцию **не заводим**. Появляется, когда оператор выбрал split в `§ Networks`.
 
 - Одна строка на хост: `<имя-хоста> (HOST_ROLE=<роль>): <сервисы>`.
-- Роли pinf: `edge` (traefik/vault-agent/otel-agent/backend/landing) / `db`
+- Роли: `edge` (traefik/vault-agent/otel-agent/backend/landing) / `db`
   (postgres) / `storage` (minio/backup). vault-agent — на каждом хосте.
 - Эндпоинты не дублируем: PG host/port — в KV `db`, restic — в KV
   `backup.repository`, otel — `OTEL_EXPORTER_OTLP_ENDPOINT` в `.env`.

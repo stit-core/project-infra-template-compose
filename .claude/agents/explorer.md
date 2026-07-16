@@ -28,7 +28,7 @@ Read-only research-агент для шаблона проектной инфр�
 <2-4 предложения с прямым ответом>
 
 ## Найденное
-- `compose/grafana.yml:42` — <что там>
+- `compose/minio.yml:42` — <что там>
 - `configs/traefik/dynamic/middlewares.yml.tpl:25-30` — <что там>
 - сервер: vault-agent up 31h, healthy
 

@@ -49,7 +49,7 @@ done → секция удаляется (история в git).
 
 | Механизм | Где | Сила |
 |---|---|---|
-| git-хуки | `scripts/git-hooks/` (ставятся `make setup`): commit-msg (Conventional Commits), pre-commit (на change `roadmap.md` → `validate-plan.sh`) | **детерминированно** |
+| git-хуки | `scripts/git-hooks/` (ставятся `make setup`): commit-msg (Conventional Commits), pre-commit (`roadmap.md` → `validate-plan.sh`; `docs/project/**.md` → `validate-project-doc.sh`) | **детерминированно** |
 | permissions.deny | `.claude/settings.json` | **детерминированно** (блок `--no-verify`, force-push, `reset --hard`, `docker volume rm`, `down -v`, запись в auto-memory) |
 | `make check` (gate) | `scripts/ship.sh` зовёт перед push — красный отменяет пуш | **детерминированно** (на ship) |
 | Path-scoped rules | `.claude/rules/*.md` | контекстная подсказка |
