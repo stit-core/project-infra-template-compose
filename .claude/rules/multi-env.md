@@ -27,10 +27,11 @@ Vault — единственный источник правды по конфи
 | Корп-эндпоинты | `.env` (managed-дефолт в коде; self-hosted override) | `VAULT_ADDR=https://vault.stit.tech`, `OTEL_EXPORTER_OTLP_ENDPOINT=https://otel.stit.tech:443`, `REGISTRY_HOST=git.stit.tech` |
 | Локально-сгенерированные | `.env` (auto после первого deploy) | `CROWDSEC_BOUNCER_API_KEY` |
 | Оператор-управление | `.env` | `COMPOSE_PROFILES` |
-| Non-secret конфиг | **Vault** `kv/projects/<p>/<env>/meta` | `backend_tag`, `acme_email`, `acme_caserver` |
+| Image-теги | `.env` (**строго**, не Vault; бамп — `make bump SVC= TAG=`) | `BACKEND_TAG` (конвенция `<SVC>_TAG`) |
+| Non-secret конфиг | **Vault** `kv/projects/<p>/<env>/meta` | `acme_email`, `acme_caserver` |
 | Runtime-секреты | **Vault** `kv/projects/<p>/<env>/<kind>` | `db`, `oidc`, `jwt`, `minio`, `backup`, `otel` |
 
-Любое значение, которое **меняется реже раза в неделю** и должно ротироваться корп-стороной → переезжает в Vault. Любое значение, которое **нужно ДО Vault-login'а** или генерится локально → остаётся в `.env`.
+Любое значение, которое **меняется реже раза в неделю** и должно ротироваться корп-стороной → переезжает в Vault. Любое значение, которое **нужно ДО Vault-login'а** или генерится локально → остаётся в `.env`. **Исключение — image-теги:** они бампаются строго через `.env` (`<SVC>_TAG`, верб `make bump`) и через Vault не ходят — деплой тега остаётся операцией проектной стороны, без участия корп-админа.
 
 ## KV layout
 
@@ -38,7 +39,7 @@ Vault — единственный источник правды по конфи
 kv/projects/<p>/
   _meta                       # { env_<env1>=1, env_<env2>=1, ..., created=<ISO> } — corp-only
   <env>/
-    meta                      # { backend_tag, acme_email, acme_caserver, ... }
+    meta                      # { acme_email, acme_caserver, ... } — image-тегов тут НЕТ (они в .env)
     otel                      # { token, accountID }
     db                        # { user, password, database }
     oidc                      # { client_id, client_secret }
@@ -63,7 +64,6 @@ kv/projects/<p>/
       Token TTL 10m / max 30m, secret_id без срока.
    2. `kv/projects/<p>/<env>/otel` — `{ token, accountID }` (accountID авто-инкрементируется корп-стороной).
    3. `kv/projects/<p>/<env>/meta` с дефолтами:
-      - `backend_tag=latest`
       - `acme_email=ops@<placeholder>`
       - `acme_caserver=https://acme-v02.api.letsencrypt.org/directory`
 3. Если передан `--source-ip <env>=<ip>` — egress IP проектной VPS дописывается в `configs/crowdsec/whitelists.yaml` корп-side и crowdsec рестартится. Без этого CrowdSec ловит otel-collector UA на `crowdsecurity/http-bad-user-agent` и режет метрики/логи 403'ами. См. `corp-infra-template/.claude/rules/crowdsec-whitelist.md`.
@@ -107,9 +107,9 @@ make ship      # render-configs обновит agent.hcl, vault-agent ренде
 
 ## Ротация
 
-Источник правды — корп Vault. Любая ротация — `vault kv patch kv/projects/<p>/<env>/<kind> <field>=<new>`. Vault-agent заметит и перерендерит `.runtime/secrets/<kind>.env` (для секретов) или `.runtime/env/compose.env` (для `meta`). Consumer'ы перечитают env только при container CREATE — `scripts/deploy.sh` делает force-recreate на следующем deploy.
+Источник правды — корп Vault. Любая ротация — `vault kv patch kv/projects/<p>/<env>/<kind> <field>=<new>`. Vault-agent заметит и перерендерит `.runtime/secrets/<kind>.env` (для секретов) или `.runtime/configs/traefik.yml` (для `meta`). Consumer'ы перечитают env только при container CREATE — `scripts/deploy.sh` делает force-recreate на следующем deploy.
 
-Для централизованного `BACKEND_TAG` rollout'а: корп патчит `meta.backend_tag` → оператор `make ship` (без MSG) → vault-agent перерендерит → force-recreate backend.
+Image-теги под ротацию НЕ попадают: rollout нового тега — `make bump SVC=backend TAG=<tag>` (правит `BACKEND_TAG` в `.env` на VPS + force-recreate), без участия корп-стороны.
 
 ## Profile-based opt-in
 

@@ -33,7 +33,8 @@ otel-agent + backup. Копируется в `<client-org>/infra`, адапти�
 Репо живёт на **рабочей станции оператора** — authoring / validate / plan / ship. Живого
 стека локально нет: приложения и контейнеры — на удалённом VPS (один VPS = одна среда).
 `make ship` пушит и триггерит remote `deploy.sh` по SSH. Ops на VPS (`ps`/`logs`/`deploy`/
-`restart`) — через `scripts/tools/ssh.sh` (хост из `ansible/inventory.ini`). Локальный SKIP
+`restart`) — через `scripts/tools/ssh.sh` (connection из `.env.local`, fallback
+`ansible/inventory.ini`). Локальный SKIP
 authoring-проверок без `.env`/docker — норма, не падение.
 
 ## Где это в экосистеме
@@ -43,8 +44,10 @@ env (dev/staging/prod).
 **Зависит от:** `corp-infra-template` — выдаёт AppRole `projects-<p>-<env>` + KV
 `kv/projects/<p>/<env>/*` (через `onboard-project.sh`), принимает OTLP на `otel.stit.tech`,
 хостит registry `git.stit.tech`.
+**Image-теги:** бампаются **строго через `.env`** (`<SVC>_TAG`, верб `make bump SVC= TAG=`),
+через Vault теги не ходят.
 **Обслуживает:** `<client-org>/backend` (форк `go-backend-template`) — runtime для его образа;
-deploy через `vault kv patch kv/projects/<p>/<env>/meta backend_tag=<tag>` + `make ship`.
+deploy нового тега — `make bump SVC=backend TAG=<tag>` (тег строго в `.env`, не в Vault).
 **Читает:** `<client-org>/strategy` (форк `business-strategy-template`) — продуктовый контекст (vision,
 surfaces); sibling-checkout рядом с этим репо, read-only. Резолв пути — `docs/reference/ecosystem.md`.
 
@@ -80,6 +83,7 @@ seed'а соответствующих KV. Сети: `proxy` (наружу), `ba
 | SHIP | `ship MSG="..."` | commit + check + push + (на main) ssh-deploy. Канон |
 | | `deploy` / `render` | server-side: git pull → render → compose up --wait / envsubst+agent.hcl |
 | OPS | `ps` / `logs SVC=` / `restart SVC=` / `recreate SVC=` / `build SVC=` | статус / логи / рестарт / пересоздать (env_file pickup) / сборка образа сервиса |
+| | `bump SVC= TAG=` | бамп image-тега: правит `<SVC>_TAG` в `.env` на VPS + force-recreate. Единственный канон бампа |
 | | `backup` / `restore-pg SNAPSHOT=` | one-shot backup / restore postgres из restic |
 | | `ssh CMD="…"` | произвольная команда на VPS (через `ssh.sh`) |
 | INTEL | `status` / `search Q= [P=]` | cockpit-сводка / поиск по compose+configs+scripts+docs |
@@ -113,7 +117,8 @@ VAULT_TOKEN=<root> bash scripts/onboard-project.sh --name <p> --envs dev,prod
 
 Per env создаёт: AppRole `projects-<p>-<env>` (flat) + policy read-only на
 `kv/data/projects/<p>/<env>/*`; `kv/.../otel` (token + accountID); `kv/.../meta`
-(`backend_tag`, `acme_email`, `acme_caserver`). Возвращает per-env блок `PROJECT_NAME` /
+(`acme_email`, `acme_caserver`; image-теги в `meta` НЕ живут — они в `.env`).
+Возвращает per-env блок `PROJECT_NAME` /
 `ENV` / `VAULT_ROLE_ID` / `VAULT_SECRET_ID` для проектного `.env`.
 
 Доп. KV (`db`, `oidc`, `jwt`, `minio`, `backup`, project-specific) — оператор запрашивает по
@@ -127,6 +132,8 @@ out-of-band. AppRole строго read-only на свой `<p>/<env>`. Подр�
   throwaway в DR, explanatory deploy.sh-внутренности). Канон и список исключений — rule `.claude/rules/make-first.md`.
 - **YAML 2-space indent**, без табов.
 - **Image закреплён конкретной версией.** `:latest` запрещён — конвенция, ловится `make validate`.
+  Бампаемые теги параметризуются `${<SVC>_TAG}` из `.env` и меняются **только** через
+  `make bump` — не через Vault.
 - **Каждый сервис имеет** `restart`, `healthcheck`, `container_name`, явный `networks`.
 - **Public сервисы** в `proxy` сети + Traefik labels с `crowdsec@file` middleware.
 - **Comments — только когда WHY неочевидно.** Не пересказывай YAML.

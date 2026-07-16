@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Идемпотентный deploy: pull → render → vault-agent first → compose up.
-# После vault-template-change ЛИБО compose.env-change (Vault meta tag-rollout:
-# BACKEND_TAG и пр. приходят из kv/.../meta, git-diff'а не порождают) —
-# force-recreate consumer'ов (env_file и image-тег читаются docker'ом при
-# container CREATE, не start; обычный `restart` не подхватит).
+# После vault-template-change — force-recreate consumer'ов (env_file читается
+# docker'ом при container CREATE, не start; обычный `restart` не подхватит).
+# Image-теги (<SVC>_TAG) живут в .env, НЕ в Vault: смена тега меняет
+# интерполированный compose-конфиг, и финальный `up -d` пересоздаёт сервис
+# сам (канон бампа — `make bump SVC= TAG=`).
 #
 # Запускать на проектном VPS из /opt/<project>-infra/.
 set -euo pipefail
@@ -51,7 +52,7 @@ bash scripts/preflight-vault.sh || true
 # Создаём runtime-директории до того, как docker попытается их bind-mount'ить
 # (если их нет, docker создаст их сам как root c 0755 — но мы хотим 0700
 # для secrets).
-mkdir -p .runtime/secrets .runtime/secrets-bootstrap .runtime/env .runtime/configs
+mkdir -p .runtime/secrets .runtime/secrets-bootstrap .runtime/configs
 chmod 0700 .runtime/secrets .runtime/secrets-bootstrap
 
 # Lazy-stack validation: storage профиль требует одновременной активации
@@ -80,7 +81,6 @@ fi
 for f in otel postgres backend minio backup; do
   [ -e ".runtime/secrets/$f.env" ] || touch ".runtime/secrets/$f.env"
 done
-[ -e ".runtime/env/compose.env" ]      || touch ".runtime/env/compose.env"
 [ -e ".runtime/configs/traefik.yml" ]   || touch ".runtime/configs/traefik.yml"
 # vault-health.sh заглушка — render-configs.sh перезапишет реальным контентом.
 # Без этого vault-agent healthcheck сразу fail'ит до первой здравой проверки.
@@ -153,35 +153,19 @@ if [ "$prev_sha" != "$new_sha" ] && [ "$prev_sha" != "none" ]; then
   [ -n "$changed_tpls" ] && template_changed=1
 fi
 
-# compose.env change (Vault meta tag-rollout): корп патчит kv/.../meta
-# (backend_tag и пр.) → vault-agent перерендеривает .runtime/env/compose.env.
-# Это НЕ git-коммит — template_changed его не ловит. Без этого детекта
-# централизованный BACKEND_TAG rollout (multi-env.md) не пересоздаёт backend
-# и новый образ не выкатывается. Baseline .composeenv-prev — последний
-# успешно-deploy'ed (пишется в конце скрипта, retry-safe).
-composeenv_changed=0
-if [ -s .runtime/env/compose.env ]; then
-  if [ -e .runtime/.composeenv-prev ]; then
-    cmp -s .runtime/.composeenv-prev .runtime/env/compose.env || composeenv_changed=1
-  else
-    composeenv_changed=1
-  fi
-fi
-
-if [ "$template_changed" -eq 1 ] || [ "$profile_changed" -eq 1 ] || [ "$composeenv_changed" -eq 1 ]; then
+if [ "$template_changed" -eq 1 ] || [ "$profile_changed" -eq 1 ]; then
   reason=""
   [ "$template_changed" -eq 1 ]   && reason="vault-template change"
   [ "$profile_changed" -eq 1 ]    && reason="${reason:+$reason + }profile set change"
-  [ "$composeenv_changed" -eq 1 ] && reason="${reason:+$reason + }compose.env change (Vault meta tag-rollout)"
   echo "$reason → restart vault-agent + force-recreate consumers"
   # Инвалидируем rendered-секреты ДО рестарта vault-agent. Иначе vault-health.sh
   # (test -s) проходит МГНОВЕННО по непустым файлам с ПРОШЛОГО деплоя: up --wait
   # рапортует healthy ещё до того, как consul-template отрисовал новые значения,
   # и force-recreate ниже фиксирует в consumer'ах СТАРЫЙ env (падение на
-  # ротированных кредах / старом backend_tag — «vault не успел переренжерить»).
+  # ротированных кредах — «vault не успел переренжерить»).
   # Пустой файл → test -s красный → --wait реально ждёт свежий рендер; vault-agent
-  # перепишет файлы атомарно при restart. compose.env/traefik.yml не трогаем —
-  # они тоже перерендерятся, а healthcheck и так блокируется на пустых secrets.
+  # перепишет файлы атомарно при restart. traefik.yml не трогаем —
+  # он тоже перерендерится, а healthcheck и так блокируется на пустых secrets.
   for f in .runtime/secrets/*.env; do [ -e "$f" ] && : > "$f"; done
   docker compose "${args[@]}" restart vault-agent
   docker compose "${args[@]}" up -d --wait --wait-timeout 60 vault-agent
@@ -189,10 +173,9 @@ if [ "$template_changed" -eq 1 ] || [ "$profile_changed" -eq 1 ] || [ "$composee
     | awk '/^  [a-z][a-z0-9_-]*:$/ {svc=$1; sub(":$","",svc)} /\.runtime\/secrets\/.*\.env/ {print svc}' \
     | sort -u)
   if [ ${#consumers[@]} -gt 0 ]; then
-    # Явный pull ДО force-recreate: новый image-тег (из compose.env) может
-    # физически отсутствовать на хосте. Без этого pull policy=missing молча
-    # оставляет старый контейнер на прежнем теге. Fail виден (RED), не тихий
-    # застой. Pinned third-party теги (postgres/minio) — pull = no-op.
+    # Явный pull ДО force-recreate: образ под текущим тегом может физически
+    # отсутствовать на хосте (свежий bootstrap / прочищенный кеш). Fail виден
+    # (RED), не тихий застой. Pinned third-party теги (postgres/minio) — pull = no-op.
     docker compose "${args[@]}" pull --quiet "${consumers[@]}" \
       || { echo "ERR: docker compose pull failed for: ${consumers[*]}" >&2; exit 1; }
     docker compose "${args[@]}" up -d --no-deps --force-recreate "${consumers[@]}"
@@ -229,11 +212,5 @@ if [ "$prev_sha" != "$new_sha" ] && [ "$prev_sha" != "none" ]; then
     fi
   fi
 fi
-
-# Зафиксировать compose.env как baseline для следующего deploy (tag-rollout
-# detect выше). Пишем здесь, в самом конце — если deploy упал раньше
-# (pull fail / non-healthy reconcile), set -e не даёт сюда дойти, baseline
-# не сдвигается, следующий ship повторит force-recreate.
-[ -s .runtime/env/compose.env ] && cp .runtime/env/compose.env .runtime/.composeenv-prev
 
 docker compose "${args[@]}" ps

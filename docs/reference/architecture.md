@@ -77,7 +77,7 @@ Per-env AppRole + KV-scope (`kv/data/projects/<p>/<env>/*`) выдаёт `corp-i
    - entrypoint пишет `role-id`/`secret-id` в `.runtime/secrets-bootstrap/`.
    - `auto_auth` логинится по AppRole, получает Vault token (TTL 10m, max 30m).
    - `scripts/render-configs.sh` собирает финальный `configs/vault-agent/agent.hcl` из `agent.hcl.parts/{head,<active-profile>,tail}.hcl` под активный `COMPOSE_PROFILES`.
-   - Always-on templates (рендерятся всегда): `meta.env.tpl` → `.runtime/env/compose.env` (`BACKEND_TAG` для `compose --env-file`), `traefik.yml.tpl` → `.runtime/configs/traefik.yml` (ACME email/caServer из Vault `meta`), `otel.env.tpl` → `.runtime/secrets/otel.env`.
+   - Always-on templates (рендерятся всегда): `traefik.yml.tpl` → `.runtime/configs/traefik.yml` (ACME email/caServer из Vault `meta`), `otel.env.tpl` → `.runtime/secrets/otel.env`.
    - Per-profile templates: `postgres.env`, `backend.env`, `minio.env`, `backup.env` — рендерятся только если соответствующий profile активен (через `agent.hcl.parts/<profile>.hcl`).
    - Все templates читают `kv/data/projects/<p>/<env>/{meta,otel,db,oidc,jwt,minio,backup}` (только то, что нужно под profile-набор).
    - Healthcheck = `.runtime/configs/vault-health.sh` (генерится render-configs.sh под активный profile-набор) — проверяет non-empty все expected output-файлы.
@@ -104,7 +104,7 @@ laptop оператора                          VPS
                                          (force-recreate consumers если vault-template менялся)
 ```
 
-Никаких runner'ов, push-trigger'ов, gitea-CI. Backend-images собирает разработчик локально (`docker buildx build … && docker push git.stit.tech/<client-org>/backend:<tag>`), затем `vault kv patch kv/projects/<p>/<env>/meta backend_tag=<tag>` на корп-стороне + `make ship` (без MSG) для force-recreate. `BACKEND_TAG` в `.env` не лежит — приходит из Vault `meta` через `.runtime/env/compose.env`.
+Никаких runner'ов, push-trigger'ов, gitea-CI. Backend-images собирает разработчик локально (`docker buildx build … && docker push git.stit.tech/<client-org>/backend:<tag>`), затем `make bump SVC=backend TAG=<tag>` — правит `BACKEND_TAG` в `.env` на VPS и force-recreate'ит backend. Image-теги живут строго в `.env` (конвенция `<SVC>_TAG`), через Vault не ходят.
 
 ## Cockpit-сводка и серверный смок
 

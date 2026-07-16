@@ -26,7 +26,6 @@ services:
       - ./configs/vault-agent/templates:/etc/vault-agent/templates:ro
       - ./.runtime/secrets:/secrets
       - ./.runtime/secrets-bootstrap:/secrets-bootstrap
-      - ./.runtime/env:/env                          # compose.env для compose --env-file
       - ./.runtime/configs:/configs                  # rendered configs (traefik.yml, ...)
     networks:
       - proxy            # outbound к vault.stit.tech
@@ -35,7 +34,7 @@ services:
       # Healthy = ВСЕ expected outputs под активный COMPOSE_PROFILES непустые.
       # Список output'ов profile-зависим; render-configs.sh генерит конкретный
       # health-script в .runtime/configs/vault-health.sh при каждом deploy.
-      # Always-on проверки: /env/compose.env, /configs/traefik.yml, /secrets/otel.env.
+      # Always-on проверки: /configs/traefik.yml, /secrets/otel.env.
       # Per-profile добавки: postgres.env / backend.env / minio.env / backup.env.
       test: ["CMD", "sh", "/configs/vault-health.sh"]
       interval: 5s

@@ -38,9 +38,9 @@ lazy-seed, profile-opt-in) — `.claude/rules/multi-env.md`.
 ## Обслуживает `<org>/backend`
 
 Runtime для клиентского образа `git.stit.tech/<org>/backend:<tag>`. Deploy нового тега —
-корп патчит `vault kv patch kv/projects/<p>/<env>/meta backend_tag=<tag>`, оператор делает
-`make ship` (без MSG) → vault-agent перерендерит `meta`, deploy.sh force-recreate'нет backend.
-`BACKEND_TAG` в `.env` не лежит — приходит из Vault.
+`make bump SVC=backend TAG=<tag>`: правит `BACKEND_TAG` в `.env` на VPS + force-recreate,
+compose сам пуллит образ. Image-теги живут **строго в `.env`** (конвенция `<SVC>_TAG`),
+через Vault не ходят — корп-сторона в rollout'е тега не участвует.
 
 ## Sibling `<org>/strategy` — продуктовый контекст
 

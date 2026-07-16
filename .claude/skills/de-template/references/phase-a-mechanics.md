@@ -102,7 +102,6 @@ A — Phase B (печать cross-repo next-steps).
 - `tail.hcl`
 
 `configs/vault-agent/templates/`:
-- `meta.env.tpl`
 - `otel.env.tpl`
 - `traefik.yml.tpl`
 
@@ -111,7 +110,7 @@ A — Phase B (печать cross-repo next-steps).
 | фрагмент | сохранить если |
 |---|---|
 | `agent.hcl.parts/postgres.hcl` | профиль `postgres` |
-| `templates/db.env.tpl` (или `postgres.env.tpl`) | профиль `postgres` |
+| `templates/postgres.env.tpl` | профиль `postgres` |
 | `agent.hcl.parts/storage.hcl` | профиль `storage` |
 | `templates/minio.env.tpl` | профиль `storage` |
 | `templates/backup.env.tpl` | профиль `storage` |
@@ -141,10 +140,10 @@ A — Phase B (печать cross-repo next-steps).
 ### Anti-patterns
 
 - Удалить `head.hcl`/`tail.hcl` (фундамент).
-- Удалить `meta.env.tpl`/`otel.env.tpl` (от корп-онбординга, всегда
+- Удалить `otel.env.tpl`/`traefik.yml.tpl` (от корп-онбординга, всегда
   нужны).
 - Удалить template без проверки ссылок в `compose/<name>.yml`
-  (`env_file: .runtime/<x>.env`).
+  (`env_file: .runtime/secrets/<x>.env`).
 
 ## A.4. Кастомить идентичность
 
@@ -225,7 +224,7 @@ A — Phase B (печать cross-repo next-steps).
 3. Анализ артефактов `de-template`-ом:
    - в карте есть `hosting: external` → форкнуть соответствующий
      `<org>/<repo>`;
-   - в карте есть `backend` → tag пушится в `meta.backend_tag`;
+   - в карте есть `backend` → tag живёт в `.env` (`BACKEND_TAG`), деплой — `make bump`;
    - в `services/*/Secrets` упоминаются KV-kind, которых нет в Vault
      (требуют seed) → `/request-secret`;
    - в `stack/Edge` упомянут source-IP whitelist → `/corp-handoff`;
@@ -259,9 +258,10 @@ A — Phase B (печать cross-repo next-steps).
 - [ ] LE-HTTP-01 A-записи для сабдоменов:
       api.<DOMAIN>, minio.<DOMAIN>, s3.<DOMAIN>.
 
-### 5. Записать tag backend в meta
-- [ ] После сборки backend-образа: `vault kv patch
-      kv/projects/<p>/<env>/meta backend_tag=<sha>`.
+### 5. Выставить tag backend в .env
+- [ ] После сборки backend-образа: `make bump SVC=backend TAG=<sha>`
+      (правит `BACKEND_TAG` в `.env` на VPS + force-recreate; Vault
+      в деплое тега не участвует).
 ```
 
 ### После печати

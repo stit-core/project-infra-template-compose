@@ -1,4 +1,4 @@
-.PHONY: help validate doctor check ship deploy render ps logs restart recreate build backup restore-pg ssh status search new-env setup plan-check project-check
+.PHONY: help validate doctor check ship deploy render ps logs restart recreate build bump backup restore-pg ssh status search new-env setup plan-check project-check
 
 SHELL := /usr/bin/env bash
 
@@ -7,11 +7,10 @@ SHELL := /usr/bin/env bash
 # SNAPSHOT= (restore-pg) / Q=,P= (search) / ENV= (new-env) / A= (status) /
 # MSG= (ship).
 #
-# compose интерполирует ${...} из --env-file. compose.env рендерится
-# vault-agent'ом из kv/projects/<p>/<env>/meta (BACKEND_TAG etc.). Поздние
-# --env-file перекрывают ранние; .env остаётся источником для identity и
-# bootstrap-auth, compose.env — для Vault-managed конфига.
-COMPOSE_ARGS := --env-file .env --env-file .runtime/env/compose.env \
+# compose интерполирует ${...} из --env-file .env: identity, bootstrap-auth
+# и image-теги (<SVC>_TAG — бампаются строго через .env, НЕ через Vault;
+# верб `bump`). Vault отдаёт только секреты/конфиги через vault-agent render.
+COMPOSE_ARGS := --env-file .env \
                 -f docker-compose.yml $(addprefix -f ,$(wildcard compose/*.yml))
 
 help: ## сгруппированный список команд
@@ -73,6 +72,20 @@ build: ## пересобрать образ сервиса с build-context (н�
 	@if [ -z "$(SVC)" ]; then echo "usage: make build SVC=<name>"; exit 2; fi
 	@if [ -f .env ]; then docker compose $(COMPOSE_ARGS) build $(SVC); \
 	else bash scripts/tools/ssh.sh exec make build SVC=$(SVC); fi
+
+# Единственный канон бампа image-тега: тег живёт в .env как <SVC>_TAG
+# (UPPER_SNAKE), НЕ в Vault. Верб правит .env на VPS и пересоздаёт сервис —
+# compose сам подтянет отсутствующий образ (pull policy=missing).
+bump: ## бамп image-тега через .env (<SVC>_TAG) + recreate: make bump SVC=backend TAG=v1.2.3
+	@if [ -z "$(SVC)" ] || [ -z "$(TAG)" ]; then echo 'usage: make bump SVC=<name> TAG=<tag>'; exit 2; fi
+	@if [ -f .env ]; then \
+		var=$$(echo "$(SVC)" | tr '[:lower:]-' '[:upper:]_')_TAG; \
+		if grep -q "^$$var=" .env; then sed -i "s|^$$var=.*|$$var=$(TAG)|" .env; \
+		elif grep -q "^# $$var=" .env; then sed -i "s|^# $$var=.*|$$var=$(TAG)|" .env; \
+		else printf '%s=%s\n' "$$var" "$(TAG)" >> .env; fi; \
+		echo "→ $$var=$(TAG) (.env)"; \
+		docker compose $(COMPOSE_ARGS) up -d --no-deps --force-recreate $(SVC); \
+	else bash scripts/tools/ssh.sh exec make bump SVC=$(SVC) TAG=$(TAG); fi
 
 backup: ## one-shot backup (на VPS; с workstation — через ssh)
 	@if [ -f .env ]; then docker exec backup /usr/local/bin/backup-now; \

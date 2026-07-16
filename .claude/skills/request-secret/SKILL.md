@@ -56,8 +56,8 @@ ENV=$(awk -F= '/^ENV=/{print $2; exit}' .env.local 2>/dev/null)
 
 | Name | Поля | Используется |
 |---|---|---|
-| `meta` | `backend_tag`, `acme_email`, `acme_caserver` | always-on (compose.env, traefik.yml) |
-| `otel` | `token` | always-on (otel-agent bearer) |
+| `meta` | `acme_email`, `acme_caserver` (image-теги тут НЕ живут — они в `.env`, `make bump`) | always-on (traefik.yml) |
+| `otel` | `token`, `accountID` (сеет корп при онбординге; шаблон читает только `token`) | always-on (otel-agent bearer) |
 | `db` | `user`, `password`, `database` | profile postgres + backend + storage |
 | `oidc` | `client_id`, `client_secret` | profile backend |
 | `jwt` | `signing_key` | profile backend |

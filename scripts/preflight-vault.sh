@@ -53,7 +53,7 @@ token=$(printf '%s' "$login_json" | jq -r '.auth.client_token // empty')
 }
 
 # 3. Profile-aware required KV paths:
-#    - always-on: meta (BACKEND_TAG, ACME_EMAIL, ACME_CASERVER) + otel (token).
+#    - always-on: meta (ACME_EMAIL, ACME_CASERVER) + otel (token).
 #    - profile postgres: + db (POSTGRES_*)
 #    - profile backend:  + db, oidc, jwt
 #    - profile storage:  + minio, backup (+ db через postgres-валидацию deploy.sh)

@@ -67,13 +67,13 @@ else
   fi
 fi
 
-# 3. .runtime отрендерен (vault-agent пишет compose.env + secrets/*.env)
+# 3. .runtime отрендерен (vault-agent пишет configs + secrets/*.env)
 if [ ! -f .env ]; then
   st ".runtime render" SKIP "нет .env"
-elif [ -f .runtime/env/compose.env ]; then
+elif [ -s .runtime/configs/traefik.yml ]; then
   st ".runtime render" PASS
 else
-  st ".runtime render" WARN ".runtime/env/compose.env нет — make render/deploy"
+  st ".runtime render" WARN ".runtime/configs/traefik.yml пуст/нет — make render/deploy"
 fi
 
 # 4. vault-agent контейнер жив (рендерит секреты для consumer'ов)

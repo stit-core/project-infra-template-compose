@@ -17,7 +17,8 @@ stit (`*.stit.tech`; корп-онбординг на шаге 1 делает st
 **Где вы работаете.** Репо живёт на **рабочей станции оператора** — здесь authoring / validate /
 plan / ship. Живого стека локально нет: приложения и контейнеры крутятся на удалённом VPS (один
 VPS = одна среда). `make ship` пушит и триггерит remote `deploy.sh` по SSH; ops-вербы (`make ps`/
-`logs`/`restart`) ходят на VPS через `scripts/tools/ssh.sh` (хост из `ansible/inventory.ini`).
+`logs`/`restart`) ходят на VPS через `scripts/tools/ssh.sh` (connection из `.env.local`,
+fallback `ansible/inventory.ini`).
 Локальный SKIP authoring-проверок без `.env`/docker — норма, не падение.
 
 ## Pre-requisites
@@ -34,7 +35,7 @@ VPS = одна среда). `make ship` пушит и триггерит remote 
 1. Gitea (`https://git.stit.tech`) → `stit-core/project-infra-template-compose` →
    **Use this template** → `<org>/infra`.
 2. `git clone git@git.stit.tech:<org>/infra.git && cd infra`.
-3. `make setup` — ставит git-хуки (commit-msg, pre-commit на `roadmap.md`).
+3. `make setup` — ставит git-хуки (commit-msg, pre-commit на `roadmap.md` + `docs/project/`).
 
 На self-hosted замените `git.stit.tech` на git вашего control-plane (`REGISTRY_HOST`).
 
@@ -52,7 +53,7 @@ ssh root@<corp-host> 'cd /opt/corp-infra && \
 - AppRole `projects-acme-<env>` (flat — Vault не принимает слеши в `auth/approle/role/<name>`) +
   policy read-only на `kv/data/projects/acme/<env>/*` и `kv/metadata/projects/acme/<env>/*`.
 - `kv/projects/acme/<env>/otel` — bearer token + accountID для OTLP-ingest.
-- `kv/projects/acme/<env>/meta` — дефолты (`backend_tag=latest`, `acme_email`, `acme_caserver`).
+- `kv/projects/acme/<env>/meta` — дефолты (`acme_email`, `acme_caserver`; image-тегов в `meta` нет — они живут в `.env`, см. `make bump`).
 
 Возвращает по блоку на env — **сохраните**, нужно в шаге 4:
 ```

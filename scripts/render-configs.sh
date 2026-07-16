@@ -74,7 +74,6 @@ health=.runtime/configs/vault-health.sh
   echo '# используется в healthcheck (см. compose/vault-agent.yml).'
   echo 'set -e'
   echo '# always-on'
-  echo 'test -s /env/compose.env'
   echo 'test -s /configs/traefik.yml'
   echo 'test -s /secrets/otel.env'
   for p in "${active_profiles[@]}"; do

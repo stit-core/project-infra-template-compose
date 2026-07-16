@@ -166,7 +166,7 @@ make deploy
 
 Что произойдёт:
 1. `render-configs.sh` собирает `agent.hcl` из `agent.hcl.parts/` под пустой `COMPOSE_PROFILES` (только always-on блок) + envsubst для middlewares/landing + генерит `.runtime/configs/vault-health.sh`.
-2. `compose up vault-agent` → AppRole-логин, рендер `.runtime/{env/compose.env, configs/traefik.yml, secrets/otel.env, secrets/.ready}` из `kv/projects/<p>/<env>/{meta,otel}`.
+2. `compose up vault-agent` → AppRole-логин, рендер `.runtime/{configs/traefik.yml, secrets/otel.env, secrets/.ready}` из `kv/projects/<p>/<env>/{meta,otel}`.
 3. CrowdSec early для bouncer auto-register.
 4. Остальные always-on: traefik / otel-agent / node-exporter / cadvisor / landing.
 5. Traefik запрашивает LE-cert на `${DOMAIN}` (landing).

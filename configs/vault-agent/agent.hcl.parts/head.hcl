@@ -31,17 +31,9 @@ auto_auth {
 
 # ───── Always-on templates ─────
 # Эти templates рендерятся независимо от COMPOSE_PROFILES — без них стек
-# не поднимется (compose читает meta для image-тегов, traefik читает свой
-# static config, otel-agent читает otel.env для bearer-token).
-
-# Non-secret конфиг (BACKEND_TAG etc.) → .runtime/env/compose.env для
-# compose --env-file. perms 0444 — compose-парсер ходит под user'ом, под
-# которым запущен `docker compose`.
-template {
-  source      = "/etc/vault-agent/templates/meta.env.tpl"
-  destination = "/env/compose.env"
-  perms       = 0444
-}
+# не поднимется (traefik читает свой static config, otel-agent читает
+# otel.env для bearer-token). Image-теги через Vault НЕ ходят — они живут
+# в .env (<SVC>_TAG, см. .env.example) и бампаются `make bump`.
 
 # Traefik static config — ACME email/caServer из meta KV-объекта.
 # perms 0444 — traefik в контейнере под не-root.

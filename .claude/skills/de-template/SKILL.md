@@ -134,8 +134,8 @@ A.2/A.3, обнуление roadmap в A.5, удаление getting-started) и
 
 ### A.3. Прунить vault-agent parts/templates
 
-- Сохраняются всегда: `head.hcl`+`tail.hcl`, `meta.env.tpl`+
-  `otel.env.tpl`+`traefik.yml.tpl`.
+- Сохраняются всегда: `head.hcl`+`tail.hcl`, `otel.env.tpl`+
+  `traefik.yml.tpl`.
 - Per profile (см. `phase-a-mechanics.md`) — каскад прунинга:
   показать parts/templates, которые исчезают, + проверить, что нет
   ссылок в `scripts/render-configs.sh` или other configs → через
@@ -182,7 +182,8 @@ de-template **не делает** cross-repo действий — печатае
 
 - **Внешние сервисы из карты** (`hosting: external`): форкнуть
   `<org>/backend` / `<org>/frontend`; backend-образ пушится в
-  `git.stit.tech/<org>/backend`, tag → `meta.backend_tag`.
+  `git.stit.tech/<org>/backend`, tag → `BACKEND_TAG` в `.env`
+  (`make bump SVC=backend TAG=…`).
 - **Корп-онбординг** (если ещё нет): `onboard-project.sh --name <p>
   --envs …` на корп-VPS → AppRole + otel + meta.
 - **Seed вторичных KV** под активные профили: чейн `/request-secret`

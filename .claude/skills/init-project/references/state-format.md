@@ -21,7 +21,7 @@ kind: init-project-journey
 ---
 
 ## Текущий этап
-2 — Hosted-сервисы. Осталось: `services/backend.md` (draft, нужна
+3 — Hosted-сервисы. Осталось: `services/backend.md` (draft, нужна
 секция Generates); `services/db.md` (не заведён).
 
 ## Открытые вопросы
@@ -34,7 +34,8 @@ kind: init-project-journey
 
 ## Cross-repo next-steps
 - Форкнуть `<org>/backend` из `go-backend-template`, образ
-  `git.stit.tech/<org>/backend`, tag → `meta.backend_tag`.
+  `git.stit.tech/<org>/backend`, tag → `BACKEND_TAG` в `.env`
+  (`make bump SVC=backend TAG=…`).
 - Корп-онбординг: `onboard-project.sh --name acme --envs dev,prod`
   (AppRole + meta + otel).
 - Seed `kv/projects/acme/dev/db` (user/password/database) через
@@ -64,7 +65,7 @@ kind: init-project-journey
 - После закрытия этапа — обновить номер на следующий и сбросить
   «осталось» под него.
 - Если идёт возврат назад (см. `journey-stages.md § Когда возвращаться
-  назад`) — указать причину: «возврат к 1: карта не содержит `redis`
+  назад`) — указать причину: «возврат к 2: карта не содержит `redis`
   (упомянут в backend service-doc)».
 
 ### `## Открытые вопросы`

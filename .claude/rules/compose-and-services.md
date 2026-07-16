@@ -49,7 +49,7 @@ depends_on:
 
 Vault-agent healthy = `.runtime/configs/vault-health.sh` зелёный = **все** expected output'ы под активный `COMPOSE_PROFILES` непусты (`test -s`; `.runtime/secrets/.ready` — лишь liveness-marker, рендерится статически, healthcheck им не гейтит). Без `depends_on: service_healthy` consumer стартует с пустым `env_file` и падает.
 
-**Редеплой со сменой значения** (ротация креды / `backend_tag`-rollout): `scripts/deploy.sh` обнуляет старые `.runtime/secrets/*.env` **перед** `restart vault-agent`. Иначе `test -s` прошёл бы мгновенно по непустым файлам с прошлого деплоя, `up --wait` рапортовал бы healthy до свежего рендера, и `--force-recreate` зафиксировал бы в consumer'е старый env (падение на новых кредах).
+**Редеплой со сменой значения** (ротация креды): `scripts/deploy.sh` обнуляет старые `.runtime/secrets/*.env` **перед** `restart vault-agent`. Иначе `test -s` прошёл бы мгновенно по непустым файлам с прошлого деплоя, `up --wait` рапортовал бы healthy до свежего рендера, и `--force-recreate` зафиксировал бы в consumer'е старый env (падение на новых кредах).
 
 ## `internal: true` сеть и `ports:` несовместимы
 
@@ -110,4 +110,7 @@ Backup-контейнер (`containers/backup/`) бэкапит **только**
 
 ## Bump образа
 
-**Никогда не меняй image-тег без явного OK.** Bump = отдельный коммит `chore(<svc>): bump <name> to <version>` с release-notes в теле.
+**Никогда не меняй image-тег без явного OK.**
+
+- **Инфра-образы** (traefik/postgres/minio/...) закреплены литеральной версией в `compose/<svc>.yml`. Bump = отдельный коммит `chore(<svc>): bump <name> to <version>` с release-notes в теле.
+- **Бампаемые app-образы** (backend и любые будущие) параметризуются `${<SVC>_TAG}` — тег живёт **строго в `.env`** на VPS, не в Vault. Bump = `make bump SVC=<svc> TAG=<tag>` (правит `.env` + force-recreate; compose сам пуллит отсутствующий образ). Rollback — тот же верб со старым тегом.

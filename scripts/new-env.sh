@@ -2,9 +2,10 @@
 # Bootstrap .env на свежем проектном VPS.
 #
 # Multi-env: на каждом VPS свой ENV (dev/prod/...) и свой AppRole.
-# .env минимален: identity (PROJECT_NAME, ENV, DOMAIN) + AppRole-bootstrap.
-# Всё остальное (backend_tag, acme email/caServer, restic endpoint, runtime
-# секреты) живёт в Vault — корп-сторона засеивает при онбординге (meta+otel)
+# .env минимален: identity (PROJECT_NAME, ENV, DOMAIN) + AppRole-bootstrap
+# + image-теги (<SVC>_TAG — бампаются строго через .env, `make bump`).
+# Всё остальное (acme email/caServer, restic endpoint, runtime секреты)
+# живёт в Vault — корп-сторона засеивает при онбординге (meta+otel)
 # и по запросу через skill `/request-secret` (печатает блок vault kv put).
 #
 # Non-interactive:
@@ -50,8 +51,9 @@ else
 
   cat > .env <<EOF
 # Сгенерировано scripts/new-env.sh. См. .env.example для контракта.
-# Vault-managed конфиг (backend_tag, acme email/caServer, restic endpoint)
-# и runtime-секреты — в kv/projects/$PROJECT_NAME/$ENV/*.
+# Vault-managed конфиг (acme email/caServer, restic endpoint) и
+# runtime-секреты — в kv/projects/$PROJECT_NAME/$ENV/*.
+# Image-теги — строго здесь (<SVC>_TAG, бамп через \`make bump\`), не в Vault.
 
 PROJECT_NAME=$PROJECT_NAME
 ENV=$ENV
@@ -64,8 +66,12 @@ VAULT_SECRET_ID=$VAULT_SECRET_ID
 # kv/projects/$PROJECT_NAME/$ENV/<kind>, добавляй сюда profile (через запятую):
 #   postgres  — нужен kv/.../db
 #   storage   — нужен kv/.../minio + kv/.../backup (+ postgres профиль)
-#   backend   — нужен kv/.../{db,oidc,jwt}
+#   backend   — нужен kv/.../{db,oidc,jwt} + BACKEND_TAG ниже
 # COMPOSE_PROFILES=
+
+# Image-тег backend; раскомментировать вместе с профилем backend.
+# Бамп — \`make bump SVC=backend TAG=<tag>\`.
+# BACKEND_TAG=
 
 CROWDSEC_BOUNCER_API_KEY=
 EOF

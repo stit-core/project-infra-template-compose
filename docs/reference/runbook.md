@@ -89,13 +89,10 @@ docker exec backup restic check
 Backend rollback (image tag):
 
 ```bash
-# На корп-стороне (vault.stit.tech):
-vault kv patch kv/projects/<p>/<env>/meta backend_tag=v0.1.0
-# На проектной (laptop / VPS):
-make ship   # без MSG, deploy.sh детектит template-change и force-recreate'нёт backend
+make bump SVC=backend TAG=v0.1.0   # с workstation (проксируется на VPS) или на VPS
 ```
 
-`BACKEND_TAG` приходит из Vault `meta`, не из `.env`. Vault-agent перерендеривает `.runtime/env/compose.env`, compose читает его через `--env-file` (см. Makefile).
+`BACKEND_TAG` живёт строго в `.env` на VPS (конвенция `<SVC>_TAG`), не в Vault. `make bump` правит его и делает force-recreate — rollback это тот же bump на старый тег.
 
 Infra rollback (compose/configs):
 

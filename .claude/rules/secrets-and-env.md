@@ -18,11 +18,12 @@ paths:
 | Identity | `PROJECT_NAME`, `ENV`, `DOMAIN` | `.env` (gitignored) | `scripts/new-env.sh` |
 | Bootstrap auth | `VAULT_ROLE_ID`, `VAULT_SECRET_ID` | `.env` | оператор (из корп онбординга) |
 | Local-managed | `CROWDSEC_BOUNCER_API_KEY`, `COMPOSE_PROFILES` | `.env` | auto-register / оператор |
+| Image-теги | `BACKEND_TAG` (конвенция `<SVC>_TAG`) | `.env` — **строго**, не Vault | оператор (`make bump SVC= TAG=`) |
 | Корп-эндпоинты | `VAULT_ADDR`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `REGISTRY_HOST` | `.env` (managed-дефолт в `.env.example`/коде; self-hosted переопределяет) | оператор (self-hosted) |
-| Vault-managed конфиг | meta: `backend_tag`→`BACKEND_TAG` в compose.env; `acme_email`/`acme_caserver`→traefik.yml | `kv/projects/<p>/<env>/meta` (vault-agent рендерит) | корп-админ (vault kv put/patch) |
+| Vault-managed конфиг | meta: `acme_email`/`acme_caserver`→traefik.yml | `kv/projects/<p>/<env>/meta` (vault-agent рендерит) | корп-админ (vault kv put/patch) |
 | Vault-managed секреты | DB, OIDC, JWT, OTEL_TOKEN, MinIO, Restic + AWS | `kv/projects/<p>/<env>/{db,oidc,jwt,otel,minio,backup}` → `.runtime/secrets/*.env` | корп-админ |
 
-Consumer-сервисы (postgres, backend, minio, backup, otel-agent) читают **только** `.runtime/secrets/*.env` и `.runtime/env/compose.env` через `env_file:` / compose `--env-file`. Они не знают про Vault напрямую.
+Consumer-сервисы (postgres, backend, minio, backup, otel-agent) читают **только** `.runtime/secrets/*.env` через `env_file:` (плюс `${...}`-интерполяцию из `.env`). Они не знают про Vault напрямую. Image-теги через Vault не ходят: `<SVC>_TAG` живёт в `.env`, бамп — `make bump SVC= TAG=`.
 
 ## Multi-env
 
@@ -35,7 +36,6 @@ Consumer-сервисы (postgres, backend, minio, backup, otel-agent) чита�
 | `.env.example` | да | Минимальный набор для bootstrap (5 переменных) |
 | `.env` | **нет** (gitignored, permissions.deny) | Реальные identity + AppRole на VPS |
 | `.runtime/secrets/*.env` | **нет** | Vault-agent rendered секреты |
-| `.runtime/env/compose.env` | **нет** | Vault-agent rendered non-secret конфиг для compose (`BACKEND_TAG` из meta) |
 | `.runtime/configs/traefik.yml` | **нет** | Vault-agent rendered traefik static (acme email/caServer из Vault) |
 | `.runtime/configs/vault-health.sh` | **нет** | render-configs.sh generated healthcheck-script под активные profile'ы |
 | `.runtime/secrets-bootstrap/{role-id,secret-id}` | **нет** | Trampoline для AppRole login |
@@ -48,7 +48,7 @@ Consumer-сервисы (postgres, backend, minio, backup, otel-agent) чита�
 ### .env / .env.example
 
 - `.env*` НИКОГДА не коммитятся (gitignore + `permissions.deny`).
-- В `.env.example` живёт минимум: identity, AppRole-bootstrap, профильные switches. Vault-managed vars (`BACKEND_TAG` etc.) присутствуют **как закомментированные declarations** — нужно для `validate.sh` coverage-check, реальное значение приходит из Vault.
+- В `.env.example` живёт минимум: identity, AppRole-bootstrap, профильные switches, image-теги (`<SVC>_TAG` — закомментированы, раскомментируются вместе с профилем; бамп только через `make bump`, не Vault).
 - Имена: `<SERVICE>_<PURPOSE>` UPPER_SNAKE_CASE.
 
 ### .runtime/

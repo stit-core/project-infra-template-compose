@@ -110,13 +110,14 @@ Identity / Secrets / Route / Generates. По разделу на каждую с
 **Что фиксируем**:
 
 - Какой Vault KV нужен: `kv/projects/<p>/<env>/<kind>` — `kind` ∈
-  {`db`, `minio`, `backup`, `backend`, `jwt`, `oidc`, project-specific}.
+  {`db`, `minio`, `backup`, `jwt`, `oidc`, project-specific}.
 - Поля KV (`user`/`password`/`database` для db; `root_user`/
   `root_password`/`access_key`/`secret_key` для minio; project-specific
   для backend).
 - Какой vault-agent template рендерит env-файл — обычно
-  `configs/vault-agent/templates/<kind>.env.tpl` → итог
-  `.runtime/<kind>.env`, подключается `env_file:`.
+  `configs/vault-agent/templates/<svc>.env.tpl` (имя по consumer-сервису:
+  `db`/`oidc`/`jwt` для backend рендерит `backend.env.tpl`) → итог
+  `.runtime/secrets/<svc>.env`, подключается `env_file:`.
 - Если секретов нет — `N/A` явной строкой.
 
 **Опции опрашиваются как**:
@@ -124,7 +125,7 @@ Identity / Secrets / Route / Generates. По разделу на каждую с
 - KV-kind: enum существующих + «нужен новый» (Other → /request-secret
   next-step).
 - Поля: Other (свободный список — архитектор называет).
-- Template: 2 опции «существующий `<kind>.env.tpl`» / «нужен новый»
+- Template: 2 опции «существующий `<svc>.env.tpl`» / «нужен новый»
   (Other → cross-repo next-step).
 
 **Что НЕ**:
@@ -138,8 +139,8 @@ Identity / Secrets / Route / Generates. По разделу на каждую с
 **Тест-критерий**:
 
 - ✅ «`kv/projects/acme/dev/db` поля `user/password/database`,
-  template `db.env.tpl` → `.runtime/db.env`, backend через
-  `env_file:`».
+  template `backend.env.tpl` → `.runtime/secrets/backend.env`, backend
+  через `env_file:`».
 - ✅ «`N/A` — сервис не читает секретов».
 - ❌ «postgres-пароль в `.env` напрямую» — не через vault.
 - ❌ «KV `kv/db` без env-префикса».
@@ -210,7 +211,7 @@ Identity / Secrets / Route / Generates. По разделу на каждую с
 - `configs/vault-agent/templates/<kind>.env.tpl` — keep (если секреты).
 - traefik labels или dynamic route (если public).
 - Для `hosting: external` — cross-repo next-step («форкни `<repo>`,
-  запиши tag в `kv/.../meta.backend_tag`»).
+  выставь tag в `.env` через `make bump SVC=<svc> TAG=…`»).
 
 **Опции опрашиваются как** — обычно Other (имена parts/templates —
 архитектор называет по реальным файлам), enum только для да/нет «нужен
@@ -227,7 +228,7 @@ Identity / Secrets / Route / Generates. По разделу на каждую с
 **Тест-критерий**:
 
 - ✅ «`COMPOSE_PROFILES += postgres`; `compose/postgres.yml` keep;
-  `agent.hcl.parts/postgres.hcl` + `templates/db.env.tpl` keep».
+  `agent.hcl.parts/postgres.hcl` + `templates/postgres.env.tpl` keep».
 - ✅ «`COMPOSE_PROFILES` — нет (always-on landing); `compose/landing.yml`
   keep; traefik labels для `${DOMAIN}`».
 - ✅ «external; cross-repo next-step: форкни `<org>/frontend`,
