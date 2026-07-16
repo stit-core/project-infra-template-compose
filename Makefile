@@ -54,8 +54,8 @@ ps: ## статус сервисов (на VPS; с workstation — через ss
 	@if [ -f .env ]; then docker compose $(COMPOSE_ARGS) ps; \
 	else bash scripts/tools/ssh.sh exec make ps; fi
 
-logs: ## логи -f --tail=100 (SVC= один сервис; с workstation — через ssh)
-	@if [ -f .env ]; then docker compose $(COMPOSE_ARGS) logs -f --tail=100 $(SVC); \
+logs: ## логи --tail=100, без follow (SVC= один сервис; с workstation — через ssh)
+	@if [ -f .env ]; then docker compose $(COMPOSE_ARGS) logs --tail=100 $(SVC); \
 	else bash scripts/tools/ssh.sh exec make logs SVC=$(SVC); fi
 
 restart: ## рестарт одного сервиса: make restart SVC=backend
