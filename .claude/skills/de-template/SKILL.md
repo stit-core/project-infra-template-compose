@@ -1,6 +1,6 @@
 ---
 name: de-template
-description: Развернуть форк `project-infra-template-compose` в самостоятельную проектную инфру по stable-артефактам `docs/project` — вывести `COMPOSE_PROFILES` из `stack § Service map`, прунить неиспользуемые `compose/*.yml` + vault-agent parts/templates, кастомить `CLAUDE.md`/`README.md` под проект (продуктовый контекст читает cross-repo из `<org>/strategy`), печатать cross-repo next-steps. Активируй когда юзер форкнул шаблон и говорит "/de-template", "разверни инфру", "де-темплейтизируй", "убери шаблонную мету", или когда `/init-project` дошёл до развёртывания (стек+сервисы stable). Движок skill-only — reviewable edits по фазам с показом каскадов перед прунингом. НЕ запускать на каноническом шаблоне.
+description: Развернуть форк `project-infra-template-compose` в самостоятельную проектную инфру по stable-артефактам `docs/project` — вывести `COMPOSE_PROFILES` из `stack § Service map`, прунить неиспользуемые `compose/*.yml` + секции `.env.example`, кастомить `CLAUDE.md`/`README.md` под проект (продуктовый контекст читает cross-repo из `<org>/strategy`), печатать cross-repo next-steps. Активируй когда юзер форкнул шаблон и говорит "/de-template", "разверни инфру", "де-темплейтизируй", "убери шаблонную мету", или когда `/init-project` дошёл до развёртывания (стек+сервисы stable). Движок skill-only — reviewable edits по фазам с показом каскадов перед прунингом. НЕ запускать на каноническом шаблоне.
 ---
 
 # de-template — движок развёртывания инфры
@@ -11,7 +11,7 @@ description: Развернуть форк `project-infra-template-compose` в �
 `<org>/strategy` для кастомизации идентичности) и:
 
 1. Выводит `COMPOSE_PROFILES` из `stack § Service map`.
-2. Прунит неиспользуемые compose/vault-agent-фрагменты (с показом
+2. Прунит неиспользуемые compose-фрагменты + env-секции (с показом
    каскада — что исчезнет — до удаления).
 3. Кастомит идентичность (`CLAUDE.md`/`README.md` под проект).
 4. Сбрасывает scaffolding (`getting-started.md`, `.claude/plans/`).
@@ -34,7 +34,7 @@ description: Развернуть форк `project-infra-template-compose` в �
 | `/de-template phase=<a1..a5>` | одна фаза (для возобновления после блокера) |
 
 `a1..a5` — шаги Phase A (см. `references/phase-a-mechanics.md`):
-`a1`=profiles, `a2`=prune-compose, `a3`=prune-vault-agent,
+`a1`=profiles, `a2`=prune-compose, `a3`=prune-env,
 `a4`=identity, `a5`=strip-scaffolding.
 
 ## Интерактив — норма, plain-чат запрещён
@@ -118,12 +118,12 @@ A.2/A.3, обнуление roadmap в A.5, удаление getting-started) и
   `phase-a-mechanics.md`).
 - Записать дефолт в `.env.example` (`COMPOSE_PROFILES=<набор>`).
 - Напомнить оператору: тот же набор выставить в `.env` после bootstrap
-  (профили активируются только после seed'а их KV —
+  (профили активируются после заполнения их секций секретов в `.env` —
   `.claude/rules/multi-env.md`).
 
 ### A.2. Прунить неиспользуемые `compose/*.yml`
 
-- Always-on (никогда не прунятся): `traefik`, `crowdsec`, `vault-agent`,
+- Always-on (никогда не прунятся): `traefik`, `crowdsec`,
   `node-exporter`, `cadvisor`, `landing`.
 - Profiled — каскад: показать список `compose/<x>.yml` для удаления +
   все ссылки на эти файлы (Makefile, скрипты, доки) → через
@@ -132,14 +132,14 @@ A.2/A.3, обнуление roadmap в A.5, удаление getting-started) и
 - `COMPOSE_ARGS` в Makefile глобит `compose/*.yml` через
   `$(wildcard …)` — Makefile править не надо.
 
-### A.3. Прунить vault-agent parts/templates
+### A.3. Прунить неиспользуемые секции `.env.example`
 
-- Сохраняются всегда: `head.hcl`+`tail.hcl`, `traefik.yml.tpl`.
-- Per profile (см. `phase-a-mechanics.md`) — каскад прунинга:
-  показать parts/templates, которые исчезают, + проверить, что нет
-  ссылок в `scripts/render-configs.sh` или other configs → через
-  `AskUserQuestion` подтвердить.
-- Удалить через `git rm`.
+- Сохраняются всегда: identity, ACME, `CROWDSEC_BOUNCER_API_KEY`,
+  `HOST_ROLE`, registry.
+- Per profile (см. `phase-a-mechanics.md`) — каскад прунинга: показать
+  секции переменных отключённых профилей + проверить, что их `${VAR}`
+  не остались в compose/configs → через `AskUserQuestion` подтвердить.
+- Удалить Edit'ом (`make validate` § .env coverage подтвердит чистоту).
 
 ### A.4. Кастомить идентичность
 
@@ -183,11 +183,8 @@ de-template **не делает** cross-repo действий — печатае
   `<org>/backend` / `<org>/frontend`; backend-образ пушится в
   `git.stit.tech/<org>/backend`, tag → `BACKEND_TAG` в `.env`
   (`make bump SVC=backend TAG=…`).
-- **Корп-онбординг** (если ещё нет): `onboard-project.sh --name <p>
-  --envs …` на корп-VPS → AppRole + meta.
-- **Seed вторичных KV** под активные профили: чейн `/request-secret`
-  на `db`/`minio`/`backup`/`jwt`/`oidc` → блок `vault kv put`
-  корп-админу.
+- **Секреты активных профилей**: чейн `/request-secret` → блок
+  `VAR=value` для `.env` на VPS.
 - **Edge** из `stack § Generates`: egress-IP VPS в crowdsec-whitelist
   (`/corp-handoff`); сабдомены под LE-DNS.
 
@@ -231,7 +228,7 @@ State — **коммитбл артефакт**, не приватная пам�
 - **Не запускать на каноническом шаблоне.** Gate первая защита.
 - **Не стартовать до `stable`-артефактов** — gate вторая защита.
 - **Не прунить always-on фундамент** (`traefik`/`crowdsec`/
-  `vault-agent`/`node-exporter`/`cadvisor`/`landing`) —
+  `node-exporter`/`cadvisor`/`landing`) —
   это фиксированная база шаблона.
 - **Не удалять без каскада.** Каждое `git rm` идёт после показа
   каскада + явного подтверждения через `AskUserQuestion`.

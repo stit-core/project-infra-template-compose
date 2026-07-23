@@ -53,7 +53,6 @@ echo "== Infra-touch =="
 # Working tree задел corp-поверхность? → smartdev чейнит в corp-handoff.
 paths=$(git status --porcelain 2>/dev/null | cut -c4-)
 declare -a hits=()
-grep -qE '^configs/vault-agent/'              <<<"$paths" && hits+=("vault-agent-config")
 grep -qE '^compose/.*\.ya?ml'                 <<<"$paths" && hits+=("compose-topology/profiles")
 grep -qE '(^|[ >])\.env\.example'             <<<"$paths" && hits+=("env-contract")
 grep -qE 'configs/crowdsec/whitelists\.yaml'  <<<"$paths" && hits+=("crowdsec-whitelist")

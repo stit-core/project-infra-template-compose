@@ -13,19 +13,18 @@
 Этот репозиторий — шаблон проектной инфраструктуры. В скоупе: дефолты, которые
 делают форк небезопасным из коробки (открытые порты, слабые edge-политики,
 отсутствие WAF/auth там, где она нужна, утечка секретов в конфиги/`.env.example`),
-и ошибки в security-sensitive конфигах (`configs/vault-agent/**`,
-`compose/vault-agent.yml`, Traefik static + dynamic, `configs/crowdsec/**`).
+и ошибки в security-sensitive конфигах (Traefik static + dynamic,
+`configs/crowdsec/**`).
 
-Вне скоупа: уязвимости в самих upstream-образах (Traefik, Postgres, Minio, Vault,
+Вне скоупа: уязвимости в самих upstream-образах (Traefik, Postgres, Minio,
 restic и т.д.) — их репортить их мейнтейнерам; здесь — только если наш
 дефолт-конфиг делает их эксплуатируемыми.
 
 ## Секреты не в репозитории
 
-Шаблон не содержит реальных секретов. `.env` минимален (identity +
-AppRole-bootstrap, mode 600) и gitignored; runtime-секреты живут в Vault
-(`kv/projects/<p>/<env>/*`) и рендерятся vault-agent'ом на VPS в `.runtime/`
-(тоже gitignored). В репо — только placeholder'ы в `.env.example`. Не коммить
-`.env*`, `.runtime/`, `*.pem`, `*.key` (`.gitignore` + `permissions.deny`
+Шаблон не содержит реальных секретов. Все секреты живут в `.env` на VPS
+(mode 600, gitignored); rendered-конфиги из `.tpl` — тоже gitignored. В репо —
+только placeholder'ы в `.env.example`. Не коммить
+`.env*`, rendered-конфиги, `*.pem`, `*.key` (`.gitignore` + `permissions.deny`
 страхуют, но не заменяют внимание). Если случайно закоммитил секрет в свой форк —
 ротируй его и вычисти историю.

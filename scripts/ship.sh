@@ -80,7 +80,7 @@ touched=""
 # CrowdSec-whitelist здесь не фильтруется: файл живёт corp-side (corp-infra-template),
 # в проектном репо его нет — corp-handoff по нему оформляется вручную (skill corp-handoff).
 [ -n "$range" ] && touched=$(git diff --name-only "$range" 2>/dev/null \
-  | grep -E '^configs/vault-agent/|^compose/[^/]+\.ya?ml$|^\.env\.example$|^ansible/roles/stit-onboard/' || true)
+  | grep -E '^compose/[^/]+\.ya?ml$|^\.env\.example$|^ansible/roles/stit-onboard/' || true)
 
 if [ -n "$corp_impact" ]; then
   echo

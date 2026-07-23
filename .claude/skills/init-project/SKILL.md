@@ -164,8 +164,7 @@ ls -la .git/hooks/commit-msg .git/hooks/pre-commit 2>/dev/null
 - Перечислить накопленные cross-repo next-steps (из state):
   - склонировать/заполнить `<org>/strategy` (продуктовый слой), если не сделан;
   - форки бэкенда/фронта (`hosting: external` из карты);
-  - корп-онбординг через `onboard-project.sh`, если не сделан;
-  - seed вторичных KV под активные профили (`/request-secret`);
+  - секреты активных профилей в `.env` на VPS (`/request-secret`);
   - egress IP VPS в crowdsec-whitelist (`/corp-handoff`);
   - сабдомены под LE-DNS.
 - Сообщить о следующем шаге: `/bootstrap-vps` (поднять VPS для env'а).
@@ -263,7 +262,7 @@ State — **коммитбл артефакт**, не приватная пам�
 - Не проектировать сам по сервисам/стеку — это `/service-deep-dive` /
   `/stack-deep-dive`. Дублирование процедуры внутри этого скилла —
   anti-pattern.
-- Не прунить compose/vault-agent руками — это `/de-template`.
+- Не прунить compose-фрагменты руками — это `/de-template`.
 - Не запускать `/de-template` до зелёного валидатора (gate).
 - Не выполнять cross-repo (форки/seed/онбординг) — только печатать
   next-steps в state и финале (граница продуктового слоя).

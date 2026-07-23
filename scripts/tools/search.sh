@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# rg/grep по compose + configs + scripts + docs. Исключает .runtime/,
+# rg/grep по compose + configs + scripts + docs. Исключает rendered-файлы,
 # rendered-конфиги и прочий шум.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
@@ -23,7 +23,7 @@ fi
 
 if command -v rg >/dev/null 2>&1; then
   rg --no-heading -n -S \
-    --glob='!.runtime/**' --glob='!**/*.rendered' \
+    --glob='!**/*.rendered' \
     "$pattern" "${scope[@]}"
 else
   grep -rn -E "$pattern" "${scope[@]}"

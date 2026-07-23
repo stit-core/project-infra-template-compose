@@ -1,11 +1,11 @@
 ---
 name: add-service
-description: Добавить новый сервис в проектную инфру (compose-фрагмент с pinned image / healthcheck / networks, опционально vault-agent template и traefik labels). Активируй на "/add-service", "добавь сервис X", "запили <name>", "новый контейнер".
+description: Добавить новый сервис в проектную инфру (compose-фрагмент с pinned image / healthcheck / networks, опционально секреты через .env и traefik labels). Активируй на "/add-service", "добавь сервис X", "запили <name>", "новый контейнер".
 ---
 
 # Skill: add-service
 
-Чек-лист добавления сервиса в проектный compose-стек. Цель — каждый сервис из коробки имеет healthcheck, корректные networks, доступ к секретам через vault-agent (если нужно), traefik labels с WAF (если public).
+Чек-лист добавления сервиса в проектный compose-стек. Цель — каждый сервис из коробки имеет healthcheck, корректные networks, секреты через `${VAR}`-интерполяцию из .env (если нужно), traefik labels с WAF (если public).
 
 В отличие от корп-вского `add-service` — здесь нет Authentik OIDC, alerting rules, prom scrape config (это корп-вещи, не проектные).
 
@@ -31,7 +31,7 @@ description: Добавить новый сервис в проектную ин
   - public с UI/API (требует WAF + rate-limit) → `crowdsec@file,secure-headers@file,rate-limit@file`
   - сервис-сервис → не в `proxy`, без traefik labels
 - **Persistence**: нужен ли named volume?
-- **Зависимости**: postgres? нужны ли секреты из Vault?
+- **Зависимости**: postgres? нужны ли секреты (новые `${VAR}` в .env)?
 - **Ресурсы**: mem_limit?
 
 ### 1. Compose-фрагмент
@@ -49,12 +49,8 @@ services:
     restart: unless-stopped
     environment:
       KEY1: value
-    # Если читает секреты — добавь env_file и depends_on на vault-agent.
-    # env_file:
-    #   - .runtime/secrets/<svc>.env
-    # depends_on:
-    #   vault-agent:
-    #     condition: service_healthy
+      # Секреты — через ${VAR}-интерполяцию из .env (декларация в .env.example):
+      # SVC_API_KEY: ${SVC_API_KEY}
     volumes:
       - <svc>-data:/data
     networks:
@@ -82,45 +78,33 @@ services:
 
 Используй `compose/backend.yml` как образец для public-сервиса с секретами; `compose/postgres.yml` — для internal с persistence.
 
-### 2. Секреты через vault-agent (если нужны)
+### 2. Секреты через .env (если нужны)
 
 Если сервис читает секреты:
 
-1. Создать `configs/vault-agent/templates/<svc>.env.tpl`. Синтаксис — consul-template,
-   а не shell envsubst: `(env "PROJECT_NAME")` / `(env "ENV")`, не `${...}`. KV v2 API
-   требует префикс `kv/data/...` в path (в `vault kv put`-CLI префикс не нужен —
-   см. `.claude/rules/secrets-and-env.md`).
+1. Добавить `${VAR}` в `environment:` сервиса:
 
-   ```
-   {{ with secret (printf "kv/data/projects/%s/%s/<svc>" (env "PROJECT_NAME") (env "ENV")) -}}
-   KEY1={{ .Data.data.key1 }}
-   KEY2={{ .Data.data.key2 }}
-   {{- end }}
+   ```yaml
+   environment:
+     SVC_API_KEY: ${SVC_API_KEY}
+     SVC_PASSWORD: ${SVC_PASSWORD}
    ```
 
-2. Добавить блок в `configs/vault-agent/agent.hcl.parts/<profile>.hcl` (либо `head.hcl` если сервис always-on; render-configs.sh склеит финальный `agent.hcl` под активный `COMPOSE_PROFILES`):
+2. Задекларировать переменные в `.env.example` (закомментированными, в секции
+   профиля) с комментарием как сгенерировать / откуда взять.
 
-   ```hcl
-   template {
-     source      = "/etc/vault-agent/templates/<svc>.env.tpl"
-     destination = "/secrets/<svc>.env"
-     perms       = 0400
-   }
-   ```
+3. Сформировать блок значений для `.env` на VPS через skill `/request-secret`
+   (генерит пароли сам, печатает copy-paste блок). Без заполненных значений
+   сервис стартует с пустым env и падает.
 
-3. Запросить seed KV-объекта через skill `/request-secret` — оно сформирует stdout-блок `vault kv put kv/projects/<p>/<env>/<svc> field=...` для корп-админа. Без seed'а vault-agent залипнет в retry-loop'е на этом template (preflight также warning'нёт).
-
-> **Corp-handoff.** Правка `configs/vault-agent/` (новый `.tpl` или блок в `agent.hcl.parts/`) — это corp-поверхность: оформи `/corp-handoff`-блок **до** claim «готово» (`make status → == Infra-touch ==` это ловит). Seed конкретного KV — частный случай handoff'а, его уже покрыл `/request-secret` выше; corp-handoff нужен ещё и когда меняется набор профилей или egress-IP под CrowdSec-whitelist.
-
-4. В compose добавь `profiles:` (если сервис opt-in), `env_file`, `depends_on`:
+4. В compose добавь `profiles:` (если сервис opt-in):
    ```yaml
    profiles: [<profile>]
-   env_file:
-     - .runtime/secrets/<svc>.env
-   depends_on:
-     vault-agent:
-       condition: service_healthy
    ```
+
+> **Corp-handoff.** Секреты — не corp-поверхность (живут в `.env` на VPS).
+> `/corp-handoff` нужен только когда сервису нужен новый образ из registry
+> `git.stit.tech` или меняется egress-IP под CrowdSec-whitelist.
 
 ### 3. Конфиг сервиса (если нужен)
 
@@ -128,7 +112,7 @@ services:
 
 ### 4. Bootstrap-переменные в .env.example
 
-Любой новый `${VAR}` в compose/configs (не в vault-agent template) — добавь в `.env.example` с комментарием.
+Любой новый `${VAR}` в compose/configs — добавь в `.env.example` с комментарием.
 
 ### 5. Backup coverage
 
@@ -164,12 +148,11 @@ services:
 - [ ] Healthcheck указан
 - [ ] `networks:` явный список
 - [ ] Если public — `proxy` сеть + traefik labels с минимум `crowdsec@file`
-- [ ] Если читает секреты — `env_file` на `.runtime/secrets/<svc>.env` + `depends_on: vault-agent: service_healthy` + `<svc>.env.tpl` + блок в `agent.hcl.parts/<profile>.hcl` + seed KV-объекта через `/request-secret`
-- [ ] Все `${VAR}` (bootstrap) есть в `.env.example`
+- [ ] Если читает секреты — `${VAR}` в `environment:` + декларация в `.env.example` + блок значений для `.env` через `/request-secret`
+- [ ] Все `${VAR}` есть в `.env.example`
 - [ ] Если новый Postgres — добавлен ещё один `pg_dumpall` блок в `containers/backup/backup-now` (с другим `-h` host'ом и `--stdin-filename`)
-- [ ] Если тронут `configs/vault-agent/` или добавлен/изменён профиль — оформлен `/corp-handoff`-блок **до** claim «готово»
+- [ ] Если нужен новый образ из registry / новый egress-IP — оформлен `/corp-handoff`-блок **до** claim «готово»
 - [ ] `make validate` зелёный
-- [ ] (Если требует Vault KV seed) — указано оператору, что нужно сделать на корп-стороне
 - [ ] (Если bespoke-сигнал вне `docker ps`) — `scripts/tools/smoke.d/90-<svc>.sh` для `== Server ==`
 
 ## Anti-patterns
@@ -177,5 +160,5 @@ services:
 - Сервис без healthcheck — `depends_on: service_healthy` для зависимых не сработает.
 - `:latest` "временно" — никогда не временно.
 - Public без `crowdsec@file` — открыт миру без WAF.
-- Чтение секрета через `environment:` напрямую из `.env` — на проектной стороне `.env` для bootstrap, runtime-секреты только через vault-agent.
+- Inline-значение секрета в compose (`password: hunter2`) — только `${VAR}` из `.env`.
 - Прокидывал секрет через label/command — может попасть в логи.

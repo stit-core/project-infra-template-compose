@@ -51,19 +51,15 @@
 Сервис = backend, subtype=backend, hosting=here. Скилл предлагает
 четыре вопроса разом:
 
-- **KV-kind** — опции из стандартных KV-kind (`db`/`minio`/`backup`/
-  `jwt`/`oidc` — см. `.claude/rules/multi-env.md`) + «нужен новый KV»
-  (Other → `/request-secret`-stub).
-- **Поля KV** — Other (свободная форма; подсказка: «обычно
-  user/password/database для db; root_user/root_password для minio»).
+- **Набор переменных** — опции из стандартных секций `.env.example`
+  (`postgres`/`storage`/`backend` — см. `.claude/rules/multi-env.md`) +
+  «нужны новые `${VAR}`» (Other → `/request-secret`-stub).
+- **Имена переменных** — Other (свободная форма; подсказка: «обычно
+  POSTGRES_USER/PASSWORD/DB для db; MINIO_ROOT_* для minio»).
   НЕ предлагать опции — это архитектор называет.
-- **vault-agent template** — две опции: «использовать существующий
-  `<svc>.env.tpl` из `configs/vault-agent/templates/`» / «нужен новый
-  template» (Other → stub + cross-repo next-step «после de-template
-  завести template»).
 - **secret-anti-pattern check** — две опции: «секреты только через
-  vault-agent / env_file» / «есть прямое чтение
-  `$VAULT_TOKEN`/`/run/secrets/`» (anti-pattern, обсудить).
+  `${VAR}`-интерполяцию из .env» / «есть inline-значения /
+  прямое чтение `/run/secrets/`» (anti-pattern, обсудить).
 
 ## B. Сырьё
 
@@ -80,7 +76,7 @@
    - не считать сервисом отдельный bin/cron-job, который живёт внутри
      контейнера другого сервиса (это деталь Identity, не сервис);
    - не плодить `infra`-сервисы под always-on (traefik/crowdsec/
-     vault-agent/cadvisor/node-exporter — фундамент шаблона);
+     cadvisor/node-exporter — фундамент шаблона);
    - не выдумывать сервисы, которых в материале нет, «потому что обычно
      бывают».
 3. Через чат показать план: «Из материала вижу:
@@ -123,15 +119,15 @@
 2. Прочитать `state/services/<name>.md`, если есть.
 3. Прочитать соседей: `stack § Service map` (как описан в карте),
    `stack.md § Domains` (если public — есть ли сабдомен), компоненты
-   инфры рядом (`compose/<name>.yml`, `configs/vault-agent/templates/`,
-   `configs/vault-agent/agent.hcl.parts/`) — образец, если уже развёрнут.
+   инфры рядом (`compose/<name>.yml`, секции `.env.example`) — образец,
+   если уже развёрнут.
 4. Применить `field-checklists.md § <секция>` к строкам. Найти:
    - пустые обязательные слоты (placeholder `<...>` считается пустым);
    - подозрения по anti-patterns (`Identity` содержит `:latest`,
      `Route` указывает на корень `${DOMAIN}` без на то причины, `Secrets`
-     обходит vault-agent);
+     содержит inline-значения);
    - расхождения с картой (subtype/hosting в frontmatter ≠ карта);
-   - битые ссылки (KV-kind, которого нет в templates;
+   - битые ссылки (`${VAR}`, которого нет в `.env.example`;
      сабдомен, который не упомянут в stack).
 5. Раунд `AskUserQuestion` (до 4 вопросов) — точечно по найденному:
    - дыры — заполняем через Other;

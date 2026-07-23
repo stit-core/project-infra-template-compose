@@ -38,7 +38,7 @@ paths:
 
 ## TLS
 
-`websecure` entrypoint всегда применяет `secure-headers` глобально (static-конфиг — `.runtime/configs/traefik.yml`, рендерится vault-agent'ом из `configs/vault-agent/templates/traefik.yml.tpl`). LE-сертификаты выпускаются HTTP-01 challenge, `acme.json` хранится в volume `traefik-acme`. Он **не** бэкапится (restic берёт только `pg_dumpall`) — при потере VPS сертификаты перевыпускаются заново. `email`/`caServer` приходят из Vault `meta` (`acme_email`/`acme_caserver`) — vault-agent рендерит их в static-конфиг, не через `${ENV}`-подстановку.
+`websecure` entrypoint всегда применяет `secure-headers` глобально (static-конфиг рендерится render-configs.sh из `configs/traefik/traefik.yml.tpl` в `configs/traefik/traefik.yml`, gitignored). LE-сертификаты выпускаются HTTP-01 challenge, `acme.json` хранится в volume `traefik-acme`. Он **не** бэкапится (restic берёт только `pg_dumpall`) — при потере VPS сертификаты перевыпускаются заново. `email`/`caServer` приходят из `.env` (`ACME_EMAIL`/`ACME_CASERVER`).
 
 ## Dashboard Traefik
 
@@ -51,5 +51,5 @@ gRPC — `&& Headers(\`Content-Type\`, \`application/grpc\`)` рулом + `load
 ## После правки
 
 - `compose/*.yml` labels → `make deploy` (Traefik watcher подхватит).
-- `configs/vault-agent/templates/traefik.yml.tpl` (static-конфиг, security-sensitive: vault-agent рендерит в `.runtime/configs/traefik.yml`) → **рестарт** Traefik (`make restart SVC=traefik`).
+- `configs/traefik/traefik.yml.tpl` (static-конфиг, security-sensitive; рендерится в `configs/traefik/traefik.yml`) → **рестарт** Traefik (`make restart SVC=traefik`; при deploy git-diff по `configs/traefik/` рестартует его сам).
 - `configs/traefik/dynamic/*.yml` (dynamic) → подхватится через `watch: true`. `.tpl` рендерятся через `scripts/render-configs.sh`.

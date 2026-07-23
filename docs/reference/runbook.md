@@ -2,21 +2,14 @@
 
 Common failure modes на проектном VPS и что делать. Ordered by likelihood.
 
-## vault-agent unhealthy / `.ready` отсутствует
+## Сервис падает на пустых секретах
 
-**Симптом:** backend, postgres в статусе `created` или `restarting`, depends_on на vault-agent.
-
-```bash
-docker logs vault-agent --tail=50
-```
+**Симптом:** postgres/backend/minio в restart-loop сразу после старта, в логах — пустой пароль / невалидный DSN / auth failed.
 
 Возможные причины:
-- **AppRole creds невалидны** — `Code: 400. Errors: invalid role or secret ID`. Проверь в `.env` что `VAULT_ROLE_ID`/`VAULT_SECRET_ID` совпадают с тем что вернул `onboard-project.sh`. Если оператор крутил `secret-id` — нужно обновить в `.env` + перезапустить vault-agent.
-- **Vault корп-стороны sealed** — `* error performing token check: vault is sealed`. Ничего не починишь с проектной стороны. Эскалировать на корп: оператор делает `vault operator unseal <key>`.
-- **Network unreachable** — `dial tcp: lookup vault.stit.tech: no such host`. Проверь DNS на VPS, проверь outbound-доступ к корпу.
-- **Path не существует в KV** — `* permission denied` на `kv/data/projects/<p>/<env>/<name>`. Значит корп-сторона не засеяла этот KV-объект (онбординг создаёт только `meta`; `db` / `oidc` / `jwt` / `minio` / `backup` запрашиваются по мере включения profile'ов). Запроси seed через skill `/request-secret` — он сформирует `vault kv put` блок для корп-админа.
-
-**Recovery:** после исправления — `make restart SVC=vault-agent`, дальше healthcheck подтянется и зависимые сервисы стартуют сами.
+- **Секция профиля не заполнена в `.env`** — профиль включён в `COMPOSE_PROFILES`, а его переменные (см. `.env.example`) пустые. Сформируй блок через skill `/request-secret`, допиши в `.env`, `make deploy`.
+- **Контейнер создан до заполнения `.env`** — environment фиксируется при container CREATE. `make deploy` пересоздаст сам; точечно — `make recreate SVC=<svc>`.
+- **Опечатка в имени переменной** — `make doctor` (секция `.env coverage`) покажет незаполненные ключи из `.env.example`.
 
 ## Backend в restart-loop
 
@@ -24,7 +17,7 @@ docker logs vault-agent --tail=50
 docker logs backend --tail=100
 ```
 
-- **PG_DSN ошибка:** проверь `.runtime/secrets/backend.env` (под root: `cat /opt/<p>-infra/.runtime/secrets/backend.env`). Если `password` там пустой — vault не отдал поле; `vault kv get kv/projects/<p>/<env>/db` покажет что в Vault.
+- **PG_DSN ошибка:** проверь `POSTGRES_*` в `.env` на VPS (PG_DSN собирается интерполяцией в `compose/backend.yml`). Пустой пароль → заполни секцию profile postgres и `make deploy`.
 
 ## Traefik не выдаёт LE-cert
 
@@ -79,7 +72,7 @@ docker exec backup restic snapshots
 docker exec backup restic check
 ```
 
-- **`Fatal: unable to open repo`**: `RESTIC_PASSWORD` / minio creds / `repository` endpoint ротированы. Меняются в Vault (`kv/data/projects/<p>/<env>/{backup,minio}`), vault-agent перерендерит `.runtime/secrets/backup.env`, после — `make recreate SVC=backup` (env_file подхватывается только при CREATE, не restart) или `make ship` без MSG (deploy.sh сам детектит template-change).
+- **`Fatal: unable to open repo`**: `RESTIC_PASSWORD` / S3-креды / `RESTIC_REPOSITORY` ротированы. Меняются в `.env` на VPS, после — `make deploy` (compose пересоздаст backup сам) или точечно `make recreate SVC=backup` (environment подхватывается только при CREATE, не restart).
 - **Cron не триггерит**: cron внутри контейнера, не на хосте. Проверь `docker exec backup pgrep crond` и `docker logs backup --tail 20`. Если crond упал — `make restart SVC=backup`. Расписание — `containers/backup/crontab`, rebuild при изменении.
 - **Disk full на VPS**: `df -h`. Restic-cache в `/root/.cache/restic` внутри backup-контейнера может расти — `docker exec backup restic cache --cleanup`.
 
@@ -91,7 +84,7 @@ Backend rollback (image tag):
 make bump SVC=backend TAG=v0.1.0   # с workstation (проксируется на VPS) или на VPS
 ```
 
-`BACKEND_TAG` живёт строго в `.env` на VPS (конвенция `<SVC>_TAG`), не в Vault. `make bump` правит его и делает force-recreate — rollback это тот же bump на старый тег.
+`BACKEND_TAG` живёт строго в `.env` на VPS (конвенция `<SVC>_TAG`). `make bump` правит его и делает force-recreate — rollback это тот же bump на старый тег.
 
 Infra rollback (compose/configs):
 
@@ -103,12 +96,12 @@ make ship
 
 ## Полная замена VPS
 
-**Предусловие:** значение `repository` в `kv/projects/<p>/<env>/backup` указывает на **внешний** S3 (не на проектный minio — он умер вместе с хостом). Если в Vault стояло local minio — снапшоты уже потеряны вместе с host'ом, restore невозможен.
+**Предусловие:** `RESTIC_REPOSITORY` указывал на **внешний** S3 (не на проектный minio — он умер вместе с хостом) и у оператора есть offsite-копия `.env` (минимум `RESTIC_*` + `BACKUP_AWS_*`). Если стоял local minio — снапшоты уже потеряны вместе с host'ом, restore невозможен.
 
 1. Заказать новый VPS, обновить A-record `${DOMAIN}` и сабдомены на новый IP (TTL заранее снизить).
 2. `ansible-playbook -i inventory.ini bootstrap.yml` (с обновлённым `ansible_host`). Зарегистрировать deploy-key.
-3. На новом VPS: `make new-env` (используй те же per-env AppRole creds — они привязаны к паре `(project, env)`, не к VPS). `RESTIC_REPOSITORY` рендерится из Vault, вводить не нужно.
-4. `make ship` (или на VPS `make deploy`) → стек поднимается, vault-agent логинится, postgres стартует пустой.
+3. На новом VPS: `make new-env` + восстановить секреты в `.env` из offsite-копии (`RESTIC_*`, `BACKUP_AWS_*`, секции активных профилей).
+4. `make ship` (или на VPS `make deploy`) → стек поднимается, postgres стартует пустой.
 5. Restore postgres из restic:
    ```bash
    docker exec backup restic snapshots --compact   # выбрать snapshot
@@ -137,7 +130,7 @@ Backup, который ни разу не тестировался, не раб�
 
 ## Когда эскалировать на корп
 
-- Vault sealed.
 - git.stit.tech registry pull fails.
+- Служебный трафик к корпу режется 403 (egress-IP не в CrowdSec-whitelist).
 
 Эскалация в `#corp-infra` Slack или ntfy.stit.tech.

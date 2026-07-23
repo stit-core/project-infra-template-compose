@@ -1,8 +1,8 @@
 # project-infra-template-compose — гайд для агентов
 
 Шаблон проектной инфры stit: docker-compose стек одного VPS на клиентский
-проект. Edge (Traefik v3 + CrowdSec) + Postgres + Minio + backend + vault-agent +
-backup. Копируется в `<client-org>/infra`, адаптируется под домен/стек.
+проект. Edge (Traefik v3 + CrowdSec) + Postgres + Minio + backend + backup.
+Копируется в `<client-org>/infra`, адаптируется под домен/стек.
 
 Этот файл — **always-on ядро + роутер**: здесь только то, что должно быть в контексте всегда
 (точка входа, где запускается, жёсткие границы) и карта, куда идти за остальным. Система слоится так:
@@ -41,12 +41,11 @@ authoring-проверок без `.env`/docker — норма, не паден�
 
 **Роль:** шаблон проектной VPS. Один форк (`<client-org>/infra`) — один проект, один VPS на
 env (dev/staging/prod).
-**Зависит от:** `corp-infra-template` — выдаёт AppRole `projects-<p>-<env>` + KV
-`kv/projects/<p>/<env>/*` (через `onboard-project.sh`), хостит registry `git.stit.tech`.
-**Image-теги:** бампаются **строго через `.env`** (`<SVC>_TAG`, верб `make bump SVC= TAG=`),
-через Vault теги не ходят.
+**Зависит от:** `corp-infra-template` — хостит registry `git.stit.tech` и ведёт
+CrowdSec-whitelist egress-IP проектных VPS.
+**Image-теги:** бампаются **строго через `.env`** (`<SVC>_TAG`, верб `make bump SVC= TAG=`).
 **Обслуживает:** `<client-org>/backend` (форк `go-backend-template`) — runtime для его образа;
-deploy нового тега — `make bump SVC=backend TAG=<tag>` (тег строго в `.env`, не в Vault).
+deploy нового тега — `make bump SVC=backend TAG=<tag>` (тег строго в `.env`).
 **Читает:** `<client-org>/strategy` (форк `business-strategy-template`) — продуктовый контекст (vision,
 surfaces); sibling-checkout рядом с этим репо, read-only. Резолв пути — `docs/reference/ecosystem.md`.
 
@@ -59,16 +58,16 @@ surfaces); sibling-checkout рядом с этим репо, read-only. Резо
 | Edge | Traefik v3 + CrowdSec | `compose/traefik.yml`, `compose/crowdsec.yml` |
 | DB | Postgres 17 | `compose/postgres.yml` |
 | App | Backend (`git.stit.tech/<client-org>/backend`) | `compose/backend.yml` |
-| Secrets | vault-agent sidecar | `compose/vault-agent.yml` |
 | Host metrics | cadvisor + node-exporter (локальные метрики хоста/контейнеров) | `compose/cadvisor.yml`, `compose/node-exporter.yml` |
 | Storage | Minio (S3 + Console) на `s3.${DOMAIN}` / `minio.${DOMAIN}` | `compose/minio.yml` |
 | Backup | restic + pg_dumpall + crond в alpine, пишет в `$RESTIC_REPOSITORY` | `compose/backup.yml`, `containers/backup/` |
 
-Always-on (traefik / vault-agent / crowdsec / node-exporter / cadvisor / landing)
-поднимается на минимальном seed'е (`meta` от корпа при онбординге). `postgres` /
-`storage` (minio + backup) / `backend` — opt-in через `COMPOSE_PROFILES`, активируются после
-seed'а соответствующих KV. Сети: `proxy` (наружу), `backend-net` (internal). См.
-`.claude/rules/multi-env.md` + `docs/reference/architecture.md`.
+Always-on (traefik / crowdsec / node-exporter / cadvisor / landing) поднимается
+на identity + ACME из `.env`. `postgres` / `storage` (minio + backup) / `backend`
+— opt-in через `COMPOSE_PROFILES`, активируются после заполнения их секций
+секретов в `.env` (единственный источник секретов, живёт только на VPS). Сети:
+`proxy` (наружу), `backend-net` (internal). См. `.claude/rules/multi-env.md` +
+`docs/reference/architecture.md`.
 
 ## Команды
 
@@ -96,7 +95,7 @@ seed'а соответствующих KV. Сети: `proxy` (наружу), `ba
 | Архитектура, сети, профили, non-goals | `docs/reference/architecture.md` |
 | Инфра-слой проекта (stack + карта сервисов + service-doc'и) | `docs/project/README.md` (вход для `/init-project` + `/de-template`) |
 | Продуктовый контекст (vision/surfaces) | соседний `<org>/strategy` (форк `business-strategy-template`), читается cross-repo |
-| KV-layout, AppRole, multi-env, lazy-seed | `.claude/rules/multi-env.md` |
+| Per-env `.env`-контракт, multi-env, профили | `.claude/rules/multi-env.md` |
 | Compose-инварианты сервиса | `.claude/rules/compose-and-services.md` |
 | Секреты и `.env` | `.claude/rules/secrets-and-env.md` |
 | Корп-handoff (когда тронул corp-поверхность) | `.claude/rules/corp-handoff.md` + skill `/corp-handoff` |
@@ -106,22 +105,15 @@ seed'а соответствующих KV. Сети: `proxy` (наружу), `ba
 
 ## Корп-контракт
 
-Проект должен быть онбоарден на корп-стороне для каждой среды (один VPS = одна среда):
+Корп-сторона даёт проектной VPS только два сервиса:
 
-```bash
-# corp-infra-template (корп-VPS), оператор с root-токеном Vault.
-VAULT_TOKEN=<root> bash scripts/onboard-project.sh --name <p> --envs dev,prod
-```
+1. **Registry** `git.stit.tech` — pull образов `git.stit.tech/<p>/backend:<tag>`
+   (push — разработчик backend-форка).
+2. **CrowdSec whitelist** — egress-IP проектной VPS, иначе служебный трафик к
+   корп-сервисам режется 403 (оформляется через `/corp-handoff`).
 
-Per env создаёт: AppRole `projects-<p>-<env>` (flat) + policy read-only на
-`kv/data/projects/<p>/<env>/*`; `kv/.../meta`
-(`acme_email`, `acme_caserver`; image-теги в `meta` НЕ живут — они в `.env`).
-Возвращает per-env блок `PROJECT_NAME` /
-`ENV` / `VAULT_ROLE_ID` / `VAULT_SECRET_ID` для проектного `.env`.
-
-Доп. KV (`db`, `oidc`, `jwt`, `minio`, `backup`, project-specific) — оператор запрашивает по
-мере подключения сервисов через skill `/request-secret` и отдаёт блок `vault kv put` корп-админу
-out-of-band. AppRole строго read-only на свой `<p>/<env>`. Подробности — `.claude/rules/multi-env.md`.
+Секреты корп не выдаёт и не хранит: все секреты — в `.env` на VPS (scaffold
+значений — skill `/request-secret`). Подробности — `.claude/rules/multi-env.md`.
 
 ## Стиль
 
@@ -131,7 +123,7 @@ out-of-band. AppRole строго read-only на свой `<p>/<env>`. Подр�
 - **YAML 2-space indent**, без табов.
 - **Image закреплён конкретной версией.** `:latest` запрещён — конвенция, ловится `make validate`.
   Бампаемые теги параметризуются `${<SVC>_TAG}` из `.env` и меняются **только** через
-  `make bump` — не через Vault.
+  `make bump`.
 - **Каждый сервис имеет** `restart`, `healthcheck`, `container_name`, явный `networks`.
 - **Public сервисы** в `proxy` сети + Traefik labels с `crowdsec@file` middleware.
 - **Comments — только когда WHY неочевидно.** Не пересказывай YAML.
@@ -151,33 +143,32 @@ out-of-band. AppRole строго read-only на свой `<p>/<env>`. Подр�
 ### Делать всегда
 - Перед claim «готово» — `make check` (validate + doctor + plan-check + project-check); после деплоя — `make ps`.
 - **Изменение — через план** (planning-first; skill `/plan`). Отклонение — осознанное, проговаривается.
-- Тронул corp-поверхность (`configs/vault-agent/`, `compose/*.yml` профили, `.env.example`,
-  `ansible/`) или изменение требует CrowdSec-whitelist'а egress-IP корп-side (файл живёт в
+- Тронул corp-поверхность (`compose/*.yml` профили, `.env.example`, `ansible/`)
+  или изменение требует CrowdSec-whitelist'а egress-IP корп-side (файл живёт в
   `corp-infra-template`, не здесь) — оформи **CORP-HANDOFF**-блок до claim «готово»
   (skill `/corp-handoff`; `make status → == Infra-touch ==` это ловит).
 - Любая новая `${VAR}` в compose/configs — в `.env.example` сразу.
 - Bumps версий образов — отдельным коммитом после явного OK.
 
 ### Сначала спросить
-- Traefik static-конфиг (`configs/vault-agent/templates/traefik.yml.tpl` → рендерится в
-  `.runtime/configs/traefik.yml`) — глобальные изменения требуют рестарта Traefik.
-- `compose/vault-agent.yml` / `configs/vault-agent/` — security-sensitive.
+- Traefik static-конфиг (`configs/traefik/traefik.yml.tpl` → рендерится в
+  `configs/traefik/traefik.yml`) — глобальные изменения требуют рестарта Traefik.
 - `containers/backup/` или `compose/backup.yml` — риск потери restore-points.
 
 ### Не делать никогда
 - `--no-verify` / `--no-gpg-sign`, `git push --force`, `docker volume rm` / `down -v` —
   блокирует `permissions.deny` в `.claude/settings.json`.
-- Commit `.env*`, `.runtime/`, `*.pem`, `*.key`. Image-теги `:latest`.
-- Хранить секреты в `.env` или `configs/` — всё через vault-agent.
+- Commit `.env*`, rendered-конфигов, `*.pem`, `*.key`. Image-теги `:latest`.
+- Inline-значения секретов в compose/`configs/` — только `${VAR}` из `.env`.
 - Писать в auto-memory — отключено (см. ниже).
 
 ## Что менять при копировании в `<org>/infra`
 
-1. `.env` — `make new-env` (PROJECT_NAME, ENV, DOMAIN, VAULT_ROLE_ID, VAULT_SECRET_ID).
+1. `.env` — `make new-env` (PROJECT_NAME, ENV, DOMAIN, ACME_EMAIL).
 2. `docker-compose.yml` — проверить network names (conflict-free на shared VPS).
-3. `compose/backend.yml` — `image:` под клиентский org, healthcheck path под backend API.
-4. `configs/vault-agent/templates/backend.env.tpl` — project-specific env, если backend читает сверх контракта.
-5. `configs/traefik/dynamic/` — клиент-специфичные routers/middlewares (опц.).
+3. `compose/backend.yml` — `image:` под клиентский org, healthcheck path под backend API;
+   project-specific `${VAR}` в `environment:` + декларация в `.env.example`.
+4. `configs/traefik/dynamic/` — клиент-специфичные routers/middlewares (опц.).
 
 Продуктовый слой проекта (vision / surface) — в соседнем `<org>/strategy` (форк
 `business-strategy-template` — репо бизнес-стратегии; продукт в `docs/projects/<slug>/`),

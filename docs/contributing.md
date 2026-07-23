@@ -6,7 +6,7 @@ enforce'ится детерминированно, как вмешаться. (�
 **Где это запускается.** Репо живёт на рабочей станции оператора — authoring-поверхность
 (validate / plan / ship). Живого стека локально нет: он на удалённом VPS (один VPS = одна среда).
 `make validate` гоняет синтаксис/tpl/`.env`-coverage и работает без живого стека; `make doctor`
-бьёт по live-поверхности (`.env`/`.runtime`/vault-agent) и без `.env` многое SKIP'ает — это норма.
+бьёт по live-поверхности (`.env`/rendered-конфиги) и без `.env` многое SKIP'ает — это норма.
 Ops-вербы (`ps`/`logs`/`restart`) оборачивают SSH на VPS через `scripts/tools/ssh.sh`.
 
 ## Что где лежит и когда грузится
@@ -90,5 +90,5 @@ Triage / DR / bootstrap делаем скиллами, не прозой в CLAU
 | CLAUDE.md игнорируется | длина / конфликт инструкций между секциями |
 | Коммит reject'нут | `scripts/git-hooks/commit-msg` — type ∈ {feat,fix,refactor,docs,test,chore,meta} |
 | `make validate` падает | compose-синтаксис / `:latest` / `${VAR}` не в `.env.example` / `.tpl` не рендерится |
-| `make doctor` падает | live-поверхность: `.env`/`.runtime`/vault-agent (локально без `.env` многое SKIP — норма) |
+| `make doctor` падает | live-поверхность: `.env`/rendered-конфиги (локально без `.env` многое SKIP — норма) |
 | `make plan-check` падает | структура секции в `roadmap.md` — см. skill `plan` |

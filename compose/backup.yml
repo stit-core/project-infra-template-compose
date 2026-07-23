@@ -10,16 +10,20 @@ services:
     # ежедневно. One-shot smoke-test: `docker exec backup /usr/local/bin/backup-now`
     # (или `make backup`). Расписание — containers/backup/crontab.
     #
-    # Все backup-параметры (endpoint, creds, restic password, postgres creds)
-    # живут в Vault и рендерятся vault-agent'ом в .runtime/secrets/backup.env:
-    #   RESTIC_REPOSITORY + RESTIC_PASSWORD + AWS_*  — kv/projects/<p>/<env>/backup
-    #   POSTGRES_USER/PASSWORD/HOST                  — kv/projects/<p>/<env>/db
-    # Ротация endpoint'а — `vault kv patch kv/projects/<p>/<env>/backup repository=...`.
-    env_file:
-      - .runtime/secrets/backup.env
+    # Все backup-параметры приходят из .env (см. .env.example § profile
+    # storage): RESTIC_REPOSITORY/RESTIC_PASSWORD + S3-креды endpoint'а
+    # (BACKUP_AWS_*) + postgres-креды для pg_dumpall. RESTIC_PASSWORD
+    # ОБЯЗАТЕЛЬНО продублирован offsite — без него restore невозможен.
+    environment:
+      PROJECT_NAME: ${PROJECT_NAME}
+      RESTIC_REPOSITORY: ${RESTIC_REPOSITORY}
+      RESTIC_PASSWORD: ${RESTIC_PASSWORD}
+      AWS_ACCESS_KEY_ID: ${BACKUP_AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${BACKUP_AWS_SECRET_ACCESS_KEY}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_HOST: ${PG_HOST:-postgres}
     depends_on:
-      vault-agent:
-        condition: service_healthy
       postgres:
         condition: service_healthy
     networks:

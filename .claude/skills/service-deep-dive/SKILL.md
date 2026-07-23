@@ -1,6 +1,6 @@
 ---
 name: service-deep-dive
-description: Углублённая проработка hosted-сервиса в `docs/project/services/<name>.md` (Hosting · Identity · Secrets · Route · Generates). Ведёт сессию через структурированные вопросы (AskUserQuestion), фиксирует рабочее состояние в `state/services/<name>.md`, не выдумывает решения сам. Использовать всегда, когда речь о `docs/project/services/`, заполнении 5 артефактных секций сервиса, заведении или углублении hosted-сервиса, разборе сырья (описание продукта, скрин compose, готовый сервис у соседей), переходе `status draft → stable`, удалении с каскадом, или копании связей со `stack § Service map` и инфра-фрагментами (compose/vault-agent/traefik). Также — единственная точка входа в `docs/project/services/`.
+description: Углублённая проработка hosted-сервиса в `docs/project/services/<name>.md` (Hosting · Identity · Secrets · Route · Generates). Ведёт сессию через структурированные вопросы (AskUserQuestion), фиксирует рабочее состояние в `state/services/<name>.md`, не выдумывает решения сам. Использовать всегда, когда речь о `docs/project/services/`, заполнении 5 артефактных секций сервиса, заведении или углублении hosted-сервиса, разборе сырья (описание продукта, скрин compose, готовый сервис у соседей), переходе `status draft → stable`, удалении с каскадом, или копании связей со `stack § Service map` и инфра-фрагментами (compose/traefik/.env). Также — единственная точка входа в `docs/project/services/`.
 ---
 
 # service-deep-dive
@@ -9,7 +9,7 @@ description: Углублённая проработка hosted-сервиса �
 `docs/project/services/<name>.md` до `status: stable`. Где `/stack-deep-dive`
 владеет картой «из чего состоит стек» (`stack § Service map`), этот скилл —
 «как именно этот сервис хостится на VPS»: хостинг/профиль, идентичность
-образа или движка, какой Vault KV нужен, как роутится, что из него родит
+образа или движка, какие `.env`-переменные нужны, как роутится, что из него родит
 `/de-template`.
 
 Канон секций — `docs/project/README.md`. Скилл ведёт сеанс через
@@ -109,12 +109,11 @@ description: Углублённая проработка hosted-сервиса �
   - enum-полей (`subtype`, `hosting`, `entrypoint: true/false`);
   - anti-patterns (бинарное «это похоже на X — согласен?»);
   - тест-критерия (✅/❌ из секции «Тест-критерий» в field-checklists);
-  - выбора существующего соседа (профиль из карты, KV-kind из
-    `configs/vault-agent/templates/`, существующий compose-фрагмент как
-    образец).
+  - выбора существующего соседа (профиль из карты, секция переменных из
+    `.env.example`, существующий compose-фрагмент как образец).
 - **Свободная форма** (через Other) — для **значения**: имена
-  (`container_name`, образ-tag, KV-поля), маршруты (`<sub>.${DOMAIN}`,
-  healthcheck path/команда), что де-факто рендерит vault-agent template.
+  (`container_name`, образ-tag, имена `${VAR}`), маршруты (`<sub>.${DOMAIN}`,
+  healthcheck path/команда).
 - **Никогда** не подсказывать конкретные домены/теги/имена от себя.
   Anti-patterns — да. Сама формулировка — нет.
 
@@ -180,12 +179,12 @@ service-deep-dive, но напомни юзеру в конце сессии: «
    присутствуют и непусты (placeholder `<...>` не считается
    содержимым). Опциональные значения — `N/A` явной строкой.
 3. Все ссылки валидны:
-   - `Secrets` упоминает существующий KV-kind (`db`/`minio`/`backup`/
-     `backend`/`meta`/`jwt`/`oidc`) либо явный
-     stub-next-step «нужен `vault kv put` через /request-secret»;
+   - `Secrets` упоминает существующую секцию `.env.example`
+     (`postgres`/`storage`/`backend`/project-specific `${VAR}`) либо явный
+     stub-next-step «блок для .env через /request-secret»;
    - `Route` ссылается на сабдомен — должен быть упомянут в
      `stack § Domains` (либо явный «допилить stack»);
-   - `Generates` упоминает реальные compose/vault-agent имена.
+   - `Generates` упоминает реальные compose/env имена.
 4. Тест-критерий из `field-checklists.md` явно подтверждён архитектором
    в этой сессии (раунд `AskUserQuestion` ✅/❌).
 5. В `state/services/<name>.md` нет `**blocker**`-вопросов.
@@ -207,10 +206,10 @@ service-deep-dive, но напомни юзеру в конце сессии: «
   stub service-doc через A-режим (минимум frontmatter + пустые H2),
   записать `state/services/<сосед>.md` с открытым вопросом «заведён
   как stub в контексте `<откуда>` — докопать».
-- **KV-секрет** (например, упомянули `backup` но нет ни `kv/.../backup`,
-  ни template): отметить в `state` как `**blocker**` (без существующего
-  KV `Secrets` неполна) + cross-repo next-step «через `/request-secret`
-  заказать seed».
+- **Секрет** (например, упомянули `backup` но его переменных нет в
+  `.env.example`): отметить в `state` как `**blocker**` (без деклараций
+  `Secrets` неполна) + next-step «через `/request-secret` сформировать
+  блок для .env + декларации».
 - **Сабдомен** (Route указывает на не-stack-уровень): отметить в
   `state` как открытый (не blocker) + напомнить в финале «допилить
   `stack § Domains`».
@@ -221,9 +220,8 @@ service-deep-dive, но напомни юзеру в конце сессии: «
 
 1. Прочитать все `services/*.md` + `stack.md § Service map` + `state/`
    — найти все ссылки на удаляемый name.
-2. Прочитать `compose/<name>.yml`, `configs/vault-agent/agent.hcl.parts/`
-   и `configs/vault-agent/templates/` — что фактически развёрнуто в
-   инфре (если уже после `/de-template`).
+2. Прочитать `compose/<name>.yml` и его переменные в `.env.example` —
+   что фактически развёрнуто в инфре (если уже после `/de-template`).
 3. Показать каскад: «ссылаются X, Y, Z; в инфре развёрнуто A, B; вот
    что сломается».
 4. Через `AskUserQuestion` по каждому месту — опции: «переименовать на

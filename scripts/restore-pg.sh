@@ -16,7 +16,7 @@
 #   7. Start backend.
 #
 # Запускать на проектном VPS из /opt/<project>-infra/. Требует backup
-# контейнер up и .runtime/secrets/postgres.env отрендеренным.
+# контейнер up и заполненные POSTGRES_* в .env.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -24,10 +24,6 @@ target="${1:-}"
 [ -n "$target" ] || { echo "usage: $0 <snapshot-id|latest>" >&2; exit 2; }
 
 [ -f .env ] || { echo "ERR: .env missing" >&2; exit 1; }
-[ -f .runtime/secrets/postgres.env ] || {
-  echo "ERR: .runtime/secrets/postgres.env отсутствует — vault-agent не отрендерил?" >&2
-  exit 1
-}
 
 docker exec backup restic snapshots >/dev/null 2>&1 || {
   echo "ERR: restic недоступен. Проверь: docker ps | grep backup" >&2
@@ -51,8 +47,8 @@ dumpfile=$(docker exec backup restic ls "$target" 2>/dev/null \
 }
 echo "    found: $dumpfile"
 
-# Подтягиваем postgres-креды из rendered secrets.
-set -a; . .runtime/secrets/postgres.env; set +a
+# Подтягиваем postgres-креды из .env (single source секретов).
+set -a; . ./.env; set +a
 : "${POSTGRES_USER:?need POSTGRES_USER}"
 : "${POSTGRES_DB:?need POSTGRES_DB}"
 

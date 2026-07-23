@@ -37,7 +37,7 @@ paths:
 
 ## Секреты
 
-- **Не клади** реальные секреты в task definitions / `vars:`. Bootstrap не должен знать `VAULT_SECRET_ID` — это даёт оператор руками после `new-env.sh`.
+- **Не клади** реальные секреты в task definitions / `vars:`. Bootstrap не должен знать секретов `.env` — их даёт оператор руками после `new-env.sh`.
 - Если когда-то понадобится — ansible-vault или (лучше) keep-out-of-ansible: оператор кладёт `.env` руками, playbook только разворачивает скелет.
 - `authorized_keys` — через файл, не inline. Templates с inline-keys ведут к мерж-конфликтам и непрозрачности.
 

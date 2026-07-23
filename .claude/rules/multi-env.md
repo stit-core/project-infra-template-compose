@@ -1,136 +1,93 @@
 ---
 name: multi-env
-description: Проектная сторона multi-env контракта — vault-agent KV-paths (kv/projects/<p>/<env>/*), как оператор запрашивает seed'ы, profile-based opt-in, lazy-seed, ротация через vault kv patch. Один env = отдельный VPS со своим ENV + AppRole-парой. Грузится при работе с .env, vault-agent config, compose-профилями, ansible-онбордингом.
+description: Проектная сторона multi-env контракта — per-env .env (единственный источник секретов/конфига), profile-based opt-in, ротация правкой .env + deploy. Один env = отдельный VPS со своим ENV и своим .env. Грузится при работе с .env, compose-профилями, ansible-онбордингом.
 paths:
   - ".env*"
-  - "configs/vault-agent/**"
   - "compose/*.yml"
   - "ansible/roles/stit-onboard/**"
 ---
 
 # Multi-environment
 
-Один проект может иметь несколько сред (`dev`, `prod`, опционально `staging`/etc). Каждая среда — **отдельный VPS** с одним и тем же compose-шаблоном, но со своим `ENV` в `.env` и своим набором AppRole-credentials. Шаблон агностичен к именам env'ов — это произвольные слаги.
+Один проект может иметь несколько сред (`dev`, `prod`, опционально `staging`/etc). Каждая среда — **отдельный VPS** с одним и тем же compose-шаблоном, но со своим `ENV` и своим `.env`. Шаблон агностичен к именам env'ов — это произвольные слаги.
 
-Этот документ описывает **проектную сторону** контракта: как vault-agent в этом шаблоне разрешает KV-paths, как оператор запрашивает seed'ы, как срабатывает profile-based opt-in. Общая карта контрактов AppRole/KV (что одинаково для всех репо экосистемы) — `corp-infra-template/docs/ecosystem.md`. Корп-side имплементация — `corp-infra-template/scripts/onboard-project.sh` + `corp-infra-template/scripts/seed-project-secrets.sh`.
+Этот документ описывает контракт per-env `.env`: что где живёт, как активируются профили, как ротируются значения. Механика секретов (имена, рендер, что нельзя коммитить) — `.claude/rules/secrets-and-env.md`. Контракт с корпом (registry + CrowdSec) — `.claude/rules/corp-handoff.md`.
 
-## Принцип: max в Vault
+## Принцип: всё в .env
 
-Vault — единственный источник правды по конфигу проекта. Корп-админ ротирует значения централизованно, vault-agent на VPS перерендерит. `.env` сжимается до identity + secret-zero для AppRole-login.
+`.env` на VPS — единственный источник конфига и секретов среды. Оператор заполняет и ротирует руками; compose интерполирует значения в `environment:` сервисов, render-configs.sh — в `.tpl`-конфиги. Никаких внешних secret-backend'ов у шаблона нет.
 
 ### Что где живёт
 
 | Категория | Где | Примеры |
 |---|---|---|
 | Identity | `.env` | `PROJECT_NAME`, `ENV`, `DOMAIN` |
-| Bootstrap auth | `.env` | `VAULT_ROLE_ID`, `VAULT_SECRET_ID` |
-| Корп-эндпоинты | `.env` (managed-дефолт в коде; self-hosted override) | `VAULT_ADDR=https://vault.stit.tech`, `REGISTRY_HOST=git.stit.tech` |
+| ACME | `.env` | `ACME_EMAIL`, `ACME_CASERVER` |
 | Локально-сгенерированные | `.env` (auto после первого deploy) | `CROWDSEC_BOUNCER_API_KEY` |
-| Оператор-управление | `.env` | `COMPOSE_PROFILES` |
-| Image-теги | `.env` (**строго**, не Vault; бамп — `make bump SVC= TAG=`) | `BACKEND_TAG` (конвенция `<SVC>_TAG`) |
-| Non-secret конфиг | **Vault** `kv/projects/<p>/<env>/meta` | `acme_email`, `acme_caserver` |
-| Runtime-секреты | **Vault** `kv/projects/<p>/<env>/<kind>` | `db`, `oidc`, `jwt`, `minio`, `backup` |
+| Оператор-управление | `.env` | `COMPOSE_PROFILES`, `HOST_ROLE` |
+| Image-теги | `.env` (**строго**; бамп — `make bump SVC= TAG=`) | `BACKEND_TAG` (конвенция `<SVC>_TAG`) |
+| Registry-эндпоинт | `.env` (managed-дефолт в коде; self-hosted override) | `REGISTRY_HOST=git.stit.tech` |
+| Секреты профилей | `.env` (секции в `.env.example`) | `POSTGRES_*`, `OIDC_*`, `JWT_SECRET`, `MINIO_*`, `RESTIC_*` |
 
-Любое значение, которое **меняется реже раза в неделю** и должно ротироваться корп-стороной → переезжает в Vault. Любое значение, которое **нужно ДО Vault-login'а** или генерится локально → остаётся в `.env`. **Исключение — image-теги:** они бампаются строго через `.env` (`<SVC>_TAG`, верб `make bump`) и через Vault не ходят — деплой тега остаётся операцией проектной стороны, без участия корп-админа.
-
-## KV layout
-
-```
-kv/projects/<p>/
-  _meta                       # { env_<env1>=1, env_<env2>=1, ..., created=<ISO> } — corp-only
-  <env>/
-    meta                      # { acme_email, acme_caserver, ... } — image-тегов тут НЕТ (они в .env)
-    db                        # { user, password, database }
-    oidc                      # { client_id, client_secret }
-    jwt                       # { signing_key }
-    minio                     # { root_user, root_password, app_access_key, app_secret_key, backup_access_key, backup_secret_key }
-    backup                    # { password, access_key, secret_key, repository }
-```
-
-`_meta` нужен только корп-стороне для аудита/документации (поле `env_<env>=1` на каждый онбоарденный env плюс `created`). Проектная сторона его не читает — AppRole не имеет прав на этот path. Невозможность залогиниться чужим ENV = валидация.
-
-## Onboarding (что делает корп при создании проекта)
-
-Корп-админ запускает `corp-infra-template/scripts/onboard-project.sh --name <p> --envs <env1>,<env2>,... [--source-ip <env>=<ip>]`. Скрипт:
-
-1. Создаёт/патчит `kv/projects/<p>/_meta` (поле `env_<env>=1` на каждый онбоарденный env плюс `created`). Идемпотентно: повторный вызов с расширенным `--envs` дописывает недостающие env'ы, существующие пропускает.
-2. Per env (если ещё не онбоарден):
-   1. AppRole `projects-<p>-<env>` (flat, дефис-разделитель — Vault не принимает слеши в `auth/approle/role/<name>`; KV-слой остаётся иерархическим) с policy `projects-<p>-<env>-read`:
-      ```hcl
-      path "kv/data/projects/<p>/<env>/*"     { capabilities = ["read"] }
-      path "kv/metadata/projects/<p>/<env>/*" { capabilities = ["read", "list"] }
-      ```
-      Token TTL 10m / max 30m, secret_id без срока.
-   2. `kv/projects/<p>/<env>/meta` с дефолтами:
-      - `acme_email=ops@<placeholder>`
-      - `acme_caserver=https://acme-v02.api.letsencrypt.org/directory`
-3. Если передан `--source-ip <env>=<ip>` — egress IP проектной VPS дописывается в `configs/crowdsec/whitelists.yaml` корп-side и crowdsec рестартится. Без этого CrowdSec может ловить служебный трафик проектной VPS к корп-сервисам и резать его 403'ами. См. `corp-infra-template/.claude/rules/crowdsec-whitelist.md`.
-4. Печатает per-env блок для оператора:
-   ```
-   === <p> / <env> ===
-   PROJECT_NAME=<p>
-   ENV=<env>
-   VAULT_ROLE_ID=<...>
-   VAULT_SECRET_ID=<...>
-   ```
-
-Никаких db/minio/backup creds на этом шаге — оператор запросит по необходимости (см. ниже).
+Полный контракт переменных с комментариями как сгенерировать — `.env.example`. Env'ы физически изолированы: разные VPS, разные `.env`, утечка значения одной среды не задевает другую.
 
 ## Operator flow — bootstrap нового VPS
 
 На каждом VPS отдельный bootstrap (по одному на env):
 
 ```bash
-make new-env             # prompt: PROJECT_NAME, ENV, DOMAIN, VAULT_ROLE_ID, VAULT_SECRET_ID
-make ship                # минимальный стек: traefik + vault-agent + crowdsec + node-exporter + cadvisor
+make new-env             # prompt: PROJECT_NAME, ENV, DOMAIN, ACME_EMAIL
+make ship                # минимальный стек: traefik + crowdsec + node-exporter + cadvisor + landing
 ```
 
-Postgres/minio/backup/backend — в `compose.profiles`, не стартуют пока оператор их явно не включит.
+Минимальному стеку секретов сверх ACME не нужно. Postgres/minio/backup/backend — в `compose.profiles`, не стартуют пока оператор их явно не включит.
 
-## Operator flow — запросить secret для нового сервиса
+## Operator flow — добавить секреты для нового профиля
 
-Когда стек дозрел до `postgres`/`minio`/`backup`/`backend`/etc — зовёшь Claude skill `/request-secret` (`.claude/skills/request-secret/SKILL.md`). Skill:
-- спросит имя KV-объекта (произвольный slug: `db`, `minio`, `stripe-key`, ...);
-- выяснит поля + значения (случайные пароли генерит сам через `openssl rand`);
-- напечатает готовый блок `vault kv put kv/projects/<p>/<env>/<name> field=value ...` для копи-паста.
+Когда стек дозрел до `postgres`/`storage`/`backend` — зовёшь Claude skill `/request-secret` (`.claude/skills/request-secret/SKILL.md`). Skill:
+- определяет по профилю/запросу нужный набор переменных (контракт — `.env.example`);
+- генерит случайные пароли сам (`openssl rand`), внешние значения (OIDC-креды, external S3) спрашивает;
+- печатает готовый блок `VAR=value` для дописывания в `.env` на VPS (без эха секретов в git).
 
-Skill намеренно не имеет hardcoded enum'а имён — это позволяет одним механизмом seed'ить как стандартные секреты (`db`/`oidc`/`jwt`/`minio`/`backup`/`meta`), так и project-specific (`stripe-key`, `sendgrid-creds`). Стандартные имена + их поля задокументированы в SKILL.md как cookbook.
-
-Оператор отправляет блок корп-админу (Slack/PR/ticket — внеконтрактно). Админ выполняет `vault kv put` (либо `corp-infra-template/scripts/seed-project-secrets.sh` с env-like файлом — он патчит существующие paths, не перезатирая). После seed'а:
+После:
 
 ```bash
-$EDITOR .env   # добавить нужный profile в COMPOSE_PROFILES
-make ship      # render-configs обновит agent.hcl, vault-agent рендерит env, force-recreate consumer'ов
+$EDITOR .env   # дописать блок + добавить профиль в COMPOSE_PROFILES
+make ship      # compose поднимет новые сервисы
 ```
+
+Project-specific переменные (например `STRIPE_KEY`) — тот же флоу + декларация в `.env.example` и `${VAR}` в compose (см. `secrets-and-env.md` § Новый секрет).
 
 ## Ротация
 
-Источник правды — корп Vault. Любая ротация — `vault kv patch kv/projects/<p>/<env>/<kind> <field>=<new>`. Vault-agent заметит и перерендерит `.runtime/secrets/<kind>.env` (для секретов) или `.runtime/configs/traefik.yml` (для `meta`). Consumer'ы перечитают env только при container CREATE — `scripts/deploy.sh` делает force-recreate на следующем deploy.
+Источник правды — `.env` на VPS. Любая ротация:
 
-Image-теги под ротацию НЕ попадают: rollout нового тега — `make bump SVC=backend TAG=<tag>` (правит `BACKEND_TAG` в `.env` на VPS + force-recreate), без участия корп-стороны.
+```bash
+$EDITOR .env             # заменить значение
+make deploy              # compose пересоздаёт сервисы с изменённым environment
+```
+
+Compose сравнивает интерполированный конфиг сам — точечный `make recreate SVC=` нужен только вне deploy-флоу. Image-теги под ротацию НЕ попадают: rollout нового тега — `make bump SVC=backend TAG=<tag>` (правит `BACKEND_TAG` в `.env` + force-recreate).
 
 ## Profile-based opt-in
 
-Default-стек поднимается **без** секретов (кроме `meta`, который засеян при онбординге). Сервисы с runtime-секретами сидят за `compose.profiles`:
+Default-стек поднимается **без** секретов профилей. Сервисы с runtime-секретами сидят за `compose.profiles`:
 
-| Сервис | Profile | Зависит от KV |
+| Сервис | Profile | Требует в .env |
 |---|---|---|
-| `traefik`, `vault-agent`, `crowdsec`, `node-exporter`, `cadvisor`, `landing` | **always-on** | `meta` |
-| `postgres` | `postgres` | `db` |
-| `minio` | `storage` | `minio` |
-| `backup` | `storage` | `backup`, `minio`, `db` |
-| `backend` | `backend` | `db`, `oidc`, `jwt` |
+| `traefik`, `crowdsec`, `node-exporter`, `cadvisor`, `landing` | **always-on** | identity + `ACME_*` |
+| `postgres` | `postgres` | `POSTGRES_*` |
+| `minio` | `storage` | `MINIO_*`, `APP_S3_*`, `BACKUP_S3_*` |
+| `backup` | `storage` | `RESTIC_*`, `BACKUP_AWS_*`, `POSTGRES_*` |
+| `backend` | `backend` | `OIDC_*`, `JWT_SECRET`, `POSTGRES_*`, `BACKEND_TAG` |
 
-`COMPOSE_PROFILES=postgres,backend make ship` = включить postgres + backend (и их KV-зависимости должны быть засеяны).
-
-`configs/vault-agent/agent.hcl` собирается `scripts/render-configs.sh` из фрагментов под активный список profile'ов — vault-agent не запрашивает KV-объекты, которые не нужны, и не залипает в retry-loop'е на отсутствующих.
+`COMPOSE_PROFILES=postgres,backend make ship` = включить postgres + backend (их секции в `.env` должны быть заполнены). `storage` требует одновременного `postgres` (backup делает pg_dumpall) — `deploy.sh` валидирует на single-host.
 
 ## Контракт со `corp-infra-template` (что обязан гарантировать корп)
 
-1. `corp-infra-template/scripts/onboard-project.sh --name <p> --envs ... [--source-ip <env>=<ip>]` — см. выше.
-2. `corp-infra-template/scripts/seed-project-secrets.sh` — admin-tool для seed/patch вторичных KV-объектов из env-like файла (формат `<group>.<field>=<value>`, в т.ч. вложенные `3rd-party.stripe.api_key=`). По запросу оператора (см. skill `/request-secret`) корп-админ либо засеивает через этот скрипт, либо выполняет напрямую `vault kv put kv/projects/<p>/<env>/<name> ...`. Имя — произвольный slug (стандартные: `db`, `oidc`, `jwt`, `minio`, `backup`; project-specific — что угодно).
-3. AppRole policy строго `kv/data/projects/<p>/<env>/*` read-only. Никаких write-прав у оператора.
-4. `_meta` объект для аудита — корп пишет, проектная сторона не трогает.
-5. Любая ротация — `vault kv patch`, без участия проектной стороны (кроме force-recreate на следующем deploy).
+1. **Registry** `git.stit.tech` — pull образов `git.stit.tech/<p>/backend:<tag>` (плюс push-доступ разработчику backend-форка).
+2. **CrowdSec whitelist** — egress-IP проектной VPS в корп-whitelist, иначе служебный трафик к корп-сервисам режется 403 (`corp-infra-template/.claude/rules/crowdsec-whitelist.md`).
 
-Каждая среда — отдельный VPS с собственным `ENV` в `.env` и своей AppRole-парой. Среда не конвертируется in-place: добавление env'а проекту = bootstrap нового VPS под этот env (skill `bootstrap-vps`).
+Секреты корп не выдаёт и не хранит — они целиком на стороне проектной VPS.
+
+Каждая среда — отдельный VPS с собственным `ENV` и `.env`. Среда не конвертируется in-place: добавление env'а проекту = bootstrap нового VPS под этот env (skill `bootstrap-vps`).

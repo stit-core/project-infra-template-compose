@@ -6,8 +6,8 @@
 #   FAIL: <чек>   — есть hard-фейл, exit 1
 #
 # FAIL только на том, что точно ломает стек И actionable здесь (compose
-# config invalid, .env без identity). DNS/Vault-seed — WARN (vault-agent
-# сам ретрайнет, см. preflight-*.sh). Поэтому на чистом лаптоп-чекауте
+# config invalid, .env без identity). DNS — WARN (traefik сам ретрайнет
+# ACME, см. preflight-dns.sh). Поэтому на чистом лаптоп-чекауте
 # (нет .env/docker) doctor = OK (всё SKIP) — make check остаётся зелёным.
 #
 # Arg: --full — печатать захваченный stderr WARN/FAIL-проверок.
@@ -53,12 +53,12 @@ else
   fi
 fi
 
-# 2. .env identity — без неё AppRole-login и интерполяция не работают
+# 2. .env identity — без неё интерполяция compose и ACME-рендер не работают
 if [ ! -f .env ]; then
   st ".env identity" SKIP "нет .env (pre-bootstrap)"
 else
   # shellcheck disable=SC1091
-  miss=$(. ./.env; for k in PROJECT_NAME ENV DOMAIN VAULT_ROLE_ID VAULT_SECRET_ID; do
+  miss=$(. ./.env; for k in PROJECT_NAME ENV DOMAIN ACME_EMAIL; do
            [ -z "${!k:-}" ] && echo "$k"; done)
   if [ -z "$miss" ]; then
     st ".env identity" PASS
@@ -67,28 +67,16 @@ else
   fi
 fi
 
-# 3. .runtime отрендерен (vault-agent пишет configs + secrets/*.env)
+# 3. configs отрендерены (render-configs.sh: envsubst *.tpl)
 if [ ! -f .env ]; then
-  st ".runtime render" SKIP "нет .env"
-elif [ -s .runtime/configs/traefik.yml ]; then
-  st ".runtime render" PASS
+  st "configs render" SKIP "нет .env"
+elif [ -s configs/traefik/traefik.yml ]; then
+  st "configs render" PASS
 else
-  st ".runtime render" WARN ".runtime/configs/traefik.yml пуст/нет — make render/deploy"
+  st "configs render" WARN "configs/traefik/traefik.yml пуст/нет — make render/deploy"
 fi
 
-# 4. vault-agent контейнер жив (рендерит секреты для consumer'ов)
-if ! command -v docker >/dev/null 2>&1; then
-  st "vault-agent" SKIP "docker недоступен"
-else
-  state=$(docker inspect -f '{{.State.Status}}' vault-agent 2>/dev/null | tr -d '[:space:]')
-  case "$state" in
-    running) st "vault-agent" PASS ;;
-    "")      st "vault-agent" SKIP "контейнер не создан / docker daemon недоступен" ;;
-    *)       st "vault-agent" WARN "state=$state — make logs SVC=vault-agent" ;;
-  esac
-fi
-
-# 5. DNS preflight (LE HTTP-01) — advisory, self-skip без .env
+# 4. DNS preflight (LE HTTP-01) — advisory, self-skip без .env
 if [ ! -f .env ]; then
   st "dns" SKIP "нет .env"
 else
@@ -100,21 +88,7 @@ else
   fi
 fi
 
-# 6. Vault preflight (AppRole login + KV для активных профилей) — advisory
-if [ ! -f .env ]; then
-  st "vault KV" SKIP "нет .env"
-else
-  cap=$(bash scripts/preflight-vault.sh 2>&1 || true)
-  if echo "$cap" | grep -q 'ВНИМАНИЕ'; then
-    st "vault KV" WARN "missing KV-paths — /request-secret → корп" "$cap"
-  elif echo "$cap" | grep -q 'недоступен\|login failed'; then
-    st "vault KV" WARN "Vault недоступен / login fail" "$cap"
-  else
-    st "vault KV" PASS
-  fi
-fi
-
-# 7. .env покрывает обязательные ключи .env.example
+# 5. .env покрывает обязательные ключи .env.example
 if [ ! -f .env ] || [ ! -f .env.example ]; then
   st ".env coverage" SKIP "нет .env / .env.example"
 else

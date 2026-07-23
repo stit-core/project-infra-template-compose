@@ -51,7 +51,6 @@ A — Phase B (печать cross-repo next-steps).
 
 - `traefik.yml`
 - `crowdsec.yml`
-- `vault-agent.yml`
 - `node-exporter.yml`
 - `cadvisor.yml`
 - `landing.yml`
@@ -92,55 +91,44 @@ A — Phase B (печать cross-repo next-steps).
   старый набор).
 - Удалить файлы без каскада.
 
-## A.3. Прунить vault-agent parts/templates
+## A.3. Прунить неиспользуемые секции `.env.example`
 
 ### Сохраняются всегда
 
-`configs/vault-agent/agent.hcl.parts/`:
-- `head.hcl`
-- `tail.hcl`
-
-`configs/vault-agent/templates/`:
-- `traefik.yml.tpl`
+Identity (`PROJECT_NAME`/`ENV`/`DOMAIN`), `ACME_*`,
+`CROWDSEC_BOUNCER_API_KEY`, `HOST_ROLE`, `REGISTRY_HOST`.
 
 ### Per profile — таблица прунинга
 
-| фрагмент | сохранить если |
+| секция `.env.example` | сохранить если |
 |---|---|
-| `agent.hcl.parts/postgres.hcl` | профиль `postgres` |
-| `templates/postgres.env.tpl` | профиль `postgres` |
-| `agent.hcl.parts/storage.hcl` | профиль `storage` |
-| `templates/minio.env.tpl` | профиль `storage` |
-| `templates/backup.env.tpl` | профиль `storage` |
-| `agent.hcl.parts/backend.hcl` | профиль `backend` |
-| `templates/backend.env.tpl` | профиль `backend` |
+| `profile postgres` (`POSTGRES_*`) | профиль `postgres` |
+| `profile storage` (`MINIO_*`, `*_S3_*`, `RESTIC_*`, `BACKUP_AWS_*`) | профиль `storage` |
+| `profile backend` (`OIDC_*`, `JWT_SECRET`, `BACKEND_TAG`) | профиль `backend` |
 
 ### Шаги
 
 1. Из A.1 определить активный набор профилей.
-2. Собрать список «к удалению» из parts и templates.
-3. Дополнительная проверка: прочитать `scripts/render-configs.sh` (он
-   собирает `agent.hcl` из parts под `COMPOSE_PROFILES`) — убедиться,
-   что нет хардкода на удаляемое имя.
+2. Собрать список секций «к удалению».
+3. Дополнительная проверка: `grep` по compose/configs — `${VAR}` из
+   удаляемых секций не должны остаться (их compose-фрагменты уже
+   удалены в A.2).
 4. **Показать каскад**:
    ```
-   Удалю:
-   - configs/vault-agent/agent.hcl.parts/storage.hcl
-   - configs/vault-agent/templates/minio.env.tpl
-   - configs/vault-agent/templates/backup.env.tpl
-   render-configs.sh берёт parts по имени профиля из
-   $COMPOSE_PROFILES — лишних включений не будет.
-   Подтверждаешь?
+   Удалю секции .env.example:
+   - profile storage (MINIO_*, *_S3_*, RESTIC_*, BACKUP_AWS_*)
+   ${VAR} этих секций в compose/configs не осталось (A.2 удалил
+   minio.yml/backup.yml). Подтверждаешь?
    ```
-5. По «Да» — `git rm`.
-6. Записать в state «A.3 done».
+5. По «Да» — Edit.
+6. Записать в state «A.3 done». `make validate` § .env coverage
+   подтвердит, что не удалено лишнего.
 
 ### Anti-patterns
 
-- Удалить `head.hcl`/`tail.hcl` (фундамент).
-- Удалить `traefik.yml.tpl` (от корп-онбординга, всегда нужен).
-- Удалить template без проверки ссылок в `compose/<name>.yml`
-  (`env_file: .runtime/secrets/<x>.env`).
+- Удалить identity/ACME (фундамент).
+- Удалить секцию, чей `${VAR}` ещё используется в compose/configs
+  (`make validate` упадёт).
 
 ## A.4. Кастомить идентичность
 
@@ -222,12 +210,10 @@ A — Phase B (печать cross-repo next-steps).
    - в карте есть `hosting: external` → форкнуть соответствующий
      `<org>/<repo>`;
    - в карте есть `backend` → tag живёт в `.env` (`BACKEND_TAG`), деплой — `make bump`;
-   - в `services/*/Secrets` упоминаются KV-kind, которых нет в Vault
-     (требуют seed) → `/request-secret`;
+   - в `services/*/Secrets` упоминаются переменные, не заполненные в
+     `.env` на VPS → `/request-secret`;
    - в `stack/Edge` упомянут source-IP whitelist → `/corp-handoff`;
-   - в `stack/Domains` — сабдомены, нужны A-записи под LE-HTTP-01;
-   - корп-онбординг не сделан (нет `kv/.../meta`) →
-     `onboard-project.sh`.
+   - в `stack/Domains` — сабдомены, нужны A-записи под LE-HTTP-01.
 
 ### Формат чеклиста в чат
 
@@ -239,26 +225,21 @@ A — Phase B (печать cross-repo next-steps).
       собрать образ `git.stit.tech/<org>/backend:<tag>`.
 - [ ] Форкнуть `<org>/frontend` (если есть external).
 
-### 2. Корп-онбординг (если ещё нет)
-- [ ] На корп-VPS: `onboard-project.sh --name <p> --envs dev,prod`.
+### 2. Секреты профилей в .env на VPS (через /request-secret)
+- [ ] `POSTGRES_*` — для postgres профиля.
+- [ ] `MINIO_*` / `*_S3_*` / `RESTIC_*` / `BACKUP_AWS_*` — для
+      storage профиля.
+- [ ] `OIDC_*` / `JWT_SECRET` — для backend профиля.
 
-### 3. Seed вторичных KV (через /request-secret)
-- [ ] `kv/projects/<p>/<env>/db` (user/password/database) — для
-      postgres профиля.
-- [ ] `kv/projects/<p>/<env>/minio` (root_user/root_password) —
-      для storage профиля.
-- [ ] `kv/projects/<p>/<env>/backup` (s3-creds) — для restic.
-
-### 4. Edge (через /corp-handoff)
+### 3. Edge (через /corp-handoff)
 - [ ] Egress IP VPS в crowdsec-whitelist (получить IP после
       /bootstrap-vps).
 - [ ] LE-HTTP-01 A-записи для сабдоменов:
       api.<DOMAIN>, minio.<DOMAIN>, s3.<DOMAIN>.
 
-### 5. Выставить tag backend в .env
+### 4. Выставить tag backend в .env
 - [ ] После сборки backend-образа: `make bump SVC=backend TAG=<sha>`
-      (правит `BACKEND_TAG` в `.env` на VPS + force-recreate; Vault
-      в деплое тега не участвует).
+      (правит `BACKEND_TAG` в `.env` на VPS + force-recreate).
 ```
 
 ### После печати

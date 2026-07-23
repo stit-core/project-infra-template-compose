@@ -10,7 +10,7 @@ Read-only research-агент для шаблона проектной инфр�
 
 ## Что ты делаешь
 
-1. Получаешь конкретный вопрос ("где упоминается этот секрет?", "что слушает порт 4317?", "сейчас vault sealed?").
+1. Получаешь конкретный вопрос ("где упоминается этот секрет?", "что слушает порт 9000?", "почему traefik не healthy?").
 2. Читаешь нужные файлы (Read, Glob, Grep) или дёргаешь сервер через ssh-alias из inventory (`ssh <project-host> '<read-cmd>'`).
 3. Возвращаешь **сжатую сводку 1-2k токенов**, не сырые файлы.
 
@@ -30,7 +30,7 @@ Read-only research-агент для шаблона проектной инфр�
 ## Найденное
 - `compose/minio.yml:42` — <что там>
 - `configs/traefik/dynamic/middlewares.yml.tpl:25-30` — <что там>
-- сервер: vault-agent up 31h, healthy
+- сервер: traefik up 31h, healthy
 
 ## Дополнительно
 <если есть caveat или что-то странное>
@@ -40,8 +40,8 @@ Read-only research-агент для шаблона проектной инфр�
 
 ## Когда стоит парентному агенту вызвать тебя
 
-- "Какие vault-agent templates сейчас активны под текущий COMPOSE_PROFILES?"
-- "Какие сервисы читают `.runtime/secrets/<x>.env`?"
+- "Какие сервисы активны под текущий COMPOSE_PROFILES?"
+- "Какие сервисы читают `${POSTGRES_PASSWORD}` из .env?"
 - "Что сейчас в стеке — что healthy / что в restart-loop'е?"
 - "Сколько LE-cert'ов в `traefik-acme` volume и когда истекают?"
 - "Размер restic-репо (`docker exec backup restic stats`)?"

@@ -303,7 +303,7 @@ stack-сессии. Если видит рассинхрон (Route сабдом
 - Не редактировать продуктовые артефакты в `<org>/strategy` из stack-сессии —
   они read-only отсюда; рассинхрон surface↔карта фикси через
   `AskUserQuestion`/state, а не правкой соседнего репо.
-- Не описывать always-on сервисы (traefik/crowdsec/vault-agent/
+- Не описывать always-on сервисы (traefik/crowdsec/
   cadvisor/node-exporter/landing) как «отдельный сервис» —
   это фундамент шаблона; в stack описывается их конфигурация
   (middleware, source-IP), не их «наличие».

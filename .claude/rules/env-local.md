@@ -16,8 +16,7 @@ runtime-секреты приложения и **не** серверный `.env
 | Файл | Где | Что |
 |---|---|---|
 | `.env.local` | workstation, gitignored | SSH connection (`SSH_HOST`/`SSH_PORT`/`SSH_USER`/`PROJECT_NAME` или `HOST=user@ip`) + токены оператора |
-| `.env` | **только на VPS** | runtime identity+bootstrap (`PROJECT_NAME`/`ENV`/`DOMAIN`/`VAULT_ROLE_ID`/`VAULT_SECRET_ID`) — см. `secrets-and-env.md` |
-| Vault KV | корп-Vault | runtime-секреты сервисов, vault-agent рендерит на VPS |
+| `.env` | **только на VPS** | identity + ACME + секреты профилей — единственный источник секретов стека, см. `secrets-and-env.md` |
 
 - SSH-**ключ** лежит на машине (`~/.ssh/…`); в файле — только **куда** ходить (host/port/user).
   **Host берётся из `.env.local`, ничего не хардкодим** в скриптах.
@@ -38,10 +37,10 @@ runtime-секреты приложения и **не** серверный `.env
   `.env.local` и использует значение внутри bash-процесса — в stdout/transcript оно не попадает.
 - ❌ **`Read`/`cat`/echo ради значения креда — необратимая утечка** в transcript: придётся
   ротировать. Нужен токен — зови tool, не вытаскивай значение в чат.
-- ❌ Эхоить `VAULT_SECRET_ID`/`ROLE_ID`, deploy-key, токены при онбординге/bootstrap (skill
+- ❌ Эхоить deploy-key, registry-PAT, токены при онбординге/bootstrap (skill
   `bootstrap-vps`/`request-secret`): подтверждай факт, не печатай значение.
 - ❌ Коммитить `.env.local` (gitignore страхует, но `git add -A` цепляет — проверяй `git status`).
-- ❌ Класть сюда долгоживущие runtime-секреты приложения (их место — Vault) или серверный `.env`.
+- ❌ Класть сюда долгоживущие runtime-секреты приложения (их место — серверный `.env`) — и не дублировать сюда серверный `.env` целиком.
 
 ## Известные ключи
 

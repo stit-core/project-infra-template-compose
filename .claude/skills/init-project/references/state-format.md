@@ -36,9 +36,7 @@ kind: init-project-journey
 - Форкнуть `<org>/backend` из `go-backend-template`, образ
   `git.stit.tech/<org>/backend`, tag → `BACKEND_TAG` в `.env`
   (`make bump SVC=backend TAG=…`).
-- Корп-онбординг: `onboard-project.sh --name acme --envs dev,prod`
-  (AppRole + meta).
-- Seed `kv/projects/acme/dev/db` (user/password/database) через
+- Секреты профиля postgres (`POSTGRES_*`) в `.env` на VPS через
   /request-secret.
 - crowdsec-whitelist: egress IP VPS (после /bootstrap-vps) через
   /corp-handoff.
@@ -94,7 +92,7 @@ kind: init-project-journey
 
 - форки бэкенда/фронта (для `hosting: external`);
 - seed KV (через `/request-secret`);
-- корп-онбординг (`onboard-project.sh` на корп-VPS);
+- корп-handoff: registry-доступ + crowdsec-whitelist (через `/corp-handoff`);
 - corp-handoff (через `/corp-handoff` для crowdsec, acme);
 - LE-DNS A-записи для сабдоменов.
 

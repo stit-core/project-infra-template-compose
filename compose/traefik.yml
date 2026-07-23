@@ -5,15 +5,15 @@ services:
     restart: unless-stopped
     command:
       - "--configFile=/etc/traefik/traefik.yml"
-      # ACME email + caServer приходят из kv/projects/<p>/<env>/meta —
-      # vault-agent рендерит traefik.yml в .runtime/configs/, отсюда bind-mount.
-      # Переключение prod ↔ staging: vault kv patch + удалить volume traefik-acme
-      # (acme.json привязан к CA-серверу).
+      # ACME email + caServer приходят из .env (ACME_EMAIL / ACME_CASERVER) —
+      # render-configs.sh рендерит traefik.yml.tpl → configs/traefik/traefik.yml,
+      # отсюда bind-mount. Переключение prod ↔ staging: правка ACME_CASERVER в
+      # .env + удалить volume traefik-acme (acme.json привязан к CA-серверу).
     ports:
       - "80:80"
       - "443:443"
     volumes:
-      - ./.runtime/configs/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./configs/traefik/traefik.yml:/etc/traefik/traefik.yml:ro
       - ./configs/traefik/dynamic:/etc/traefik/dynamic:ro
       - traefik-acme:/letsencrypt
       - /var/run/docker.sock:/var/run/docker.sock:ro
@@ -26,7 +26,5 @@ services:
       retries: 3
       start_period: 10s
     depends_on:
-      vault-agent:
-        condition: service_healthy
       crowdsec:
         condition: service_healthy

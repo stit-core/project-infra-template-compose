@@ -19,7 +19,7 @@ Provisioning нового VPS под клиентский проект — од�
 
 | Режим | Триггеры | LE endpoint | Что меняется |
 |---|---|---|---|
-| **production** | "клиентский VPS", "новый проект", "поднимаем для <client>", реальный домен заранее настроен | LE prod (`acme-v02.api.letsencrypt.org`) | Дефолт `kv/projects/<p>/<env>/meta.acme_caserver` |
+| **production** | "клиентский VPS", "новый проект", "поднимаем для <client>", реальный домен заранее настроен | LE prod (`acme-v02.api.letsencrypt.org`) | Дефолт `ACME_CASERVER` в `.env` |
 | **rehearsal** | "обкатка", "обкатываю шаблон", "тестовый прогон", "пробую заново", "тестовый VPS", "буду повторять bootstrap" | LE staging (`acme-staging-v02.api.letsencrypt.org`) — untrusted, rate-limits ~100× выше | Корп-админ patch'ит `meta.acme_caserver` на staging URL перед первым deploy'ем |
 
 **Почему важно:** LE prod лимиты тесные:
@@ -29,9 +29,10 @@ Provisioning нового VPS под клиентский проект — од�
 
 При rehearsal (DNS ещё не настроен → failed challenges, многократный teardown/redeploy → duplicate certs) лимит сжигается за день. Staging — те же API, лимиты ~30k/week.
 
-Контроль на корп-стороне: `acme_caserver` живёт в `kv/projects/<p>/<env>/meta` (засеивается `onboard-project.sh`). Если режим rehearsal — оператор просит корп-админа выставить staging URL при онбординге **либо** patch'ит после:
+Контроль: `ACME_CASERVER` живёт в `.env` на VPS. Если режим rehearsal — выстави staging URL до первого deploy:
 ```bash
-vault kv patch kv/projects/acme/dev/meta acme_caserver=https://acme-staging-v02.api.letsencrypt.org/directory
+# в .env на VPS
+ACME_CASERVER=https://acme-staging-v02.api.letsencrypt.org/directory
 ```
 
 **Migration prod ↔ staging на том же VPS:** acme.json привязан к CA-серверу. Сброс acme-volume —
@@ -40,8 +41,8 @@ vault kv patch kv/projects/acme/dev/meta acme_caserver=https://acme-staging-v02.
 ```bash
 docker compose <args> down traefik
 docker volume rm <p>-infra_traefik-acme   # destructive, оператор вручную
-# на корп-стороне: vault kv patch kv/projects/<p>/<env>/meta acme_caserver=<new>
-make ship  # vault-agent перерендерит traefik.yml, traefik подымется с новым CA
+$EDITOR .env                              # ACME_CASERVER=<new>
+make ship  # render-configs перерендерит traefik.yml, traefik подымется с новым CA
 ```
 
 ## Когда НЕ применять
@@ -53,26 +54,20 @@ make ship  # vault-agent перерендерит traefik.yml, traefik поды�
 ## Предусловия (СПРОСИ юзера)
 
 > **Где живёт корп-сторона — два пути (спроси заранее).**
-> - **managed:** control-plane держит stit на `*.stit.tech`; `onboard-project.sh` запускает
->   корп-оператор stit, тебе возвращают per-env блок creds. Vault/registry-эндпоинты —
->   managed-дефолты из `.env.example` (`vault.stit.tech` / `git.stit.tech`).
-> - **self-hosted:** ты сам держишь форк `corp-infra-template` (свой `<org>/infra`-control-plane);
->   `onboard-project.sh` запускаешь **в нём**, эндпоинты в проектном `.env` наводишь на свой
->   домен (`VAULT_ADDR` / `REGISTRY_HOST` — см. `.env.example`).
+> - **managed:** registry держит stit на `git.stit.tech`; registry-эндпоинт —
+>   managed-дефолт из `.env.example`.
+> - **self-hosted:** ты сам держишь форк `corp-infra-template` (свой control-plane);
+>   registry-эндпоинт в проектном `.env` наводишь на свой домен (`REGISTRY_HOST` —
+>   см. `.env.example`).
 >
-> Шаги ниже одинаковы для обоих путей; различие — чей это control-plane и какие эндпоинты в `.env`.
+> Шаги ниже одинаковы для обоих путей; различие — чей это control-plane и какой эндпоинт в `.env`.
 > Вендор-лока нет: managed = инстанс того же шаблона, self-hosted = твой форк.
 
-1. **Корп-сторона онбоарднула проект и нужный ENV?** На control-plane (managed stit-VPS
-   **или** твой форк `corp-infra-template`), оператор с root-токеном Vault:
-   ```bash
-   VAULT_TOKEN=<root> bash scripts/onboard-project.sh \
-     --name <p> --envs dev,prod \
-     --source-ip dev=<vps-egress-ip>,prod=<vps-egress-ip>
-   ```
-   Создаст per-env AppRole + засеит `kv/projects/<p>/<env>/meta`. Вернёт блок `PROJECT_NAME / ENV / VAULT_ROLE_ID / VAULT_SECRET_ID` для каждого env. Без этого делать нечего.
-
-   `--source-ip` пишет egress-IP проектной VPS в корп CrowdSec whitelist. Без него служебный трафик с проектной VPS к корп-сервисам может резаться 403'ами. Можно опустить флаг, если IP заранее неизвестен — добавляется потом `echo` в `configs/crowdsec/whitelists.yaml` + `docker compose restart crowdsec` на корп-VPS (см. `corp-infra-template/.claude/rules/crowdsec-whitelist.md`).
+1. **Корп-сторона знает egress-IP проектной VPS?** Egress-IP пишется в корп CrowdSec
+   whitelist — без него служебный трафик с проектной VPS к корп-сервисам (registry-pull)
+   может резаться 403'ами. Добавляется `echo` в `configs/crowdsec/whitelists.yaml` +
+   `docker compose restart crowdsec` на корп-VPS (см.
+   `corp-infra-template/.claude/rules/crowdsec-whitelist.md`). Оформи через `/corp-handoff`.
 
 2. **VPS provisioned**, у тебя есть IP и root-доступ по SSH ключу (минимум один ключ в `/root/.ssh/authorized_keys`).
 
@@ -135,19 +130,18 @@ ansible-playbook -i ansible/inventory.ini ansible/bootstrap.yml --tags onboard
 ```bash
 ssh root@<IP>
 cd /opt/<project>-infra
-PROJECT_NAME=<p> ENV=<env> DOMAIN=<d> \
-VAULT_ROLE_ID=<id> VAULT_SECRET_ID=<id> \
+PROJECT_NAME=<p> ENV=<env> DOMAIN=<d> ACME_EMAIL=<email> \
 make new-env
 ```
 
-Создаёт `.env` (chmod 600) с **5 переменными** — identity + AppRole. Всё остальное (image tags, ACME-config, restic endpoint, runtime-секреты) приходит из Vault.
+Создаёт `.env` (chmod 600) — identity + ACME. Секреты профилей допишешь по мере активации (шаг 7); image-теги — тоже в `.env` (`make bump`).
 
 `.env` содержит **закомментированную** строку `# COMPOSE_PROFILES=` — будешь раскомментировать по мере активации сервисов (см. шаг 7).
 
 **Rehearsal-режим** — добавь шаг до первого deploy'я:
 ```bash
-# на корп-стороне
-vault kv patch kv/projects/<p>/<env>/meta acme_caserver=https://acme-staging-v02.api.letsencrypt.org/directory
+# в .env на VPS
+ACME_CASERVER=https://acme-staging-v02.api.letsencrypt.org/directory
 ```
 
 ### 6. Первый деплой — always-on стек
@@ -165,26 +159,25 @@ make deploy
 ```
 
 Что произойдёт:
-1. `render-configs.sh` собирает `agent.hcl` из `agent.hcl.parts/` под пустой `COMPOSE_PROFILES` (только always-on блок) + envsubst для middlewares/landing + генерит `.runtime/configs/vault-health.sh`.
-2. `compose up vault-agent` → AppRole-логин, рендер `.runtime/{configs/traefik.yml, secrets/.ready}` из `kv/projects/<p>/<env>/meta`.
-3. CrowdSec early для bouncer auto-register.
-4. Остальные always-on: traefik / node-exporter / cadvisor / landing.
-5. Traefik запрашивает LE-cert на `${DOMAIN}` (landing).
+1. `render-configs.sh` — envsubst для traefik.yml/middlewares/landing из `.env`.
+2. CrowdSec early для bouncer auto-register.
+3. Остальные always-on: traefik / node-exporter / cadvisor / landing.
+4. Traefik запрашивает LE-cert на `${DOMAIN}` (landing).
 
 **Если что-то не поднимается:**
-- vault-agent не healthy / retry-loop на `kv/.../meta` → корп не онбоарднул env (см. предусловия). `make doctor` (секция «vault KV») покажет какие KV-paths отсутствуют.
+- traefik не healthy / пустой traefik.yml → `.env` не заполнен (`ACME_EMAIL`) или render не отработал; `make doctor` (секция «configs render») покажет.
 - LE cert не выпустился → DNS не указывает на VPS, или 80/443 закрыты файрволом.
 - crowdsec bouncer auto-register не сработал → fallback `docker exec crowdsec cscli bouncers add traefik` (cscli внутри контейнера — make-first исключение), прописать в `.env`, `make deploy`.
 
 ### 7. Активация дополнительных профилей (по мере необходимости)
 
-Каждый сервис кроме always-on'а — за `COMPOSE_PROFILES`. Активация требует двух шагов:
-1. Корп-админ засевает соответствующий KV-объект.
-2. Оператор обновляет `COMPOSE_PROFILES` в `.env` и `make ship`.
+Каждый сервис кроме always-on'а — за `COMPOSE_PROFILES`. Активация — два шага:
+1. Дописать секцию секретов профиля в `.env` на VPS (контракт — `.env.example`).
+2. Обновить `COMPOSE_PROFILES` в `.env` и `make ship`.
 
-Запросить scaffold для админа — Claude skill `/request-secret` (см. `.claude/skills/request-secret/SKILL.md`). Skill спросит имя KV-объекта (произвольный slug: `db`, `minio`, `backup`, `oidc`, `jwt`, project-specific), сгенерит случайные поля где надо, напечатает блок `vault kv put kv/projects/<p>/<env>/<name>` для копи-паста админу.
+Scaffold блока значений — Claude skill `/request-secret` (см. `.claude/skills/request-secret/SKILL.md`). Skill определит набор переменных профиля, сгенерит случайные пароли где надо, напечатает блок `VAR=value` для копи-паста в `.env`.
 
-После seed'а — на VPS:
+После дописывания — на VPS:
 ```bash
 $EDITOR .env   # COMPOSE_PROFILES=postgres,storage,backend
 make ship
@@ -192,12 +185,12 @@ make ship
 
 **Storage обязательно с postgres** (backup делает pg_dumpall, без postgres сразу падает — deploy.sh валидирует, ругнётся явно).
 
-**Restic endpoint** живёт в `kv/projects/<p>/<env>/backup.repository`. Корп-админ выбирает:
+**Restic endpoint** живёт в `RESTIC_REPOSITORY` в `.env`. Оператор выбирает:
 - external managed S3 (recommended для prod): `s3:https://s3.example.com/<p>-<env>-backups`
 - bare-IP S3 на другом хосте: `s3:http://<ip>:9000/<p>-<env>-backups`
 - local project minio (ТОЛЬКО rehearsal): `s3:http://minio:9000/backups`
 
-`RESTIC_PASSWORD` (в `.../backup.password`) **обязательно продублирован offsite** — без него restore из снапшотов невозможен. Это политика корп-стороны.
+`RESTIC_PASSWORD` (в `.env`) **обязательно продублирован offsite** — без него restore из снапшотов невозможен.
 
 ### Day-2 workflow
 
@@ -207,14 +200,13 @@ make ship
 make ship MSG="feat(foo): bar"   # add -A + commit + push + (на main) ssh-deploy
 ```
 
-На чистом дереве MSG не нужен — просто push + deploy. Смена `COMPOSE_PROFILES` в `.env` подхватывается `deploy.sh` (rerender agent.hcl + force-recreate vault-agent + consumer'ов).
+На чистом дереве MSG не нужен — просто push + deploy. Смена `COMPOSE_PROFILES` / значений в `.env` подхватывается `deploy.sh` (compose пересоздаёт затронутые сервисы сам).
 
 ### Verify
 
 - `make ps` — always-on сервисы healthy.
 - `https://${DOMAIN}/` — landing отдаётся через traefik + LE.
-- `docker exec vault-agent ls -la /secrets/ /env /configs` — rendered файлы (`ls` внутри контейнера — make-first исключение).
-- `make logs SVC=vault-agent` — successful render, нет re-auth циклов.
+- `configs/traefik/traefik.yml` на VPS непустой (render отработал).
 
 ### Backup smoke-test (после активации storage профиля)
 
@@ -233,15 +225,15 @@ docker exec minio mc ls local/backups/
 
 - **Не запускай ssh-hardening без проверки** что в `/root/.ssh/authorized_keys` есть твой ключ. Роль `ssh-hardening` обязана это assert'нуть, но дополнительно проверь руками.
 - **Не публикуй deploy-key из stdout/log'а** — это секрет. Передай оператору приватным каналом.
-- **Креды tool-only.** `VAULT_SECRET_ID`/`ROLE_ID`, deploy-key, токены — не эхо-ить значение в чат
+- **Креды tool-only.** Deploy-key, registry-PAT, токены — не эхо-ить значение в чат
   (подтверждай факт, не печатай секрет; `.claude/rules/env-local.md`). Connection к VPS для ops-вербов
   после bootstrap — в `.env.local` (workstation, gitignored), не хардкодь; `ssh.sh` читает его сам.
 - **DNS-cutover до первого deploy** — иначе LE rate-limit съедает попытки выпуска.
-- **Rehearsal → ВСЕГДА staging** — production LE сжигается за день многократных итераций. Если режим rehearsal, но `meta.acme_caserver` указывает на prod — это твоя ошибка, проси корп-патч.
-- **Production → НИКОГДА staging** — клиент получит untrusted cert. Если режим production и видишь staging в `kv/.../meta.acme_caserver` — стоп, перепроверь с юзером.
+- **Rehearsal → ВСЕГДА staging** — production LE сжигается за день многократных итераций. Если режим rehearsal, но `ACME_CASERVER` в `.env` указывает на prod — это твоя ошибка, поправь до deploy.
+- **Production → НИКОГДА staging** — клиент получит untrusted cert. Если режим production и видишь staging в `ACME_CASERVER` — стоп, перепроверь с юзером.
 
 ## После
 
-- Записать в credentials store клиента: IP VPS, deploy-key fingerprint, `.env` хеш / Vaultwarden ссылку.
+- Записать в credentials store клиента: IP VPS, deploy-key fingerprint, копию `.env` (password-manager оператора).
 - На корп-стороне — добавить uptime-kuma monitor на `https://${DOMAIN}/`.
 - Создать `docs/incidents/` skeleton (если ещё нет).

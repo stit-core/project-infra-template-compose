@@ -16,5 +16,3 @@ volumes:
   crowdsec-config:
   postgres-data:
   minio-data:
-  vault-agent-secrets:
-  vault-agent-bootstrap:

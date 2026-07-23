@@ -42,7 +42,7 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
 
 **Что НЕ**:
 
-- Заводить строку для always-on фундамента (traefik/crowdsec/vault-agent/
+- Заводить строку для always-on фундамента (traefik/crowdsec/
   cadvisor/node-exporter/landing) — это не «часть продукта».
 - Авторить здесь продуктовые surfaces — они в `<org>/strategy`, читаются
   cross-repo (карта — про инфра-инвентарь, не про UX-поверхности).
@@ -170,9 +170,9 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
 - **Топология хостов** (single-host vs split): Postgres / MinIO co-located на
   одном VPS (дефолт) или вынесены на отдельные хосты (`HOST_ROLE` db/storage).
   При split docker service-name DNS между хостами не работает — backend
-  достаёт PG через `db.host`/`db.port` из KV (vault-agent рендерит PG_DSN),
-  restic — через `backup.repository` из KV; cross-host сеть/TLS — дело
-  потребителя. См. `references/multi-host.md`.
+  достаёт PG через `PG_HOST`/`PG_PORT` из `.env`, restic — через
+  `RESTIC_REPOSITORY`; cross-host сеть/TLS — дело потребителя.
+  См. `references/multi-host.md`.
 
 **Опции опрашиваются как**:
 
@@ -210,12 +210,12 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
 **Что фиксируем**:
 
 - Backup-движок: restic (дефолт шаблона) / pgBackRest / `N/A`.
-- `RESTIC_REPOSITORY` URI (через KV `backup.repository`). Restic endpoint:
+- `RESTIC_REPOSITORY` URI (в `.env`). Restic endpoint:
   managed S3 (дефолт) или **MinIO на отдельном хосте** при split (`HOST_ROLE`
   storage) — URI наводится на storage-хост. См. `references/multi-host.md`.
 - Что бэкапится: pg_dumpall (всегда при postgres), volume'ы (minio data,
-  vault rendered configs, etc.). При split backup делает pg_dumpall к PG на
-  db-хосте по сети — cross-host доступ обеспечивает потребитель.
+  etc.). При split backup делает pg_dumpall к PG на db-хосте по сети —
+  cross-host доступ обеспечивает потребитель.
 - Расписание crond (`0 3 * * *` — 03:00 daily).
 - Retention: `keep-daily 7 keep-weekly 4 keep-monthly 3` (дефолт
   `containers/backup/backup-now`) или другое.
@@ -224,8 +224,7 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
 **Опции опрашиваются как**:
 
 - Движок: enum (`restic` / `pgBackRest` / `N/A`).
-- Что бэкапится: multiSelect (`postgres` / `minio-volume` / `vault-rendered`
-  / `other` Other).
+- Что бэкапится: multiSelect (`postgres` / `minio-volume` / `other` Other).
 - Расписание: 4 опции (`daily 03:00` / `daily 02:00` / `every 6h` /
   Other).
 - Retention: Other (бизнес-решение).
@@ -295,8 +294,8 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
 **Что фиксируем**:
 
 - Какие среды у проекта (`dev` / `staging` / `prod` / произвольные слаги).
-- Каждая среда = **отдельный VPS** с одним `ENV` в `.env` и своей
-  AppRole-парой (канон — `.claude/rules/multi-env.md`).
+- Каждая среда = **отдельный VPS** с одним `ENV` и своим `.env`
+  (канон — `.claude/rules/multi-env.md`).
 - Чем среды отличаются: домен (`dev.acme.dev` vs `acme.dev`), масштаб
   (RAM/CPU VPS), какой набор профилей включён.
 - `N/A` — если среда одна (single-env проект).
@@ -311,8 +310,7 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
 
 - Конвертировать среду in-place — добавление env = bootstrap нового VPS
   (это не stack-факт, а операция; `skill bootstrap-vps`).
-- Хардкодить `VAULT_ROLE_ID`/`SECRET_ID` per env — они в `.env` на VPS.
-- Описывать корп-онбординг AppRole/KV — это `multi-env.md` + корп-сторона.
+- Дублировать значения секретов per env — они в `.env` на VPS.
 
 **Тест-критерий**:
 
@@ -337,8 +335,7 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
 - `configs/traefik/dynamic/*` — клиент-специфичные routers/middlewares.
 - `DOMAIN` в `.env.example` (либо дефолт).
 - crowdsec source-IP next-step (corp-handoff: egress IP в whitelist).
-- acme `meta` next-step (`acme_email`/`acme_caserver` через
-  `vault kv put kv/projects/<p>/<env>/meta`).
+- ACME next-step (`ACME_EMAIL`/`ACME_CASERVER` в `.env` на VPS).
 - Кастомные имена сетей (если не дефолт) — `.env.example`.
 
 **Что НЕ**:

@@ -31,7 +31,7 @@ Snapshot содержит **один файл** — `/pgdump-<UTC>.sql.gz`, не
 
 **Volumes (minio-data, app-uploads etc.) НЕ бэкапятся** по дефолту — только postgres. Если нужны volume-снапшоты, расширь `containers/backup/backup-now`.
 
-Restic-репо: значение `RESTIC_REPOSITORY` приходит из Vault `kv/projects/<p>/<env>/backup.repository` (НЕ из `.env`) — vault-agent рендерит его в `.runtime/secrets/backup.env` рядом с `RESTIC_PASSWORD` и `AWS_*`. **Local-default нет by design**: на single-VPS host failure уносит и postgres-data, и репо. Корп-сторона при seed'е `backup` KV-объекта обязана задать external endpoint (managed S3 / bare-IP S3 / corp Minio). Дисциплина — на стороне корп-админа при `vault kv put kv/projects/<p>/<env>/backup repository=...`.
+Restic-репо: значение `RESTIC_REPOSITORY` живёт в `.env` на VPS рядом с `RESTIC_PASSWORD` и `BACKUP_AWS_*`. **Local-default нет by design**: на single-VPS host failure уносит и postgres-data, и репо. Оператор обязан задать external endpoint (managed S3 / bare-IP S3 на другом хосте) и продублировать `RESTIC_PASSWORD` + копию `.env` offsite (password-manager).
 
 Retention в `containers/backup/backup-now`: 7 daily / 4 weekly / 3 monthly.
 
@@ -48,7 +48,7 @@ Retention в `containers/backup/backup-now`: 7 daily / 4 weekly / 3 monthly.
 
 ### 1. Список снапшотов
 
-На VPS (backup-контейнер должен быть up; если стек down — поднять `vault-agent` + `postgres` + `backup` отдельно через compose up). `restic` живёт внутри backup-контейнера и make-обёртки не имеет — `docker exec backup restic …` legit (make-first debug-исключение).
+На VPS (backup-контейнер должен быть up; если стек down — поднять `postgres` + `backup` отдельно через compose up). `restic` живёт внутри backup-контейнера и make-обёртки не имеет — `docker exec backup restic …` legit (make-first debug-исключение).
 
 ```bash
 docker exec backup restic snapshots --compact
@@ -90,16 +90,16 @@ snapshot `<id>`? Это остановит backend и пересоздаст Б�
 
 ### C. Полный host-restore (новый VPS)
 
-**Предусловие:** значение `kv/projects/<p>/<env>/backup.repository` указывает на **external** endpoint (managed S3 / corp Minio / bare-IP другого хоста). Если был local minio — снапшоты ушли вместе с хостом, restore невозможен.
+**Предусловие:** `RESTIC_REPOSITORY` указывал на **external** endpoint (managed S3 / bare-IP другого хоста) и у оператора есть offsite-копия `.env` (минимум `RESTIC_*` + `BACKUP_AWS_*`). Если был local minio — снапшоты ушли вместе с хостом, restore невозможен.
 
 1. Provision нового VPS.
 2. Skill `bootstrap-vps` (ansible-playbook + регистрация deploy-key) — поднимет Docker, склонирует репо.
-3. На новом хосте: `make new-env` — те же AppRole creds для `(project, env)` (scope'ятся к паре, не к хосту). `RESTIC_REPOSITORY` рендерится из Vault, повторно ничего не вводить.
+3. На новом хосте: `make new-env` + восстановить секреты в `.env` из offsite-копии (та же пара `(project, env)`): `RESTIC_*`, `BACKUP_AWS_*`, секции активных профилей.
 4. DNS cutover на новый IP. **Gate:** перед перепиской DNS-записи задай `AskUserQuestion`
    («Переключить DNS `<domain>` на новый IP `<new-ip>`? Старый хост перестанет принимать
    трафик») с вариантами `Переключить` / `Подождать прогрев стека` / `Отмена`. Cutover
    до готовности стека на новом хосте уронит прод.
-5. `make ship` — стек поднимается, vault-agent рендерит секреты.
+5. `make ship` — стек поднимается на секретах из `.env`.
 6. Сценарий A выше — для postgres.
 7. Volume'ы (minio-data, app-uploads) — не покрыты backup'ом; восстанавливаются из external source / re-uploads / off-site mirror если настроен.
 8. Verify все healthchecks + LE-сертификаты выпустились.
@@ -122,14 +122,14 @@ snapshot `<id>`? Это остановит backend и пересоздаст Б�
   DNS cutover, перезалив volume. Перед каждым — `AskUserQuestion` с явным описанием последствия
   и вариантом `Отмена`. Нет ответа `Запустить`/`Переключить` — шаг не выполняется.
 - **Не делай drop database без двойной проверки** что снапшот загружен и читается.
-- **Backup creds + repository endpoint** живут в Vault (`kv/data/projects/<p>/<env>/{backup,minio}`), vault-agent рендерит в `.runtime/secrets/backup.env`. Если хост потерян целиком — пересоздаёшь `.env` с теми же AppRole для `(project, env)`, vault-agent рендерит секреты автоматически.
+- **Backup creds + repository endpoint** живут в `.env` на VPS (`RESTIC_*`, `BACKUP_AWS_*`). Если хост потерян целиком — восстановление возможно только из offsite-копии `.env`; держи её в password-manager'е оператора актуальной.
 - **Restic check** перед критичным restore — `restic check --read-data` (медленно, но валидирует данные).
 
 ## Что делать если restic-репо тоже потерян
 
-Local-default `s3:http://minio:9000/backups` отсутствует by design — на single-VPS он не даёт DR. Если в `kv/.../backup.repository` всё-таки local minio и хост умер — снапшоты потеряны вместе с базой. Recovery невозможен.
+Local-default `s3:http://minio:9000/backups` отсутствует by design — на single-VPS он не даёт DR. Если в `RESTIC_REPOSITORY` всё-таки local minio и хост умер — снапшоты потеряны вместе с базой. Recovery невозможен.
 
-Для prod — `repository` в `kv/projects/<p>/<env>/backup` должен указывать на external endpoint. От local minio защищает только дисциплина корп-админа при seed'е этого KV-объекта.
+Для prod — `RESTIC_REPOSITORY` в `.env` должен указывать на external endpoint. От local minio защищает только дисциплина оператора при заполнении `.env`.
 
 См. `docs/reference/runbook.md` → «Полная замена VPS» при сохранившемся репо и «Quarterly DR drill» для регулярной проверки что backup восстанавливается.
 

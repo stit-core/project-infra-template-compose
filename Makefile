@@ -7,9 +7,9 @@ SHELL := /usr/bin/env bash
 # SNAPSHOT= (restore-pg) / Q=,P= (search) / ENV= (new-env) / A= (status) /
 # MSG= (ship).
 #
-# compose интерполирует ${...} из --env-file .env: identity, bootstrap-auth
-# и image-теги (<SVC>_TAG — бампаются строго через .env, НЕ через Vault;
-# верб `bump`). Vault отдаёт только секреты/конфиги через vault-agent render.
+# compose интерполирует ${...} из --env-file .env: identity, ACME, секреты
+# профилей и image-теги (<SVC>_TAG — бампаются строго через .env, верб `bump`).
+# .env — единственный источник секретов (см. .claude/rules/secrets-and-env.md).
 COMPOSE_ARGS := --env-file .env \
                 -f docker-compose.yml $(addprefix -f ,$(wildcard compose/*.yml))
 
@@ -22,7 +22,7 @@ help: ## сгруппированный список команд
 validate: ## Compose syntax + yamllint + .tpl + .env coverage (FORMAT=detailed)
 	@bash scripts/tools/validate.sh $(if $(filter detailed,$(FORMAT)),--format=detailed)
 
-doctor: ## Live fail-fast preflight: compose/vault-agent/dns/vault/env (A= --full)
+doctor: ## Live fail-fast preflight: compose/render/dns/env (A= --full)
 	@bash scripts/tools/doctor.sh $(A)
 
 check: ## Каноничный pre-ship gate: validate + doctor + plan-check + project-check
@@ -43,7 +43,7 @@ ship: ## commit + push + (если main) ssh-deploy. usage: make ship MSG="feat(
 deploy: ## на VPS: git pull + render + compose up --wait
 	bash scripts/deploy.sh
 
-render: ## envsubst для *.tpl + сборка agent.hcl из parts
+render: ## envsubst для configs/**/*.tpl из .env
 	bash scripts/render-configs.sh
 
 ##@ OPS
@@ -63,7 +63,7 @@ restart: ## рестарт одного сервиса: make restart SVC=backend
 	@if [ -f .env ]; then docker compose $(COMPOSE_ARGS) restart $(SVC); \
 	else bash scripts/tools/ssh.sh exec make restart SVC=$(SVC); fi
 
-recreate: ## пересоздать сервис — подхват ротированного env_file/тега (restart не перечитывает env_file): make recreate SVC=backend
+recreate: ## пересоздать сервис — подхват ротированного .env-значения/тега (restart не перечитывает environment): make recreate SVC=backend
 	@if [ -z "$(SVC)" ]; then echo "usage: make recreate SVC=<name>"; exit 2; fi
 	@if [ -f .env ]; then docker compose $(COMPOSE_ARGS) up -d --no-deps --force-recreate $(SVC); \
 	else bash scripts/tools/ssh.sh exec make recreate SVC=$(SVC); fi
@@ -74,7 +74,7 @@ build: ## пересобрать образ сервиса с build-context (н�
 	else bash scripts/tools/ssh.sh exec make build SVC=$(SVC); fi
 
 # Единственный канон бампа image-тега: тег живёт в .env как <SVC>_TAG
-# (UPPER_SNAKE), НЕ в Vault. Верб правит .env на VPS и пересоздаёт сервис —
+# (UPPER_SNAKE). Верб правит .env на VPS и пересоздаёт сервис —
 # compose сам подтянет отсутствующий образ (pull policy=missing).
 bump: ## бамп image-тега через .env (<SVC>_TAG) + recreate: make bump SVC=backend TAG=v1.2.3
 	@if [ -z "$(SVC)" ] || [ -z "$(TAG)" ]; then echo 'usage: make bump SVC=<name> TAG=<tag>'; exit 2; fi

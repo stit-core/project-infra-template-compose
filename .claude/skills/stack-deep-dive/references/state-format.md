@@ -38,7 +38,7 @@ ref: docs/project/stack.md
 
 ## Host layout
 - Режим: split (single-host — секцию опускаем).
-- vps-app (HOST_ROLE=edge): traefik, vault-agent, backend, landing.
+- vps-app (HOST_ROLE=edge): traefik, backend, landing.
 - vps-db (HOST_ROLE=db): postgres; backend достаёт PG через db.host/db.port из KV.
 - vps-storage (HOST_ROLE=storage): minio, backup; restic.repository → этот хост.
 ```
@@ -92,8 +92,8 @@ stack'а, но важны для будущих сессий.
 секцию **не заводим**. Появляется, когда оператор выбрал split в `§ Networks`.
 
 - Одна строка на хост: `<имя-хоста> (HOST_ROLE=<роль>): <сервисы>`.
-- Роли: `edge` (traefik/vault-agent/backend/landing) / `db`
-  (postgres) / `storage` (minio/backup). vault-agent — на каждом хосте.
+- Роли: `edge` (traefik/backend/landing) / `db`
+  (postgres) / `storage` (minio/backup).
 - Эндпоинты не дублируем: PG host/port — в KV `db`, restic — в KV
   `backup.repository`.
 - Граница (репликация/HA/cross-host сеть = дело потребителя) — фиксируется как
@@ -120,7 +120,7 @@ stack'а, но важны для будущих сессий.
 ❌ Никогда не пишем сюда:
 - Значения секретов (acme_email, restic-пароль). Только
   ссылки на KV-пути.
-- Содержимое `.env`, `.env.local`, `.runtime/`.
+- Содержимое `.env`, `.env.local`, rendered-конфигов.
 - Личные данные оператора.
 
 ## Что НЕ хранить в заметке

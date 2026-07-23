@@ -19,8 +19,8 @@ status: draft
 (postgres 17 / minio). container_name, healthcheck (path/команда), сети (proxy / backend-net).>
 
 ## Secrets
-<Какой Vault KV нужен: kv/projects/<p>/<env>/<kind> и поля (db: user/password/database;
-minio: root_user/...). Какой vault-agent template рендерит env. `N/A` если секретов нет.>
+<Какие `${VAR}` нужны в .env: секция .env.example (postgres: POSTGRES_*;
+storage: MINIO_*/...) или project-specific имена. `N/A` если секретов нет.>
 
 ## Route
 <Публичный ли: сабдомен (`<name>.${DOMAIN}`), traefik router + crowdsec@file middleware. Или
@@ -30,6 +30,6 @@ internal (только backend-net) → `_internal_`. Порт.>
 <Что de-template родит/изменит в инфре из этого артефакта:
 - COMPOSE_PROFILES += <profile> (выводится из subtype)
 - compose/<name>.yml — keep, остальные неиспользуемые pruned
-- vault-agent agent.hcl.parts/<part>.hcl + templates/<kind>.env.tpl — keep
+- секция переменных сервиса в .env.example — keep
 - traefik labels / dynamic route (если public)
-- для external: cross-repo next-step (форкни <repo>, запиши tag в meta)>
+- для external: cross-repo next-step (форкни <repo>, tag → BACKEND_TAG в .env)>

@@ -1,8 +1,7 @@
 ---
 name: corp-handoff
-description: Изменение corp-поверхности (новая Vault-KV-зависимость / профиль / env-контракт / crowdsec-whitelist / новый env-онбординг / новый сабдомен под LE) ОБЯЗАНО породить CORP-HANDOFF-блок корп-админу (или DNS-владельцу) до claim «готово». Грузится при правке configs/vault-agent, compose-профилей, .env.example, crowdsec whitelists, ansible onboard.
+description: Изменение corp-поверхности (crowdsec-whitelist / registry-доступ / новый сабдомен под LE) ОБЯЗАНО породить CORP-HANDOFF-блок корп-админу (или DNS-владельцу) до claim «готово». Грузится при правке compose-профилей, .env.example, crowdsec whitelists, ansible onboard.
 paths:
-  - "configs/vault-agent/**"
   - "compose/*.yml"
   - ".env.example"
   - "ansible/roles/stit-onboard/**"
@@ -11,10 +10,11 @@ paths:
 # Corp-handoff
 
 Этот репо **и есть** таргет деплоя (`ship → deploy → контейнер`). Но часть
-конфига живёт не здесь, а на корп-стороне: Vault (`kv/projects/<p>/<env>/*`),
-AppRole/онбординг, CrowdSec-whitelist. Любое изменение, которое
-**требует действия корп-стороны** (или владельца DNS), обязано быть зафиксировано
-явно — иначе стек молча не поднимется (vault-agent retry-loop / cert не выпишется).
+поверхности живёт не здесь, а на корп-стороне: registry `git.stit.tech`
+(pull/push образов) и CrowdSec-whitelist (egress-IP проектной VPS). Любое
+изменение, которое **требует действия корп-стороны** (или владельца DNS),
+обязано быть зафиксировано явно — иначе стек молча деградирует (pull режется
+403 / cert не выпишется).
 
 **Железобетонное правило:** тронул corp-поверхность → до claim «готово» / до
 коммита оформи `CORP-HANDOFF`-блок и **попроси оператора передать его корп-админу**
@@ -26,13 +26,13 @@ AppRole/онбординг, CrowdSec-whitelist. Любое изменение, �
 
 | Класс | Триггер | Кому |
 |---|---|---|
-| **Vault KV** | новый профиль в `COMPOSE_PROFILES` / новый сервис, которому нужен KV-объект (`db`/`oidc`/`jwt`/`minio`/`backup`/project-specific); новое поле в существующем объекте; новый `${VAR}` из vault-agent template | корп (Vault) — через skill `request-secret` |
-| **Env-онбординг** | новый `ENV`/проект (новый VPS) — нужен AppRole `projects-<p>-<env>` + seed `meta` | корп (`onboard-project.sh --envs`) |
+| **Registry-доступ** | новый образ/репо в `git.stit.tech` (pull для VPS, push для разработчика backend-форка) | корп (Gitea-аккаунт/права) |
 | **CrowdSec whitelist** | новый egress-IP проектной VPS (иначе служебный трафик к корп-сервисам режется 403) | корп (whitelist corp-side в `corp-infra-template` + crowdsec restart) |
 | **DNS** | новый сабдомен `<name>.${DOMAIN}` под LE HTTP-01 | владелец DNS (A-record `*.${DOMAIN}` → VPS IP) |
 
-Не-corp: чисто локальная правка (compose-логика без нового KV/профиля, .tpl-рефактор
-без нового `${VAR}`, scripts/tools, доки, healthcheck-тюнинг).
+Не-corp: чисто локальная правка (compose-логика, новые `${VAR}` в `.env.example`
++ `.env`, .tpl-рефактор, scripts/tools, доки, healthcheck-тюнинг). Секреты —
+целиком проектная сторона (`.env` на VPS, skill `request-secret`).
 
 ## Формат CORP-HANDOFF-блока
 
@@ -40,10 +40,10 @@ AppRole/онбординг, CrowdSec-whitelist. Любое изменение, �
 === CORP HANDOFF · передай корп-админу ===
 WHAT   <что изменилось: имя объекта/поля/профиля/IP, required?>
 WHY    <фича/причина — ссылка на коммит/план-атом>
-ACTION <что корп обязан сделать: vault kv put/patch <path> / onboard-project --envs / whitelist IP / DNS A-record>
-WHO    <корп (Vault/AppRole/CrowdSec) | владелец DNS>
+ACTION <что корп обязан сделать: registry-доступ / whitelist IP / DNS A-record>
+WHO    <корп (Gitea/CrowdSec) | владелец DNS>
 DECIDE <нужно ли решение: значение/выбор; или «дефолт N годится?»>
-RISK   <что будет, если не сделано: стек не поднимется / cert не выпишется / метрики режутся>
+RISK   <что будет, если не сделано: pull образа режется / cert не выпишется / трафик к корпу 403>
 ===
 ```
 
@@ -62,16 +62,15 @@ RISK   <что будет, если не сделано: стек не подн�
 
 - Оформлять блок **до** claim «готово»/коммита, не после.
 - Один блок на одно логически цельное corp-изменение; несколько — список в `**Corp impact.**`.
-- Конкретика: точный KV-path, имя поля, required-флаг, точное действие. «Что-то с Vault» — бесполезно админу.
-- Для seed/patch KV — делегируй skill `request-secret` (он печатает готовый `vault kv put`-блок).
+- Конкретика: точный IP, имя репо/образа, точное действие. «Что-то с доступом» — бесполезно админу.
 
 ## Не делать
 
-- ❌ Молча закоммитить новый профиль / KV-зависимость / `${VAR}` из template без блока.
+- ❌ Молча закоммитить изменение, требующее corp-действия (новый образ, новый IP), без блока.
 - ❌ Откладывать «на ship» — ship агрегирует уже **записанное** в `**Corp impact.**`; не записал → потерял.
-- ❌ Самому выполнять `vault kv put`/`patch` / `ssh` на корп-VPS — не зона этого репо.
-- ❌ Писать значение секрета в блок/чат — только имя пути/поля и факт «нужен» (см. `.claude/rules/secrets-and-env.md`).
-- ❌ Workaround'ить отсутствующий KV/политику обходом вместо handoff (см. skill `triage`).
+- ❌ Самому выполнять команды на корп-VPS — не зона этого репо.
+- ❌ Писать значение секрета в блок/чат (см. `.claude/rules/secrets-and-env.md`).
+- ❌ Workaround'ить отсутствующий whitelist/доступ обходом вместо handoff (см. skill `triage`).
 - ❌ Помечать задачу «готово», пока handoff не предъявлен оператору.
 
 ## Сигналы, что ты здесь
@@ -80,4 +79,4 @@ RISK   <что будет, если не сделано: стек не подн�
 - Правишь файл под `paths:` этого правила (оно само в контексте).
 - `make ship` напомнил, что `**Corp impact.**` пуст при тронутой corp-поверхности.
 
-Процедура — skill `corp-handoff`. Seed конкретного KV — skill `request-secret` (его частный случай).
+Процедура — skill `corp-handoff`. Секреты профилей — не corp-handoff, а skill `request-secret` (блок для `.env` на VPS).

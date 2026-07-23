@@ -13,7 +13,7 @@ self-hosted = ваш форк). Канон карты контрактов жи�
 
 | Репо | Роль |
 |---|---|
-| `stit-core/corp-infra-template` | Корп control-plane: Vault, Gitea registry, CrowdSec, SSO. Source of truth контрактов. Managed = инстанс на `*.stit.tech`, self-hosted = ваш форк. |
+| `stit-core/corp-infra-template` | Корп control-plane: Gitea registry, CrowdSec, SSO. Source of truth контрактов. Managed = инстанс на `*.stit.tech`, self-hosted = ваш форк. |
 | `stit-core/go-backend-template` | Шаблон Go-бэкенда. Форк `<org>/backend` собирает образ в `git.stit.tech`. |
 | `stit-core/business-strategy-template` | Шаблон бизнес-стратегии (business → ajtbd → swot → hypothesis-map → опц. продукт `projects/<slug>/`: vision/**surface** → interface → screens). Форк `<org>/strategy`. |
 | `stit-core/project-infra-template-compose` | **Этот.** Шаблон проектной VPS — runtime стека одного проекта. Форк `<org>/infra`. |
@@ -23,23 +23,23 @@ self-hosted = ваш форк). Канон карты контрактов жи�
 
 | Что корп выдаёт | Как | Адрес |
 |---|---|---|
-| AppRole `projects-<p>-<env>` + KV `kv/projects/<p>/<env>/*` (read-only) | `onboard-project.sh --name <p> --envs ...` | `vault.stit.tech` |
 | Source + container registry | deploy-key + PAT login | `git.stit.tech` |
-| CrowdSec whitelist egress-IP проектной VPS | `--source-ip <env>=<ip>` при онбординге | corp-side |
+| CrowdSec whitelist egress-IP проектной VPS | `configs/crowdsec/whitelists.yaml` corp-side | corp-side |
 
-Адреса `vault.stit.tech` / `git.stit.tech` — managed-инстанс; на
-self-hosted это адреса вашего форка `corp-infra-template`, задаются через `VAULT_ADDR` /
-`REGISTRY_HOST` (см. `.env.example`). Вендор-лока нет.
+Адрес `git.stit.tech` — managed-инстанс; на self-hosted это адрес вашего форка
+`corp-infra-template`, задаётся через `REGISTRY_HOST` (см. `.env.example`).
+Вендор-лока нет.
 
-Один VPS = одна среда, своя AppRole-пара. Детали проектной стороны контракта (KV-layout,
-lazy-seed, profile-opt-in) — `.claude/rules/multi-env.md`.
+Один VPS = одна среда, свой `.env` (единственный источник секретов — корп в них
+не участвует). Детали проектной стороны (`.env`-контракт, profile-opt-in) —
+`.claude/rules/multi-env.md`.
 
 ## Обслуживает `<org>/backend`
 
 Runtime для клиентского образа `git.stit.tech/<org>/backend:<tag>`. Deploy нового тега —
 `make bump SVC=backend TAG=<tag>`: правит `BACKEND_TAG` в `.env` на VPS + force-recreate,
-compose сам пуллит образ. Image-теги живут **строго в `.env`** (конвенция `<SVC>_TAG`),
-через Vault не ходят — корп-сторона в rollout'е тега не участвует.
+compose сам пуллит образ. Image-теги живут **строго в `.env`** (конвенция `<SVC>_TAG`)
+— корп-сторона в rollout'е тега не участвует.
 
 ## Sibling `<org>/strategy` — продуктовый контекст
 
@@ -68,6 +68,6 @@ compose сам пуллит образ. Image-теги живут **строго
 
 ## Что меняешь, тронув корп-контракт
 
-Изменение, требующее действия корп-стороны (новый AppRole/env, seed KV, CrowdSec-whitelist,
-новый сабдомен под LE-DNS) — оформляется CORP-HANDOFF-блоком (skill `/corp-handoff`). Проектная
-сторона строго read-only на свой `kv/projects/<p>/<env>/*`; никаких write-прав у оператора.
+Изменение, требующее действия корп-стороны (registry-доступ, CrowdSec-whitelist,
+новый сабдомен под LE-DNS) — оформляется CORP-HANDOFF-блоком (skill `/corp-handoff`).
+Секреты — не корп-контракт: они в `.env` на VPS (skill `/request-secret`).

@@ -1,149 +1,120 @@
 ---
 name: secrets-and-env
-description: Правила секретов в проектной инфре. Multi-env (kv/projects/<p>/<env>/*), .env только identity+bootstrap, vault-agent рендерит .runtime/, ротация = vault kv patch + force-recreate. Грузится при работе с .env, .tpl, vault-agent.
+description: Правила секретов в проектной инфре. Все секреты и конфиг-значения — в .env на VPS (gitignored, single source), сервисы получают их через compose-интерполяцию environment, ротация = правка .env + make deploy/recreate. Грузится при работе с .env, .tpl, compose.
 paths:
   - ".env"
   - ".env.example"
   - "**/*.tpl"
-  - "configs/vault-agent/**"
-  - "compose/vault-agent.yml"
+  - "compose/**"
 ---
 
 # Секреты и .env
 
-## Три уровня данных
+## Модель: .env — единственный источник
 
-| Уровень | Что | Где | Кто пишет |
-|---|---|---|---|
-| Identity | `PROJECT_NAME`, `ENV`, `DOMAIN` | `.env` (gitignored) | `scripts/new-env.sh` |
-| Bootstrap auth | `VAULT_ROLE_ID`, `VAULT_SECRET_ID` | `.env` | оператор (из корп онбординга) |
-| Local-managed | `CROWDSEC_BOUNCER_API_KEY`, `COMPOSE_PROFILES` | `.env` | auto-register / оператор |
-| Image-теги | `BACKEND_TAG` (конвенция `<SVC>_TAG`) | `.env` — **строго**, не Vault | оператор (`make bump SVC= TAG=`) |
-| Корп-эндпоинты | `VAULT_ADDR`, `REGISTRY_HOST` | `.env` (managed-дефолт в `.env.example`/коде; self-hosted переопределяет) | оператор (self-hosted) |
-| Vault-managed конфиг | meta: `acme_email`/`acme_caserver`→traefik.yml | `kv/projects/<p>/<env>/meta` (vault-agent рендерит) | корп-админ (vault kv put/patch) |
-| Vault-managed секреты | DB, OIDC, JWT, MinIO, Restic + AWS | `kv/projects/<p>/<env>/{db,oidc,jwt,minio,backup}` → `.runtime/secrets/*.env` | корп-админ |
+Все секреты и конфиг-значения стека живут в **одном** `.env` на VPS (gitignored,
+chmod 600). Оператор заполняет и ротирует его руками. Сервисы получают значения
+через compose-интерполяцию `${VAR}` в `environment:`; конфиг-файлы с
+переменными (traefik static, middlewares, landing) рендерятся из `.tpl`
+envsubst'ом (`scripts/render-configs.sh`).
 
-Consumer-сервисы (postgres, backend, minio, backup) читают **только** `.runtime/secrets/*.env` через `env_file:` (плюс `${...}`-интерполяцию из `.env`). Они не знают про Vault напрямую. Image-теги через Vault не ходят: `<SVC>_TAG` живёт в `.env`, бамп — `make bump SVC= TAG=`.
+| Категория | Что | Кто пишет |
+|---|---|---|
+| Identity | `PROJECT_NAME`, `ENV`, `DOMAIN` | `scripts/new-env.sh` |
+| ACME | `ACME_EMAIL`, `ACME_CASERVER` | `scripts/new-env.sh` / оператор |
+| Local-managed | `CROWDSEC_BOUNCER_API_KEY`, `COMPOSE_PROFILES`, `HOST_ROLE` | auto-register / оператор |
+| Image-теги | `BACKEND_TAG` (конвенция `<SVC>_TAG`) | оператор (`make bump SVC= TAG=`) |
+| Registry | `REGISTRY_HOST` (managed-дефолт в коде; self-hosted переопределяет) | оператор (self-hosted) |
+| Секреты профилей | `POSTGRES_*`, `OIDC_*`, `JWT_SECRET`, `MINIO_*`, `APP_S3_*`, `BACKUP_S3_*`, `RESTIC_*`, `BACKUP_AWS_*` | оператор (scaffold — skill `/request-secret`) |
 
 ## Multi-env
 
-Один проект = N сред = N **отдельных VPS**, каждый со своим `ENV` в `.env` и своим AppRole для пары `(project, env)`. Контракт KV layout / AppRole / onboarding flow — `.claude/rules/multi-env.md` (плюс `corp-infra-template/docs/ecosystem.md` для общей карты). Этот документ — про **механику секретов на проектной стороне**: что в `.env` vs Vault, vault-agent template syntax, ротация через force-recreate.
+Один проект = N сред = N **отдельных VPS**, каждый со своим `ENV` и своим
+`.env`. Контракт per-env `.env` — `.claude/rules/multi-env.md`. Этот документ —
+про **механику секретов**: имена, рендер, ротация, что нельзя коммитить.
 
 ## Что куда
 
 | Файл | В репо? | Зачем |
 |---|---|---|
-| `.env.example` | да | Минимальный набор для bootstrap (5 переменных) |
-| `.env` | **нет** (gitignored, permissions.deny) | Реальные identity + AppRole на VPS |
-| `.runtime/secrets/*.env` | **нет** | Vault-agent rendered секреты |
-| `.runtime/configs/traefik.yml` | **нет** | Vault-agent rendered traefik static (acme email/caServer из Vault) |
-| `.runtime/configs/vault-health.sh` | **нет** | render-configs.sh generated healthcheck-script под активные profile'ы |
-| `.runtime/secrets-bootstrap/{role-id,secret-id}` | **нет** | Trampoline для AppRole login |
-| `configs/vault-agent/templates/*.tpl` | да | Consul-template шаблоны (`{{ with secret (printf "kv/data/projects/%s/%s/db" (env "PROJECT_NAME") (env "ENV")) }}`) |
-| `configs/vault-agent/agent.hcl.parts/*.hcl` | да | head/<profile>/tail-фрагменты — render-configs.sh собирает agent.hcl под активный `COMPOSE_PROFILES` |
-| `configs/<svc>/*.tpl` | да | envsubst-шаблоны с .env-vars (например, middlewares.yml.tpl с `${CROWDSEC_BOUNCER_API_KEY}`) |
+| `.env.example` | да | Полный контракт переменных: активные — заполняются на bootstrap, профильные — закомментированы с комментарием как сгенерировать |
+| `.env` | **нет** (gitignored, permissions.deny) | Реальные значения на VPS |
+| `configs/<svc>/*.tpl` | да | envsubst-шаблоны с .env-vars (`traefik.yml.tpl` с `${ACME_EMAIL}`, `middlewares.yml.tpl` с `${CROWDSEC_BOUNCER_API_KEY}`) |
+| rendered `configs/<svc>/<file>` | **нет** (gitignored) | Выход render-configs.sh, пересобирается каждый deploy |
 
 ## Правила
 
 ### .env / .env.example
 
 - `.env*` НИКОГДА не коммитятся (gitignore + `permissions.deny`).
-- В `.env.example` живёт минимум: identity, AppRole-bootstrap, профильные switches, image-теги (`<SVC>_TAG` — закомментированы, раскомментируются вместе с профилем; бамп только через `make bump`, не Vault).
+- `.env.example` — контракт: каждый `${VAR}` из compose/configs присутствует
+  там (активный или закомментированный `# VAR=`) с комментарием откуда взять /
+  как сгенерировать (`openssl rand -hex 32` для паролей). `make validate`
+  ловит пропуски детерминированно.
 - Имена: `<SERVICE>_<PURPOSE>` UPPER_SNAKE_CASE.
+- Секреты профилей закомментированы в `.env.example` и раскомментируются в
+  `.env` вместе с профилем.
 
-### .runtime/
+### Новый секрет / новый render-target
 
-- Полностью gitignored.
-- Создаётся `scripts/deploy.sh` (mkdir + touch заглушек) + render-configs.sh + vault-agent.
-- В backup НЕ попадает (rendered, восстанавливается из Vault + render-configs).
-- Permissions: vault-agent пишет `0400` для secrets, `0444` для configs/env. Не лезь руками.
+Новая переменная для сервиса — **две** правки:
+1. `${VAR}` в `compose/<svc>.yml` (`environment:`) или в `configs/<svc>/<file>.tpl`.
+2. Декларация в `.env.example` с комментарием как сгенерировать.
 
-### Vault KV path: CLI vs API (зачем `kv/data/...`)
-
-KV v2 — два view одного пути:
-
-| Где | Path |
-|---|---|
-| `vault kv put/get/patch` (CLI) | `kv/projects/<p>/<env>/<kind>` |
-| HTTP API + consul-template `secret` | `kv/data/projects/<p>/<env>/<kind>` |
-
-CLI прячет сегмент `data/`. API/template — нет. Если в `.tpl` написать `kv/projects/...` без `data/` — Vault вернёт 404, vault-agent залипнет в retry-loop'е.
-
-Ответ API оборачивает поля в `{ "data": { "data": { ... } } }`, поэтому двойной `.Data.data.<key>` в шаблонах.
-
-### vault-agent шаблоны
-
-`configs/vault-agent/templates/<svc>.{env,yml}.tpl` — **consul-template** (внутри vault-agent), не shell-envsubst:
-
-- `(env "PROJECT_NAME")`, `(env "ENV")` — переменные тянутся через template-function (vault-agent контейнерное окружение).
-- `kv/data/projects/...`, не `kv/projects/...`.
-- Имена полей в `.Data.data.<key>` точно совпадают с тем, что клали `vault kv put`. Поправка имени в Vault → правка `.tpl`.
-
-```
-{{ with secret (printf "kv/data/projects/%s/%s/db" (env "PROJECT_NAME") (env "ENV")) -}}
-PG_DSN=postgres://{{ .Data.data.user }}:{{ .Data.data.password }}@postgres:5432/{{ .Data.data.database }}
-{{- end }}
-```
-
-Каждый новый render-target требует **трёх** правок:
-1. Создать `<svc>.{env,yml}.tpl` в `configs/vault-agent/templates/`.
-2. Добавить `template {}` блок в соответствующий `configs/vault-agent/agent.hcl.parts/<profile>.hcl` (или `head.hcl` если always-on).
-3. Если consumer-сервис в новом profile — добавить `profiles: [<name>]` в `compose/<svc>.yml`.
-
-После — `make ship`. `scripts/deploy.sh` детектит изменения в `templates/` или `agent.hcl.parts/` + смену `COMPOSE_PROFILES` → restart vault-agent + force-recreate consumer'ов автоматически. Вручную:
-
-```bash
-make restart SVC=vault-agent
-make recreate SVC=<consumer>
-```
+После — `make ship`; на VPS оператор дописывает значение в `.env` (scaffold
+блока — skill `/request-secret`) и `make deploy`.
 
 ### Ротация
 
-Источник истины — Vault на корп-стороне:
+Источник истины — `.env` на VPS:
 
 ```bash
-# на корп-VPS (corp-infra-template)
-vault kv patch kv/projects/<p>/<env>/db password=<new>
+# на VPS
+$EDITOR .env          # заменить значение
+make deploy           # compose пересоздаст сервисы с изменённым environment
 ```
 
-Vault-agent на проектном VPS заметит изменение и перерендерит `.runtime/secrets/<svc>.env`. **Но consumer уже прочитал env_file при создании контейнера** — нужен force-recreate, не restart:
+`docker compose up` сравнивает интерполированный конфиг и пересоздаёт только
+затронутые сервисы. Точечно — `make recreate SVC=<svc>` (`restart` НЕ
+перечитывает environment — контейнер фиксирует env при CREATE).
 
-```bash
-make restart SVC=backend     # ❌ контейнер не пересоздан, env_file не перечитан
-make recreate SVC=backend    # ✅
-```
-
-`make ship` (без MSG, на чистом дереве) делает force-recreate автоматически когда видит смену `.tpl` / `parts/` / `COMPOSE_PROFILES` между deploy'ами.
-
-Не редактируй `.runtime/secrets/*.env` руками — vault-agent перетрёт.
+Смена `ACME_*` — рестарт traefik руками (`make restart SVC=traefik`): traefik
+читает static config только на старте, а контент bind-mount'а compose не
+отслеживает.
 
 ### Profile-based opt-in
 
-Минимальный стек (always-on) — traefik / vault-agent / crowdsec / node-exporter / cadvisor / landing. Поднимается на одном лишь `meta` seed'е от корпа при онбординге.
+Минимальный стек (always-on) — traefik / crowdsec / node-exporter / cadvisor /
+landing. Поднимается на identity + ACME из `.env`, других секретов не требует.
 
 Опциональные сервисы за `COMPOSE_PROFILES`:
 
-| Profile | Сервисы | Зависит от KV |
+| Profile | Сервисы | Требует в .env |
 |---|---|---|
-| `postgres` | postgres | db |
-| `storage` | minio, minio-init, backup | minio, backup, db (+ обязательно `postgres` профиль) |
-| `backend` | backend | db, oidc, jwt |
+| `postgres` | postgres | `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` |
+| `storage` | minio, minio-init, backup | `MINIO_*`, `APP_S3_*`, `BACKUP_S3_*`, `RESTIC_*`, `BACKUP_AWS_*` (+ обязательно `postgres` профиль) |
+| `backend` | backend | `OIDC_*`, `JWT_SECRET` (+ секция postgres) + `BACKEND_TAG` |
 
-Запрос seed'а — Claude skill `/request-secret` (`.claude/skills/request-secret/SKILL.md`). Печатает stdout-блок `vault kv put kv/projects/<p>/<env>/<name>` для корп-админа; имя — произвольный slug, не enum.
+Scaffold значений — Claude skill `/request-secret`
+(`.claude/skills/request-secret/SKILL.md`): печатает stdout-блок переменных
+с сгенерированными паролями — оператор дописывает его в `.env` на VPS.
 
 ## Что нельзя коммитить (cross-check)
 
 `git diff --cached` перед коммитом — убедись что нет:
 - `.env` или `.env.local` / `.env.production`
-- `.runtime/` любого уровня
-- `.onboard-creds` (legacy, не должен генериться, но safety-net в .gitignore)
+- `.onboard-creds` (safety-net в .gitignore)
 - `*.pem`, `*.key`
-- Inline-секретов в `compose/*.yml` (значения вида `password: actual_secret` — должно быть `${VAR}` или через vault-agent)
+- Inline-секретов в `compose/*.yml` (значения вида `password: actual_secret` —
+  должно быть `${VAR}` с декларацией в `.env.example`)
+- Rendered-файлов из `.tpl` (gitignored: `configs/traefik/traefik.yml`,
+  `configs/traefik/dynamic/middlewares.yml`)
 
 Hook `permissions.deny` страхует, но привычка проверять — золото.
 
 ## Чек перед коммитом
 
 - В `.env.example` нет реальных значений (только placeholder / пусто)?
-- Любой новый `${VAR}` в compose/configs — добавлен в `.env.example` (как declared / закомментированный, если Vault-managed) или в vault-agent template + соответствующий `agent.hcl.parts/<profile>.hcl`?
+- Любой новый `${VAR}` в compose/configs — добавлен в `.env.example`
+  (активный или закомментированный) с комментарием как сгенерировать?
 - `scripts/tools/validate.sh` зелёный (он ловит missing vars в `.env.example`)?

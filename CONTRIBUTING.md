@@ -8,7 +8,7 @@
 ## С чего начать
 
 - Прочитай `CLAUDE.md` (ядро + роутер) и `docs/reference/architecture.md` (как
-  устроен стек: сети, профили, edge, vault-agent).
+  устроен стек: сети, профили, edge).
 - Поднимать ничего не нужно: `make validate` гоняет синтаксис compose, yamllint,
   `.tpl` и покрытие `.env.example` без живой инфры. Git-хуки — `make setup`.
 
@@ -16,18 +16,17 @@
 
 - **Конфиг → код.** Любой сервис декларативен в `compose/*.yml` + `configs/`.
   Ничего «только на сервере, в репо нет» — это путь к drift'у.
-- **Максимум в Vault.** `.env` минимален (identity + AppRole-bootstrap). Image-теги,
-  ACME, restic endpoint, runtime-секреты — в `kv/projects/<p>/<env>/*`,
-  рендерятся vault-agent'ом. Секреты в `.env`/`configs/` не хранятся.
+- **Всё в .env.** Один gitignored-файл на VPS (identity, ACME, image-теги,
+  секреты профилей) — оператор заполняет и ротирует руками. Inline-секретов
+  в compose/`configs/` не бывает — только `${VAR}` с декларацией в `.env.example`.
 - **Никаких реальных секретов в репо.** Токены, пароли, ключи, IP, домены
   конкретного хостинга в коммит не попадают. Параметры — через `${VAR}` /
   `.env.example` с пустыми значениями и комментарием как сгенерировать.
 - **Pinned images.** Образы закреплены конкретной версией; `:latest` ловит
   `make validate`.
-- **Multi-env через KV-dimension.** Один шаблон, N VPS, у каждого свой `ENV` и
-  scope в Vault.
+- **Multi-env физически.** Один шаблон, N VPS, у каждого свой `ENV` и свой `.env`.
 - **Без вендор-лока.** Control-plane может быть managed (stit) или self-hosted —
-  меняется только хост Vault/registry в `.env` и KV, не зашит. Не вшивай
+  меняется только хост registry в `.env`, не зашит. Не вшивай
   зависимость от одного провайдера там, где это мешает self-host.
 - **Forward-only документация.** Текст описывает текущее состояние, без «было/стало» —
   история живёт в `git log`.
@@ -38,7 +37,7 @@
   поведение.
 - **PR** — форкни репозиторий, заведи ветку, открой pull request с понятным описанием
   «зачем». Держи PR сфокусированным; не подмешивай несвязанные правки.
-- Тронул corp-поверхность (`configs/vault-agent/`, compose-профили, `.env.example`,
+- Тронул corp-поверхность (compose-профили, `.env.example`,
   `ansible/`) — опиши это в PR отдельно (в проекте это оформляется CORP-HANDOFF-блоком
   корп-админу).
 
@@ -61,9 +60,8 @@ make validate    # compose syntax + yamllint + .tpl + .env coverage
 
 ## Что меняется осторожно
 
-`configs/vault-agent/**`, `compose/vault-agent.yml`, Traefik static-конфиг,
-`compose/backup.yml` / `containers/backup/` — security- и data-sensitive. Помечай
-такие правки отдельным коммитом, чтобы было видно в blame.
+Traefik static-конфиг, `compose/backup.yml` / `containers/backup/` — security- и
+data-sensitive. Помечай такие правки отдельным коммитом, чтобы было видно в blame.
 
 ## Стиль
 

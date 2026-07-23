@@ -59,7 +59,7 @@ make project-check
 |---|---|
 | A.1 — `COMPOSE_PROFILES` | `.env.example` содержит непустой `COMPOSE_PROFILES=...` строкой |
 | A.2 — прунинг compose | в `compose/` нет `<name>.yml` для профилей, которых нет в карте |
-| A.3 — прунинг vault-agent | в `configs/vault-agent/agent.hcl.parts/` и `templates/` нет «лишних» имён |
+| A.3 — прунинг env-секций | в `.env.example` нет секций профилей, которых нет в карте |
 | A.4 — идентичность | `CLAUDE.md` не содержит «Шаблон проектной инфры stit» / `README.md` не «шаблон проектной инфры» |
 | A.5 — scaffolding | `docs/getting-started.md` нет; `.claude/plans/roadmap.md` пуст |
 
@@ -121,21 +121,17 @@ make project-check
    `AskUserQuestion` опцию «исправить ссылку сначала» / «всё равно
    удалить» / «выход».
 
-### Каскад A.3 — прунинг vault-agent
+### Каскад A.3 — прунинг env-секций
 
 Пример:
 
 ```
-Удалю:
-- configs/vault-agent/agent.hcl.parts/storage.hcl
-- configs/vault-agent/templates/minio.env.tpl
-- configs/vault-agent/templates/backup.env.tpl
+Удалю секции .env.example:
+- profile storage (MINIO_*, *_S3_*, RESTIC_*, BACKUP_AWS_*)
 
 Ссылки в репо:
-- scripts/render-configs.sh — собирает agent.hcl из parts по имени
-  профиля из $COMPOSE_PROFILES. Профиля storage в наборе нет —
-  лишних включений не будет.
-- compose/minio.yml + compose/backup.yml — уже удалены в A.2.
+- compose/minio.yml + compose/backup.yml — уже удалены в A.2, их
+  ${VAR} в compose не осталось.
 - docs/ — упоминания общие, не блокируют.
 
 Подтверждаешь?
@@ -143,12 +139,12 @@ make project-check
 
 Проверки перед показом:
 
-1. `grep -r "<part-name>" scripts/ configs/ docs/ compose/`
+1. `grep -r "<VAR-name>" scripts/ configs/ docs/ compose/`
    — все хиты.
-2. Если template упомянут в существующем `compose/<name>.yml` через
-   `env_file: .runtime/secrets/<name>.env` — это **рассинхрон**:
-   `compose/<name>.yml` сохранился (профиль в карте есть), а template
-   удаляется (?). Через `AskUserQuestion` показать конфликт, остановить.
+2. Если `${VAR}` удаляемой секции упомянут в существующем
+   `compose/<name>.yml` — это **рассинхрон**: `compose/<name>.yml`
+   сохранился (профиль в карте есть), а его переменные удаляются (?).
+   Через `AskUserQuestion` показать конфликт, остановить.
 
 ### Каскад A.5 — strip scaffolding
 

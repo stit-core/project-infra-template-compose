@@ -1,6 +1,6 @@
 ---
 name: compose-and-services
-description: Инварианты compose-фрагментов — один сервис = один файл compose/<svc>.yml, pinned image (не :latest), обязательные restart/healthcheck/container_name/явные networks, depends_on vault-agent healthy для consumer'ов секретов, env_file фиксируется при CREATE (force-recreate на смену), internal-сеть + ports несовместимы. Грузится при правке compose/ или docker-compose.yml.
+description: Инварианты compose-фрагментов — один сервис = один файл compose/<svc>.yml, pinned image (не :latest), обязательные restart/healthcheck/container_name/явные networks, секреты через ${VAR}-интерполяцию environment из .env (декларация в .env.example), environment фиксируется при CREATE (recreate на ротацию), internal-сеть + ports несовместимы. Грузится при правке compose/ или docker-compose.yml.
 paths:
   - "compose/*.yml"
   - "docker-compose.yml"
@@ -18,8 +18,8 @@ paths:
 
 | Сеть | external | internal | Кто |
 |---|---|---|---|
-| `proxy` | — | нет | Traefik + публичные сервисы (backend) + outbound (vault-agent → vault.stit.tech) |
-| `backend-net` | — | да | postgres, backend, vault-agent (для bind-mount consumer'ов на одном хосте сеть формальна, но держим internal=true) |
+| `proxy` | — | нет | Traefik + публичные сервисы (backend) + outbound (backup → внешний S3) |
+| `backend-net` | — | да | postgres, backend, cadvisor, node-exporter |
 
 Если новый сервис нужен только внутрь — `backend-net`. Если публичный — `proxy + backend-net` (backend-net чтобы видеть БД), не складывай только в `proxy`.
 
@@ -37,19 +37,20 @@ paths:
 - `read_only: true` + `tmpfs: ["/tmp"]` для всего что не пишет в `/data`.
 - `depends_on` с `condition: service_healthy`.
 
-## Зависимость от vault-agent
+## Секреты сервиса
 
-**Любой сервис, читающий runtime-секреты** через `env_file: .runtime/secrets/<svc>.env`, обязан иметь:
+**Любой сервис с runtime-секретами** получает их через `${VAR}`-интерполяцию
+в `environment:` (значения — из `.env` на VPS):
 
 ```yaml
-depends_on:
-  vault-agent:
-    condition: service_healthy
+environment:
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
 ```
 
-Vault-agent healthy = `.runtime/configs/vault-health.sh` зелёный = **все** expected output'ы под активный `COMPOSE_PROFILES` непусты (`test -s`; `.runtime/secrets/.ready` — лишь liveness-marker, рендерится статически, healthcheck им не гейтит). Без `depends_on: service_healthy` consumer стартует с пустым `env_file` и падает.
-
-**Редеплой со сменой значения** (ротация креды): `scripts/deploy.sh` обнуляет старые `.runtime/secrets/*.env` **перед** `restart vault-agent`. Иначе `test -s` прошёл бы мгновенно по непустым файлам с прошлого деплоя, `up --wait` рапортовал бы healthy до свежего рендера, и `--force-recreate` зафиксировал бы в consumer'е старый env (падение на новых кредах).
+Каждый `${VAR}` обязан быть задекларирован в `.env.example` (активный или
+закомментированный) с комментарием как сгенерировать — `make validate` ловит
+пропуски. Inline-значений секретов в compose не бывает. См.
+`.claude/rules/secrets-and-env.md`.
 
 ## `internal: true` сеть и `ports:` несовместимы
 
@@ -74,13 +75,15 @@ networks:
 
 Backend в шаблоне идёт через traefik (labels), не через `ports:` — там это не блокер. Когда DNS не поднят и сервис временно торчит портом — обязательно proxy.
 
-## env_file читается при container CREATE, не start
+## environment фиксируется при container CREATE, не start
 
-Docker фиксирует содержимое `env_file:` в container config в момент **создания** контейнера, не запуска. Это две практические импликации:
-
-1. **На свежем bootstrap'е** vault-agent ещё не отрендерил `.runtime/secrets/*.env`, а compose уже валидирует **существование** этих путей до старта любого сервиса. Решение — `scripts/deploy.sh` делает `touch` пустых файлов перед `compose up`.
-
-2. **После изменения vault-template** (добавил поле, переименовал переменную) недостаточно сделать `make restart SVC=<consumer>` — контейнер уже создан со старым ENV. Нужен `make recreate SVC=<consumer>`. `scripts/deploy.sh` делает это автоматически когда видит изменения в `configs/vault-agent/templates/*.tpl` или `configs/vault-agent/agent.hcl.parts/*.hcl` между prev/new sha, а также на смену активного `COMPOSE_PROFILES` (хранит набор в `.runtime/.profiles-prev`).
+Docker фиксирует environment в container config в момент **создания** контейнера,
+не запуска. После смены значения в `.env` недостаточно `make restart SVC=` —
+контейнер создан со старым ENV. `make deploy` (финальный `compose up -d`)
+сравнивает интерполированный конфиг и пересоздаёт затронутые сервисы сам;
+точечно — `make recreate SVC=<svc>`. Bind-mounted конфиги compose так НЕ
+отслеживает — сервисы с изменёнными `configs/<dir>/` рестартует `deploy.sh`
+по git-diff'у (traefik/crowdsec/postgres).
 
 ## Traefik labels
 
@@ -113,4 +116,4 @@ Backup-контейнер (`containers/backup/`) бэкапит **только**
 **Никогда не меняй image-тег без явного OK.**
 
 - **Инфра-образы** (traefik/postgres/minio/...) закреплены литеральной версией в `compose/<svc>.yml`. Bump = отдельный коммит `chore(<svc>): bump <name> to <version>` с release-notes в теле.
-- **Бампаемые app-образы** (backend и любые будущие) параметризуются `${<SVC>_TAG}` — тег живёт **строго в `.env`** на VPS, не в Vault. Bump = `make bump SVC=<svc> TAG=<tag>` (правит `.env` + force-recreate; compose сам пуллит отсутствующий образ). Rollback — тот же верб со старым тегом.
+- **Бампаемые app-образы** (backend и любые будущие) параметризуются `${<SVC>_TAG}` — тег живёт **строго в `.env`** на VPS. Bump = `make bump SVC=<svc> TAG=<tag>` (правит `.env` + force-recreate; compose сам пуллит отсутствующий образ). Rollback — тот же верб со старым тегом.

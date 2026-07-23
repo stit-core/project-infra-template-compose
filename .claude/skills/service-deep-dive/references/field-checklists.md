@@ -109,49 +109,44 @@ Identity / Secrets / Route / Generates. По разделу на каждую с
 
 **Что фиксируем**:
 
-- Какой Vault KV нужен: `kv/projects/<p>/<env>/<kind>` — `kind` ∈
-  {`db`, `minio`, `backup`, `jwt`, `oidc`, project-specific}.
-- Поля KV (`user`/`password`/`database` для db; `root_user`/
-  `root_password`/`access_key`/`secret_key` для minio; project-specific
-  для backend).
-- Какой vault-agent template рендерит env-файл — обычно
-  `configs/vault-agent/templates/<svc>.env.tpl` (имя по consumer-сервису:
-  `db`/`oidc`/`jwt` для backend рендерит `backend.env.tpl`) → итог
-  `.runtime/secrets/<svc>.env`, подключается `env_file:`.
+- Какие `${VAR}` нужны сервису: секция `.env.example` ∈
+  {`postgres`, `storage`, `backend`, project-specific}.
+- Имена переменных (`POSTGRES_USER`/`POSTGRES_PASSWORD`/`POSTGRES_DB`
+  для db; `MINIO_ROOT_*`/`*_S3_*` для minio; project-specific для
+  backend) + комментарий как сгенерировать / откуда взять.
+- Как сервис их получает — `${VAR}`-интерполяция в `environment:`
+  compose-фрагмента (значения — из `.env` на VPS).
 - Если секретов нет — `N/A` явной строкой.
 
 **Опции опрашиваются как**:
 
-- KV-kind: enum существующих + «нужен новый» (Other → /request-secret
-  next-step).
-- Поля: Other (свободный список — архитектор называет).
-- Template: 2 опции «существующий `<svc>.env.tpl`» / «нужен новый»
-  (Other → cross-repo next-step).
+- Секция: enum существующих + «нужны новые `${VAR}`» (Other →
+  /request-secret next-step).
+- Имена переменных: Other (свободный список — архитектор называет).
 
 **Что НЕ**:
 
-- Хранить секрет в `.env` или `configs/` — всё через vault-agent.
-- Прямое чтение `$VAULT_TOKEN` или `/run/secrets/` из приложения —
-  anti-pattern (только env_file через vault-agent).
-- KV-путь без `<p>/<env>` префикса — корп-AppRole не пропустит.
+- Inline-значение секрета в compose/`configs/` — только `${VAR}`
+  с декларацией в `.env.example`.
+- Прямое чтение `/run/secrets/` из приложения — anti-pattern
+  (только environment через compose-интерполяцию).
 - Хардкодить креды в образ — никогда.
 
 **Тест-критерий**:
 
-- ✅ «`kv/projects/acme/dev/db` поля `user/password/database`,
-  template `backend.env.tpl` → `.runtime/secrets/backend.env`, backend
-  через `env_file:`».
+- ✅ «`POSTGRES_USER`/`POSTGRES_PASSWORD`/`POSTGRES_DB` в `.env`
+  (секция profile postgres), backend получает `PG_DSN` интерполяцией
+  в `environment:`».
 - ✅ «`N/A` — сервис не читает секретов».
-- ❌ «postgres-пароль в `.env` напрямую» — не через vault.
-- ❌ «KV `kv/db` без env-префикса».
+- ❌ «postgres-пароль захардкожен в compose» — только `${VAR}`.
+- ❌ «`${VAR}` без декларации в `.env.example`».
 
 **Порядок копания**:
 
 1. Есть ли вообще секреты? (если нет — `N/A`, секция готова).
-2. KV-kind (enum + Other).
-3. Поля (Other).
-4. Template (enum + Other).
-5. Anti-patterns: «через vault-agent?» / «env-префикс есть?».
+2. Секция/набор (enum + Other).
+3. Имена переменных (Other).
+4. Anti-patterns: «${VAR} задекларирован?» / «нет inline-значений?».
 
 ---
 
@@ -207,13 +202,12 @@ Identity / Secrets / Route / Generates. По разделу на каждую с
 
 - `COMPOSE_PROFILES += <profile>` (или «always-on» для landing/infra).
 - `compose/<name>.yml` — keep (при `hosting: here`).
-- `configs/vault-agent/agent.hcl.parts/<part>.hcl` — keep (если секреты).
-- `configs/vault-agent/templates/<kind>.env.tpl` — keep (если секреты).
+- Секция переменных сервиса в `.env.example` — keep (если секреты).
 - traefik labels или dynamic route (если public).
 - Для `hosting: external` — cross-repo next-step («форкни `<repo>`,
   выставь tag в `.env` через `make bump SVC=<svc> TAG=…`»).
 
-**Опции опрашиваются как** — обычно Other (имена parts/templates —
+**Опции опрашиваются как** — обычно Other (имена переменных/файлов —
 архитектор называет по реальным файлам), enum только для да/нет «нужен
 этот pull-up».
 
@@ -222,13 +216,13 @@ Identity / Secrets / Route / Generates. По разделу на каждую с
 - Пустой `Generates` — движку `/de-template` не из чего разворачивать.
 - Дублировать полный `COMPOSE_PROFILES` — здесь только `+=` для **этого**
   сервиса.
-- Описывать always-on сервисы (traefik/crowdsec/vault-agent/...) — они
+- Описывать always-on сервисы (traefik/crowdsec/...) — они
   фундамент шаблона, не из service-doc.
 
 **Тест-критерий**:
 
 - ✅ «`COMPOSE_PROFILES += postgres`; `compose/postgres.yml` keep;
-  `agent.hcl.parts/postgres.hcl` + `templates/postgres.env.tpl` keep».
+  секция `profile postgres` в `.env.example` keep».
 - ✅ «`COMPOSE_PROFILES` — нет (always-on landing); `compose/landing.yml`
   keep; traefik labels для `${DOMAIN}`».
 - ✅ «external; cross-repo next-step: форкни `<org>/frontend`,
@@ -240,7 +234,7 @@ Identity / Secrets / Route / Generates. По разделу на каждую с
 
 1. Какой профиль `+=` (или always-on)?
 2. Compose-фрагмент keep?
-3. Vault-agent parts/templates keep (если есть Secrets)?
+3. Секция переменных в `.env.example` keep (если есть Secrets)?
 4. Traefik labels / dynamic route (если public)?
 5. Для external — cross-repo next-step текстом.
 
@@ -254,7 +248,7 @@ Identity / Secrets / Route / Generates. По разделу на каждую с
 |---|---|---|
 | `:latest` тег | Identity | «образ pinned (semver/sha) — или `:latest`?» |
 | Public без middleware | Route | «`crowdsec@file` есть?» |
-| Секрет в `.env` напрямую | Secrets | «всё через vault-agent?» |
+| Inline-значение секрета в compose | Secrets | «только `${VAR}` из `.env`?» |
 | service-doc для `external` | frontmatter + Hosting | «`hosting: external` → файл вообще должен быть?» (нет → каскад) |
 | Пустой `Generates` | Generates | «что родит de-template?» |
 | Сабдомен не в `stack § Domains` | Route | «допилить stack — или это уже в нём?» |

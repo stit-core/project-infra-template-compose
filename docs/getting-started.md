@@ -5,14 +5,14 @@
 
 Принцип: **поднимите платформу скриптами, спроектируйте проект скиллами — не правьте фундамент
 руками.** Multi-env: один проект имеет N сред (`dev`, `prod`, ...) — **N отдельных VPS**, по
-одному на `ENV`. Шаги 1–8 проходите на каждый VPS отдельно (корп-онбординг env'ов —
+одному на `ENV`. Шаги 1–8 проходите на каждый VPS отдельно (корп-handoff —
 один раз, шаг 1).
 
-**Два пути control-plane.** Корп control-plane (Vault, registry) — это либо **managed**
-stit (`*.stit.tech`; корп-онбординг на шаге 1 делает stit), либо **self-hosted** — ваш форк
+**Два пути control-plane.** Корп control-plane (registry) — это либо **managed**
+stit (`git.stit.tech`; корп-шаги на шаге 1 делает stit), либо **self-hosted** — ваш форк
 `corp-infra-template` на своём VPS (корп-шаги делаете вы на нём). Куда смотрит проектная VPS,
-задаётся в `.env` через `VAULT_ADDR` / `REGISTRY_HOST`
-(managed-дефолты в `.env.example`). Вендор-лока нет — архитектура та же, меняется только хост.
+задаётся в `.env` через `REGISTRY_HOST`
+(managed-дефолт в `.env.example`). Вендор-лока нет — архитектура та же, меняется только хост.
 
 **Где вы работаете.** Репо живёт на **рабочей станции оператора** — здесь authoring / validate /
 plan / ship. Живого стека локально нет: приложения и контейнеры крутятся на удалённом VPS (один
@@ -26,8 +26,8 @@ fallback `ansible/inventory.ini`).
 - Куплены VPS (Debian 12 / Ubuntu 24.04, 2–4 GB RAM, 40+ GB disk) — по одному на env.
 - Для каждого env опубликован домен с A-записью на IP соответствующего VPS (LE HTTP-01).
   Convention — `<env>.<domain>` или `<env>-<domain>`, но это вне шаблона.
-- Доступ к корп control-plane: на managed — выданный stit; на self-hosted — Vault root token
-  и Gitea admin вашего форка `corp-infra-template`.
+- Доступ к корп control-plane: на managed — выданный stit; на self-hosted —
+  Gitea admin вашего форка `corp-infra-template`.
 - Локально: ansible 2.15+, git, ssh.
 
 ## 0. Форк
@@ -39,32 +39,19 @@ fallback `ansible/inventory.ini`).
 
 На self-hosted замените `git.stit.tech` на git вашего control-plane (`REGISTRY_HOST`).
 
-## 1. Day-0 — корп-онбординг проекта (один раз на все env)
+## 1. Day-0 — корп-handoff (один раз на все env)
 
-На корп control-plane, оператор с Vault root-токеном. **Managed:** этот шаг выполняет stit по
-вашему запросу. **Self-hosted:** выполняете вы на своём форке `corp-infra-template`:
+Корп-стороне нужно от проекта две вещи (**managed:** делает stit по запросу;
+**self-hosted:** делаете вы на своём форке `corp-infra-template`):
 
-```bash
-ssh root@<corp-host> 'cd /opt/corp-infra && \
-  VAULT_TOKEN=<root> bash scripts/onboard-project.sh --name acme --envs dev,prod'
-```
+- **Registry-доступ** к `git.stit.tech` — pull для VPS + push для разработчика
+  backend-форка (Gitea-аккаунт/PAT).
+- **CrowdSec-whitelist** egress-IP каждой проектной VPS — иначе служебный трафик
+  к корп-сервисам режется 403 (`configs/crowdsec/whitelists.yaml` corp-side +
+  restart crowdsec).
 
-Создаёт per-env:
-- AppRole `projects-acme-<env>` (flat — Vault не принимает слеши в `auth/approle/role/<name>`) +
-  policy read-only на `kv/data/projects/acme/<env>/*` и `kv/metadata/projects/acme/<env>/*`.
-- `kv/projects/acme/<env>/meta` — дефолты (`acme_email`, `acme_caserver`; image-тегов в `meta` нет — они живут в `.env`, см. `make bump`).
-
-Возвращает по блоку на env — **сохраните**, нужно в шаге 4:
-```
-=== acme / dev ===
-PROJECT_NAME=acme
-ENV=dev
-VAULT_ROLE_ID=<id>
-VAULT_SECRET_ID=<id>
-```
-
-Доп. KV (`db`/`oidc`/`jwt`/`minio`/`backup`/project-specific) на этом шаге НЕ создаются —
-запросите по мере активации сервисов (шаг 6). Подробности контракта — `.claude/rules/multi-env.md`.
+Секреты проекта корп не выдаёт — они целиком в `.env` на VPS (шаги 4 и 6).
+Подробности контракта — `.claude/rules/multi-env.md`.
 
 ## 2. Day-1 — bootstrap чистого VPS
 
@@ -106,15 +93,14 @@ ssh root@<vps> 'docker login git.stit.tech -u <user> -p <PAT>'
 ```bash
 ssh root@<vps>
 cd /opt/<project>-infra
-PROJECT_NAME=acme ENV=prod DOMAIN=acme.com \
-VAULT_ROLE_ID=<id> VAULT_SECRET_ID=<id> \
+PROJECT_NAME=acme ENV=prod DOMAIN=acme.com ACME_EMAIL=ops@acme.com \
 make new-env
 ```
 
-Создаёт `.env` (chmod 600) с переменными identity+auth. Всё остальное — в Vault
-(засеивается по необходимости, шаг 6). `CROWDSEC_BOUNCER_API_KEY` заполняется автоматически на
-первом деплое. На self-hosted допишите в `.env` адреса своего control-plane (`VAULT_ADDR` /
-`REGISTRY_HOST` — см. `.env.example`). Строка
+Создаёт `.env` (chmod 600) — identity + ACME. Секреты профилей дописываются по
+необходимости (шаг 6). `CROWDSEC_BOUNCER_API_KEY` заполняется автоматически на
+первом деплое. На self-hosted допишите в `.env` адрес своего registry
+(`REGISTRY_HOST` — см. `.env.example`). Строка
 `# COMPOSE_PROFILES=` закомментирована — раскомментируете по мере активации сервисов.
 
 ## 5. Первый деплой — минимальный стек
@@ -126,34 +112,29 @@ make ship          # commit + check + push + (на main) ssh-deploy
 ```
 
 Или на VPS с пошаговым stdout: `make deploy`. Что произойдёт:
-1. `render-configs.sh` собирает `agent.hcl` из `agent.hcl.parts/` под активный
-   `COMPOSE_PROFILES` (на старте — пусто, только always-on) + envsubst для middlewares/landing.
-2. vault-agent логинится по AppRole, рендерит `.runtime/{env,secrets,configs}/*` из
-   `kv/projects/<p>/<env>/meta`.
-3. Always-on (traefik / crowdsec / node-exporter / cadvisor / landing) стартуют
-   после vault-agent healthy.
-4. Traefik запрашивает LE-cert на `${DOMAIN}` (landing).
-5. CrowdSec bouncer auto-register на первом подъёме — заполняет `CROWDSEC_BOUNCER_API_KEY`.
+1. `render-configs.sh` — envsubst для traefik.yml / middlewares / landing из `.env`.
+2. Always-on (traefik / crowdsec / node-exporter / cadvisor / landing) стартуют.
+3. Traefik запрашивает LE-cert на `${DOMAIN}` (landing).
+4. CrowdSec bouncer auto-register на первом подъёме — заполняет `CROWDSEC_BOUNCER_API_KEY`.
 
 Проверка: `make ps` (все healthy), `curl -fsS https://${DOMAIN}/` (landing через traefik+LE).
 
 ## 6. Активация дополнительных профилей
 
-По мере того как нужны postgres / storage / backend — запрашиваете seed и активируете profile.
+По мере того как нужны postgres / storage / backend — заполняете секреты и активируете profile.
 
-1. Skill `/request-secret` — спросит NAME (любой slug: `db`, `minio`, `backup`, `oidc`, `jwt`,
-   `stripe-key`, ...), поля + значения; сгенерит случайные где нужно (`openssl rand`). Печатает
-   `vault kv put kv/projects/<p>/<env>/<name> ...` для копи-паста. Отдайте корп-админу — он выполнит.
-2. После seed'а на VPS отредактируйте `.env`:
+1. Skill `/request-secret` — определит набор переменных профиля (контракт —
+   `.env.example`), сгенерит случайные значения где нужно (`openssl rand`).
+   Печатает блок `VAR=value` — допишите его в `.env` на VPS.
+2. Там же в `.env` отредактируйте:
    ```
    COMPOSE_PROFILES=postgres,storage,backend
    ```
    (`storage` обязательно с `postgres` — backup делает pg_dumpall; deploy.sh валидирует.)
-3. `make ship` (без MSG, чистое дерево → push + deploy). При смене `COMPOSE_PROFILES` deploy.sh
-   rerender'ит `agent.hcl` с новыми template-блоками, restart'ит vault-agent, force-recreate
-   consumer'ов (env_file читается только при container CREATE).
+3. `make ship` (без MSG, чистое дерево → push + deploy). Compose сам пересоздаёт
+   сервисы, чей environment изменился.
 
-Какой профиль от каких KV зависит — `.claude/rules/multi-env.md § Profile-based opt-in`.
+Какой профиль какие переменные требует — `.claude/rules/multi-env.md § Profile-based opt-in`.
 
 ## 7. `/init-project` — спроектировать инфру под продукт
 
@@ -169,9 +150,9 @@ Skill-оркестратор `/init-project` ведёт онбординг ин�
 ## 8. `/de-template` — своя инфра
 
 `/de-template` читает stable-артефакты `docs/project/`, мутирует репо in-repo: прунит
-неиспользуемые `compose/*.yml` + `vault-agent/agent.hcl.parts`/`templates`, ставит
+неиспользуемые `compose/*.yml` + секции `.env.example`, ставит
 `COMPOSE_PROFILES`, кастомит `CLAUDE.md`/README под идентичность проекта, срезает scaffolding.
-Cross-repo (форки backend/frontend, seed секретов) — печатает next-steps, не выполняет.
+Cross-repo (форки backend/frontend, заполнение `.env` на VPS) — печатает next-steps, не выполняет.
 
 ## Готово
 

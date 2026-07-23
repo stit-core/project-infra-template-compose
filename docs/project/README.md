@@ -66,7 +66,7 @@ status: draft
 Пустых таблиц быть не должно.
 
 Каждый `service` и `stack` несёт секцию **Generates** — контракт для `de-template`: что из артефакта
-родится/изменится в инфре (профиль, vault-agent part/template, traefik route, edge-конфиг). Маппинг
+родится/изменится в инфре (профиль, секция `.env.example`, traefik route, edge-конфиг). Маппинг
 живёт рядом с источником, не отдельным файлом.
 
 ## Generates → инфра (что выводит de-template)
@@ -81,7 +81,7 @@ status: draft
 | `frontend` (`hosting: here`) | — (always-on `landing`) | `compose/landing.yml` |
 | `frontend`/`backend` (`hosting: external`) | — | cross-repo next-step |
 
-Always-on edge/host-метрики (`traefik`/`crowdsec`/`vault-agent`/`node-exporter`/
+Always-on edge/host-метрики (`traefik`/`crowdsec`/`node-exporter`/
 `cadvisor`) — фиксированный фундамент шаблона, не описывается service-doc'ами. `stack § Generates`
 несёт только cross-cutting: traefik dynamic routes, `DOMAIN`, crowdsec source-IP next-step.
 

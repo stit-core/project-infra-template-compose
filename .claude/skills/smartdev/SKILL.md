@@ -78,13 +78,13 @@ Split и `.env.local` — rules `make-first`/`env-local`. `make doctor` без `
 | Задача = нужны креды/seed для сервиса | → skill `request-secret` |
 | Задача = restore / потеря данных / host crashed | → skill `dr-restore` |
 | Задача = новый VPS / клиент / первый запуск | → skill `bootstrap-vps` |
-| Задача крупная (>5 шагов / security-sensitive / >2 сервиса / vault-agent config) | → skill `plan` |
+| Задача крупная (>5 шагов / security-sensitive / >2 сервиса / env-контракт) | → skill `plan` |
 | Задача мелкая (<5 шагов, без неочевидностей) | делай сразу, RED→GREEN |
 | Задачи нет, working tree чистый, план none | спроси юзера: какую задачу решаем |
 
-Security-sensitive (план + явный OK обязательны до правки): `configs/vault-agent/`
-(`agent.hcl.parts/`, `templates/` — вкл. `traefik.yml.tpl`, static-конфиг Traefik рендерится
-из него в `.runtime/configs/traefik.yml`; правка → рестарт Traefik = downtime),
+Security-sensitive (план + явный OK обязательны до правки): `.env.example`-контракт,
+`configs/traefik/traefik.yml.tpl` (static-конфиг Traefik рендерится из него в
+`configs/traefik/traefik.yml`; правка → рестарт Traefik = downtime),
 `containers/backup/` + `compose/backup.yml` (риск потери restore-points).
 
 ## 4. Дефолтная петля — RED→GREEN
@@ -93,7 +93,7 @@ Security-sensitive (план + явный OK обязательны до пра�
 
 1. Правишь.
 2. `make validate` (синтаксис/tpl/.env-coverage) — зелёный.
-3. `make doctor` если задело live-поверхность (.env/.runtime/vault-agent) — зелёный или осознанный WARN.
+3. `make doctor` если задело live-поверхность (.env/rendered configs) — зелёный или осознанный WARN.
 4. `== Infra-touch ==` стал ≠ none → `corp-handoff` ДО claim «готово».
 5. Коммит (Conventional Commits). Деплой — `make ship MSG="..."` (см. ниже), только когда юзер этого хочет.
 
@@ -121,11 +121,10 @@ make ship MSG="feat(foo): bar"
 
 1. `git pull --ff-only origin main` — fail если remote разошлась.
 2. `scripts/render-configs.sh` — envsubst для `.tpl` + сборка `agent.hcl`.
-3. preflight DNS + Vault — только warnings.
-4. **vault-agent first** — рендерит `.runtime/secrets/*.env` ДО старта consumer'ов (`env_file` фиксируется при CREATE).
-5. **crowdsec early** — bouncer auto-register если `CROWDSEC_BOUNCER_API_KEY=` пуст.
-6. `docker compose up -d --remove-orphans --wait --wait-timeout 180`.
-7. Diff `prev_sha..new_sha`: `configs/vault-agent/**` → force-recreate consumer'ов; `configs/{traefik,crowdsec,postgres}/**` → restart их.
+3. preflight DNS — только warnings.
+4. **crowdsec early** — bouncer auto-register если `CROWDSEC_BOUNCER_API_KEY=` пуст.
+5. `docker compose up -d --remove-orphans --wait --wait-timeout 180` (смена .env-значений → compose пересоздаёт сам).
+6. Diff `prev_sha..new_sha`: `configs/{traefik,crowdsec,postgres}/**` → restart их.
 
 ### Hot-fix прямо на VPS
 
@@ -133,7 +132,7 @@ make ship MSG="feat(foo): bar"
 git-репо. Следующий `make ship`/`make deploy` сделает `git pull --ff-only` и
 **затрёт правки**. Hot-fix = обязательный backport в git в тот же день. Если
 оператор упомянул правку на хосте — флажь `⚠ on-server drift, нужен backport`
-(в `triage`). Исключение — gitignored (`.env`, `.runtime/`) правятся на VPS легально.
+(в `triage`). Исключение — gitignored (`.env`, rendered-конфиги) правятся на VPS легально.
 
 Debug на VPS: `ssh root@<vps> 'cd /opt/<p>-infra && make deploy'` (пошаговый stdout
 вместо `--wait`-таймаутов через SSH).

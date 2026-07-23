@@ -40,12 +40,11 @@ certificatesResolvers:
     acme:
       # email + caServer обязаны быть в файле (не CLI): traefik 3.6 при наличии
       # acme-блока в static yaml игнорирует --certificatesresolvers.*.acme.* флаги.
-      # Значения приходят из kv/projects/<p>/<env>/meta — vault-agent рендерит
-      # этот файл в .runtime/configs/traefik.yml, traefik читает через bind-mount.
-{{ with secret (printf "kv/data/projects/%s/%s/meta" (env "PROJECT_NAME") (env "ENV")) }}
-      email: {{ .Data.data.acme_email }}
-      caServer: {{ .Data.data.acme_caserver }}
-{{ end }}
+      # Значения приходят из .env (ACME_EMAIL / ACME_CASERVER) — render-configs.sh
+      # рендерит этот файл envsubst'ом в configs/traefik/traefik.yml (gitignored),
+      # traefik читает его через bind-mount.
+      email: ${ACME_EMAIL}
+      caServer: ${ACME_CASERVER}
       storage: /letsencrypt/acme.json
       httpChallenge:
         entryPoint: web

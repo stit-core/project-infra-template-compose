@@ -3,8 +3,8 @@
 # Запускается supercronic'ом по расписанию (см. /etc/crontab) или вручную:
 #   docker exec backup /usr/local/bin/backup-now
 #
-# Все настройки приходят через env_file (.runtime/secrets/backup.env),
-# vault-agent рендерит из Vault. Список переменных см. backup.env.tpl.
+# Все настройки приходят через environment контейнера (интерполяция из .env,
+# см. compose/backup.yml + .env.example § profile storage).
 set -eu
 
 : "${POSTGRES_HOST:=postgres}"

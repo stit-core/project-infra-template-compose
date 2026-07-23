@@ -1,16 +1,14 @@
 #!/usr/bin/env bash
 # Bootstrap .env на свежем проектном VPS.
 #
-# Multi-env: на каждом VPS свой ENV (dev/prod/...) и свой AppRole.
-# .env минимален: identity (PROJECT_NAME, ENV, DOMAIN) + AppRole-bootstrap
-# + image-теги (<SVC>_TAG — бампаются строго через .env, `make bump`).
-# Всё остальное (acme email/caServer, restic endpoint, runtime секреты)
-# живёт в Vault — корп-сторона засеивает при онбординге (meta)
-# и по запросу через skill `/request-secret` (печатает блок vault kv put).
+# Multi-env: на каждом VPS свой ENV (dev/prod/...) и свой .env.
+# Стартовый .env — identity (PROJECT_NAME, ENV, DOMAIN) + ACME. Секреты
+# профилей (postgres/storage/backend) оператор дописывает руками по мере
+# активации — контракт и комментарии как сгенерировать в .env.example,
+# scaffold блока значений — skill `/request-secret`.
 #
 # Non-interactive:
-#   PROJECT_NAME=acme ENV=prod DOMAIN=acme.com \
-#   VAULT_ROLE_ID=... VAULT_SECRET_ID=... \
+#   PROJECT_NAME=acme ENV=prod DOMAIN=acme.com ACME_EMAIL=ops@acme.com \
 #   bash scripts/new-env.sh
 #
 # Interactive: bash scripts/new-env.sh
@@ -41,32 +39,32 @@ if [ -f .env ]; then
 else
   echo "=== Project identity ==="
   prompt PROJECT_NAME "PROJECT_NAME (lowercase, e.g. acme)"
-  prompt ENV          "ENV (dev/prod/...; должен совпадать с env'ом в kv/projects/<p>/_meta)"
+  prompt ENV          "ENV (dev/prod/...)"
   prompt DOMAIN       "DOMAIN (e.g. acme.com)"
 
   echo
-  echo "=== Vault AppRole (из вывода корп onboard-project --envs ...) ==="
-  prompt VAULT_ROLE_ID   "VAULT_ROLE_ID"
-  prompt VAULT_SECRET_ID "VAULT_SECRET_ID"
+  echo "=== ACME (Let's Encrypt) ==="
+  prompt ACME_EMAIL   "ACME_EMAIL (получает LE expiry-нотификации)"
 
   cat > .env <<EOF
 # Сгенерировано scripts/new-env.sh. См. .env.example для контракта.
-# Vault-managed конфиг (acme email/caServer, restic endpoint) и
-# runtime-секреты — в kv/projects/$PROJECT_NAME/$ENV/*.
-# Image-теги — строго здесь (<SVC>_TAG, бамп через \`make bump\`), не в Vault.
+# Единственный источник конфига и секретов стека — этот файл (chmod 600,
+# gitignored). Секреты профилей дописывай руками по мере активации
+# (комментарии как сгенерировать — в .env.example; scaffold — /request-secret).
+# Image-теги — строго здесь (<SVC>_TAG, бамп через \`make bump\`).
 
 PROJECT_NAME=$PROJECT_NAME
 ENV=$ENV
 DOMAIN=$DOMAIN
 
-VAULT_ROLE_ID=$VAULT_ROLE_ID
-VAULT_SECRET_ID=$VAULT_SECRET_ID
+ACME_EMAIL=$ACME_EMAIL
+ACME_CASERVER=https://acme-v02.api.letsencrypt.org/directory
 
-# Profile-based opt-in. По мере того, как корп засеивает соответствующие
-# kv/projects/$PROJECT_NAME/$ENV/<kind>, добавляй сюда profile (через запятую):
-#   postgres  — нужен kv/.../db
-#   storage   — нужен kv/.../minio + kv/.../backup (+ postgres профиль)
-#   backend   — нужен kv/.../{db,oidc,jwt} + BACKEND_TAG ниже
+# Profile-based opt-in. Перед включением профиля заполни его секцию секретов
+# (контракт — .env.example):
+#   postgres  — POSTGRES_USER / POSTGRES_PASSWORD / POSTGRES_DB
+#   storage   — MINIO_* + APP_S3_* + BACKUP_S3_* + RESTIC_* + BACKUP_AWS_* (+ postgres профиль)
+#   backend   — OIDC_* + JWT_SECRET (+ секция postgres) + BACKEND_TAG ниже
 # COMPOSE_PROFILES=
 
 # Image-тег backend; раскомментировать вместе с профилем backend.
@@ -82,18 +80,16 @@ fi
 cat <<EOF
 
 ================================================================================
-Минимальный стек (traefik + vault-agent + crowdsec + node-exporter
-+ cadvisor + landing) поднимется как только корп засеит kv/projects/$PROJECT_NAME/$ENV/meta.
-Это происходит при \`onboard-project --envs $ENV\` на корп-стороне.
+Минимальный стек (traefik + crowdsec + node-exporter + cadvisor + landing)
+готов к подъёму — секретов сверх ACME ему не нужно.
 
 Запусти:
   make ship      # с workstation; либо \`make deploy\` напрямую на VPS
 
-По мере необходимости — запрашивай seed'ы вторичных секретов через Claude:
+По мере необходимости — добавляй секреты профилей через Claude:
   /request-secret               # skill в .claude/skills/request-secret/
 
-Claude сформирует блок \`vault kv put kv/projects/$PROJECT_NAME/$ENV/<name>\`
-с правильными значениями (генерит пароли где надо) — отдай корп-админу.
-После seed'а — обнови COMPOSE_PROFILES в .env и \`make ship\`.
+Claude сформирует блок переменных для .env (генерит пароли где надо) —
+допиши его в .env на VPS, обнови COMPOSE_PROFILES и \`make ship\`.
 ================================================================================
 EOF

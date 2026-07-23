@@ -24,8 +24,8 @@ Code reviewer со свежим контекстом. Вызывают чтоб�
 
 ## Severity
 
-- **critical** — блокеры. Утечка секретов в repo (`.env`, `.runtime/`, inline в compose), ломаное TLS, отсутствие healthcheck у нового сервиса с `depends_on: service_healthy`-зависимыми, прямой `image: latest`, публичный endpoint без `crowdsec@file` middleware, секрет читается напрямую из `.env` мимо vault-agent. Без фикса не пускать в main.
-- **important** — серьёзные. Нарушение convention из `.claude/rules/`, новый named volume без backup-coverage (если он не self-rebuilding), новый Postgres без второго `pg_dumpall` блока в `containers/backup/backup-now`, vault-agent template читает `kv/projects/...` без сегмента `data/`, новый сервис с runtime-секретами без `depends_on: vault-agent: service_healthy`.
+- **critical** — блокеры. Утечка секретов в repo (`.env`, rendered-конфиги, inline-значения в compose), ломаное TLS, отсутствие healthcheck у нового сервиса с `depends_on: service_healthy`-зависимыми, прямой `image: latest`, публичный endpoint без `crowdsec@file` middleware. Без фикса не пускать в main.
+- **important** — серьёзные. Нарушение convention из `.claude/rules/`, новый named volume без backup-coverage (если он не self-rebuilding), новый Postgres без второго `pg_dumpall` блока в `containers/backup/backup-now`, новый `${VAR}` в compose/configs без декларации в `.env.example`.
 - **nit** — стилистические. Имена volumes/networks, неконсистентный port format ("3000" vs 3000), мелкие комментарии.
 
 ## Что искать (per область)
@@ -34,9 +34,8 @@ Code reviewer со свежим контекстом. Вызывают чтоб�
 - Все сервисы имеют `restart`, `healthcheck`, `container_name`, `networks`?
 - `image:` закреплён версией (не `:latest`)?
 - Новый сервис с `ports:` имеет `proxy` сеть рядом с `backend-net` (internal сеть одна не даёт port forwarding)?
-- Новый сервис, читающий `.runtime/secrets/*.env`, имеет `depends_on: vault-agent: service_healthy`?
 - Новый Postgres → добавлен ещё один `pg_dumpall` блок в `containers/backup/backup-now`?
-- Если сервис opt-in — есть `profiles: [...]` в compose-фрагменте + KV-зависимость задокументирована?
+- Если сервис opt-in — есть `profiles: [...]` в compose-фрагменте + его секция переменных в `.env.example`?
 - depends_on с `condition: service_healthy` где нужно?
 
 ### Traefik labels
@@ -45,17 +44,11 @@ Code reviewer со свежим контекстом. Вызывают чтоб�
 - `tls.certresolver: letsencrypt`?
 - Новый сабдомен не конфликтует с существующими (`grep -r 'Host(\`<sub>' compose/`)?
 
-### Vault-agent templates (`configs/vault-agent/templates/*.tpl`)
-- Path с префиксом `kv/data/...` (KV v2 API), не `kv/...`?
-- `(env "PROJECT_NAME")` / `(env "ENV")` — consul-template syntax, не shell `${VAR}`?
-- `.Data.data.<key>` (двойной `data`) — KV v2 wrapping?
-- Новый template добавлен в `configs/vault-agent/agent.hcl.parts/<profile>.hcl` или `head.hcl` (always-on)?
-- Если новый seed-target — оператору сказано звать `/request-secret`?
-
 ### Secrets / .env / .tpl
 - Никаких секретов в repo? `git diff --cached | grep -E '(token|secret|password)\s*[:=]\s*\S+'` — не должно быть значений.
-- Любой новый `${VAR}` есть в `.env.example` (как declared / закомментированный, если Vault-managed)?
-- `.tpl` под `configs/` (не `configs/vault-agent/templates/`) рендерится через envsubst — все переменные на месте?
+- Любой новый `${VAR}` есть в `.env.example` (активный или закомментированный) с комментарием как сгенерировать?
+- `.tpl` под `configs/` рендерится через envsubst — все переменные на месте?
+- Rendered-выходы `.tpl` (например `configs/traefik/traefik.yml`) в `.gitignore`?
 
 ### Docs
 - Ссылки `docs/<x>.md#anchor` ведут куда надо?

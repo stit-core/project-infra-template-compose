@@ -5,14 +5,14 @@
 ### Проектная VPS-инфра одним docker-compose стеком
 
 IaC-шаблон проектной инфры: один форк = один проект = один VPS на среду. Edge,
-Postgres, MinIO, backend, vault-agent, backup — декларативно,
-секреты из Vault. Форк → `<org>/infra`, разворот за день.
+Postgres, MinIO, backend, backup — декларативно,
+секреты в `.env` на VPS. Форк → `<org>/infra`, разворот за день.
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-2563eb)](LICENSE)
 [![Часть stit](https://img.shields.io/badge/stit-открытые_шаблоны-6366f1)](https://git.stit.tech/stit-core/stit-public)
 [![Stack](https://img.shields.io/badge/stack-Docker_Compose-0ea5e9)](#что-внутри)
 [![Edge](https://img.shields.io/badge/edge-Traefik_v3_%2B_CrowdSec-22c55e)](#что-внутри)
-[![Secrets](https://img.shields.io/badge/secrets-vault--agent-000000)](#контракт-с-control-plane)
+[![Secrets](https://img.shields.io/badge/secrets-plain_.env-000000)](#контракт-с-control-plane)
 [![Open core](https://img.shields.io/badge/open_core-no_vendor_lock-8b5cf6)](#два-пути-managed-или-self-hosted)
 
 </div>
@@ -22,8 +22,8 @@ Postgres, MinIO, backend, vault-agent, backup — декларативно,
 ## Место в экосистеме
 
 ```
-corp-infra-template          control plane — Vault · registry
-      │  onboard-project.sh → AppRole projects-<p>-<env> + KV seed
+corp-infra-template          control plane — registry · CrowdSec
+      │  registry-pull + whitelist egress-IP
       ▼
 project-infra-template-compose   ← вы здесь   (форк → <org>/infra, один VPS на среду)
       │  runtime для образа backend
@@ -40,23 +40,21 @@ project-infra-template-compose   ← вы здесь   (форк → <org>/infra
 
 Вендор-лока нет — control-plane может быть наш или ваш:
 
-- **Managed (stit).** Наводите эндпоинты на наш контур (`vault.stit.tech`,
-  `git.stit.tech`); мы онбордим проект (`onboard-project.sh`) и
-  держим uptime. Меньше всего возни.
+- **Managed (stit).** Наводите registry на наш контур (`git.stit.tech`);
+  мы держим uptime. Меньше всего возни.
 - **Self-hosted.** Поднимаете **свой** control-plane из
   [`corp-infra-template`](https://git.stit.tech/stit-core/corp-infra-template)
-  (свой Vault, registry, онбординг) и наводите эти же эндпоинты на
-  него — ни от кого не зависите.
+  (свой registry) и наводите registry-эндпоинт на него — ни от кого не
+  зависите.
 
-Технически меняется только хост Vault / registry — он в `.env` и KV, не
-зашит. Стек и контракты одинаковы в обоих путях.
+Технически меняется только хост registry — он в `.env`, не зашит. Стек и
+контракты одинаковы в обоих путях.
 
 ## Что внутри
 
 | Слой | Что | Активация |
 |---|---|---|
 | **Edge** | Traefik v3 + CrowdSec — HTTP-01 LE, WAF, IP-bans | always-on |
-| **Secrets** | vault-agent sidecar — рендерит секреты из Vault на VPS | always-on |
 | **Host metrics** | cadvisor · node-exporter — локальные метрики хоста/контейнеров | always-on |
 | **Landing** | заглушка корня `${DOMAIN}` под LE-cert | always-on |
 | **DB** | Postgres 17 | profile `postgres` |
@@ -74,12 +72,8 @@ MinIO можно вынести на отдельные хосты (split) — �
 Полный путь (corp Day-0 → bootstrap VPS → профили → `/init-project`) —
 **[`docs/getting-started.md`](docs/getting-started.md)**. Коротко, три шага:
 
-**1. Корп-онбординг** (один раз на среду, на control-plane):
-```bash
-VAULT_TOKEN=<root> make onboard NAME=acme ENVS=dev,prod
-```
-Создаёт per-env AppRole + сеет `kv/projects/acme/<env>/meta`; возвращает
-`PROJECT_NAME / ENV / VAULT_ROLE_ID / VAULT_SECRET_ID` на каждую среду.
+**1. Корп-handoff** (один раз на среду): egress-IP будущей VPS — в корп
+CrowdSec-whitelist; доступ к registry `git.stit.tech` для pull/push образов.
 
 **2. Форк + bootstrap VPS** (один VPS на среду): `Use this template` →
 `<org>/infra`, клон, поднять чистый VPS и завести identity:
@@ -88,34 +82,33 @@ cp ansible/inventory.example.ini ansible/inventory.ini   # host/IP (gitignored)
 ansible-galaxy collection install -r ansible/requirements.yml
 ansible-playbook -i ansible/inventory.ini ansible/bootstrap.yml
 # на VPS, в /opt/<p>-infra:
-PROJECT_NAME=acme ENV=prod DOMAIN=acme.com VAULT_ROLE_ID=<id> VAULT_SECRET_ID=<id> \
-  make new-env                   # .env (chmod 600), 5 переменных — остальное из Vault
+PROJECT_NAME=acme ENV=prod DOMAIN=acme.com ACME_EMAIL=ops@acme.com \
+  make new-env                   # .env (chmod 600) — единственный источник секретов
 ```
 
 **3. Первый деплой** (с рабочей станции оператора):
 ```bash
 make ship        # check + push + (на main) ssh-deploy. На чистом дереве MSG не нужен.
 ```
-Минимальный стек (traefik / vault-agent / crowdsec / metrics / landing)
-живёт сразу. Дальше — активация профилей: `/request-secret` → блок `vault kv put`
-корп-админу → `COMPOSE_PROFILES` + `make ship`.
+Минимальный стек (traefik / crowdsec / metrics / landing)
+живёт сразу. Дальше — активация профилей: `/request-secret` → блок `VAR=value`
+в `.env` на VPS → `COMPOSE_PROFILES` + `make ship`.
 
 ## Принципы
 
 - **Конфиг → код.** Всё декларативно в `compose/*.yml` и `configs/`. Нет «только на сервере».
-- **Максимум в Vault.** `.env` минимален (identity + AppRole-bootstrap). Image-теги,
-  ACME, restic endpoint, runtime-секреты — в `kv/projects/<p>/<env>/*`,
-  ротируются централизованно.
-- **Multi-env через KV-dimension.** Один шаблон, N VPS, у каждого свой `ENV` и scope в Vault.
-- **Lazy stack.** Минимальный стек на meta seed'е; profiled-сервисы — по мере seed'ов.
+- **Всё в .env.** Один файл на VPS (chmod 600, gitignored) — identity, ACME,
+  image-теги, секреты профилей. Оператор заполняет и ротирует руками.
+- **Multi-env физически.** Один шаблон, N VPS, у каждого свой `ENV` и свой `.env`.
+- **Lazy stack.** Минимальный стек без секретов профилей; profiled-сервисы — по мере заполнения `.env`.
 - **Локальный CI.** Backend-образ собирает разработчик; `make ship` пушит код + ssh-деплоит.
 
 ## Контракт с control-plane
 
-- **Vault** — secrets backend; AppRole per `(project, env)` от `onboard-project.sh`.
-- **Registry** — образы backend / worker / frontend.
+- **Registry** `git.stit.tech` — образы backend / worker / frontend.
+- **CrowdSec whitelist** — egress-IP проектной VPS.
 
-KV-layout, onboarding-флоу и multi-env — [`.claude/rules/multi-env.md`](.claude/rules/multi-env.md).
+`.env`-контракт и multi-env — [`.claude/rules/multi-env.md`](.claude/rules/multi-env.md).
 Restore из backup'а — `make restore-pg SNAPSHOT=latest`
 ([`docs/reference/runbook.md`](docs/reference/runbook.md)).
 
