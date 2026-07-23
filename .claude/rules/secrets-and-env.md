@@ -19,11 +19,11 @@ paths:
 | Bootstrap auth | `VAULT_ROLE_ID`, `VAULT_SECRET_ID` | `.env` | оператор (из корп онбординга) |
 | Local-managed | `CROWDSEC_BOUNCER_API_KEY`, `COMPOSE_PROFILES` | `.env` | auto-register / оператор |
 | Image-теги | `BACKEND_TAG` (конвенция `<SVC>_TAG`) | `.env` — **строго**, не Vault | оператор (`make bump SVC= TAG=`) |
-| Корп-эндпоинты | `VAULT_ADDR`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `REGISTRY_HOST` | `.env` (managed-дефолт в `.env.example`/коде; self-hosted переопределяет) | оператор (self-hosted) |
+| Корп-эндпоинты | `VAULT_ADDR`, `REGISTRY_HOST` | `.env` (managed-дефолт в `.env.example`/коде; self-hosted переопределяет) | оператор (self-hosted) |
 | Vault-managed конфиг | meta: `acme_email`/`acme_caserver`→traefik.yml | `kv/projects/<p>/<env>/meta` (vault-agent рендерит) | корп-админ (vault kv put/patch) |
-| Vault-managed секреты | DB, OIDC, JWT, OTEL_TOKEN, MinIO, Restic + AWS | `kv/projects/<p>/<env>/{db,oidc,jwt,otel,minio,backup}` → `.runtime/secrets/*.env` | корп-админ |
+| Vault-managed секреты | DB, OIDC, JWT, MinIO, Restic + AWS | `kv/projects/<p>/<env>/{db,oidc,jwt,minio,backup}` → `.runtime/secrets/*.env` | корп-админ |
 
-Consumer-сервисы (postgres, backend, minio, backup, otel-agent) читают **только** `.runtime/secrets/*.env` через `env_file:` (плюс `${...}`-интерполяцию из `.env`). Они не знают про Vault напрямую. Image-теги через Vault не ходят: `<SVC>_TAG` живёт в `.env`, бамп — `make bump SVC= TAG=`.
+Consumer-сервисы (postgres, backend, minio, backup) читают **только** `.runtime/secrets/*.env` через `env_file:` (плюс `${...}`-интерполяцию из `.env`). Они не знают про Vault напрямую. Image-теги через Vault не ходят: `<SVC>_TAG` живёт в `.env`, бамп — `make bump SVC= TAG=`.
 
 ## Multi-env
 
@@ -119,7 +119,7 @@ make recreate SVC=backend    # ✅
 
 ### Profile-based opt-in
 
-Минимальный стек (always-on) — traefik / vault-agent / crowdsec / otel-agent / node-exporter / cadvisor / landing. Поднимается на одном лишь `meta` + `otel` seed'е от корпа при онбординге.
+Минимальный стек (always-on) — traefik / vault-agent / crowdsec / node-exporter / cadvisor / landing. Поднимается на одном лишь `meta` seed'е от корпа при онбординге.
 
 Опциональные сервисы за `COMPOSE_PROFILES`:
 

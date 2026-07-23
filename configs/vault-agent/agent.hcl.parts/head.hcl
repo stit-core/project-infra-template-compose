@@ -31,9 +31,9 @@ auto_auth {
 
 # ───── Always-on templates ─────
 # Эти templates рендерятся независимо от COMPOSE_PROFILES — без них стек
-# не поднимется (traefik читает свой static config, otel-agent читает
-# otel.env для bearer-token). Image-теги через Vault НЕ ходят — они живут
-# в .env (<SVC>_TAG, см. .env.example) и бампаются `make bump`.
+# не поднимется (traefik читает свой static config). Image-теги через Vault
+# НЕ ходят — они живут в .env (<SVC>_TAG, см. .env.example) и бампаются
+# `make bump`.
 
 # Traefik static config — ACME email/caServer из meta KV-объекта.
 # perms 0444 — traefik в контейнере под не-root.
@@ -41,12 +41,4 @@ template {
   source      = "/etc/vault-agent/templates/traefik.yml.tpl"
   destination = "/configs/traefik.yml"
   perms       = 0444
-}
-
-# OTEL bearer-token + tenant — для otel-agent (always-on) и backend
-# (когда profile=backend) через тот же файл.
-template {
-  source      = "/etc/vault-agent/templates/otel.env.tpl"
-  destination = "/secrets/otel.env"
-  perms       = 0400
 }

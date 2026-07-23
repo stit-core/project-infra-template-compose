@@ -15,31 +15,28 @@ Single-VPS docker-compose стек одного проекта (дефолт). �
         ┌───────────────────┼───────────────┐
         │                   │               │
   ┌─────┴─────┐      ┌──────┴──────┐  ┌─────┴──────┐
-  │  Backend  │      │  otel-agent │  │   Vault-   │
-  │ (api.D)   │      │ OTLP+scrape │  │   Agent    │
-  └─────┬─────┘      └──────┬──────┘  └─────┬──────┘
-        │                   │ ↑             │
-        │ backend-net       │ │ scrape      │ outbound
-        ↓                   ↓ │             ↓
-  ┌─────────┐       ┌────────┴────────┐ vault.stit.tech
-  │Postgres │       │ cadvisor +      │ (corp Vault)
-  └─────────┘       │ node-exporter   │
-                    └─────────────────┘
-                            ↓
-                     otel.stit.tech (corp ingest)
+  │  Backend  │      │ cadvisor +  │  │   Vault-   │
+  │ (api.D)   │      │node-exporter│  │   Agent    │
+  └─────┬─────┘      └─────────────┘  └─────┬──────┘
+        │                                   │
+        │ backend-net                       │ outbound
+        ↓                                   ↓
+  ┌─────────┐                        vault.stit.tech
+  │Postgres │                        (corp Vault)
+  └─────────┘
 ```
 
 Дополнительно:
 - **Backup** (restic, in-container crond): сидит сбоку, ежедневно делает `pg_dumpall | gzip | restic backup --stdin` (один файл-снапшот, не volume tree). `RESTIC_REPOSITORY` приходит только из Vault (`kv/projects/<p>/<env>/backup.repository`), не из `.env` — нет local-default, чтобы исключить случайный указатель на проектный minio (host failure уносит и postgres-data, и репо).
 - **Minio**: S3-storage на `s3.${DOMAIN}` / console `minio.${DOMAIN}`; bucket `app-uploads` для backend, `backups` для restic; service-accounts создаёт `minio-init`.
-- **cadvisor + node-exporter**: host-/container-метрики, скрейпятся локальным otel-agent'ом и шлются в корп под тем же tenant'ом, что и app-телеметрия (`service.namespace=$OTEL_TENANT`). Видны в корп-Grafana дашбордах cadvisor + Node Exporter Full при выборе `$tenant=<project>`.
+- **cadvisor + node-exporter**: host-/container-метрики, доступны локально в `backend-net` (`cadvisor:8080`, `node-exporter:9100`) — endpoint'ы для любого коллектора/Prometheus, который проект решит поднять сам.
 
 ## Сети
 
 | Network | Тип | Кто в ней |
 |---|---|---|
-| `proxy` | bridge, external | Traefik (edge), backend (для входящего HTTPS), vault-agent + otel-agent (исходящий к корпу), backup (исходящий к S3 / корп при off-site) |
-| `backend-net` | bridge, **internal** | postgres, backend, otel-agent (получает OTLP от backend, скрейпит cadvisor + node-exporter), cadvisor, node-exporter, vault-agent (рендерит файлы в shared volume) |
+| `proxy` | bridge, external | Traefik (edge), backend (для входящего HTTPS), vault-agent (исходящий к корп Vault), backup (исходящий к S3 / корп при off-site) |
+| `backend-net` | bridge, **internal** | postgres, backend, cadvisor, node-exporter, vault-agent (рендерит файлы в shared volume) |
 
 Постгрес НЕ в `proxy` — он недоступен извне. Backend стучится в постгрес по hostname `postgres` через `backend-net`.
 
@@ -53,7 +50,6 @@ Single-VPS docker-compose стек одного проекта (дефолт). �
 | `vault-agent-secrets` | rendered env-files | нет (рендерится из Vault) |
 | `vault-agent-bootstrap` | role-id/secret-id files | нет (из .env) |
 | `minio-data` | S3-объекты (uploads + backups) | да (restic в bucket `backups`) |
-| `otel-agent-data` | OTel collector queue/state | нет |
 | `.runtime/secrets/` (bind-mount) | env-files для `env_file:` consumer'ов | нет |
 
 `.runtime/secrets/` — bind-mount, а не named volume, потому что compose должен резолвить `env_file:` пути на хосте при создании контейнера.
@@ -63,7 +59,6 @@ Single-VPS docker-compose стек одного проекта (дефолт). �
 | Корп-сервис | Что | Адрес |
 |---|---|---|
 | Vault | Secrets backend, AppRole-логин для проекта | `https://vault.stit.tech` |
-| OTel ingest | Telemetry (logs/metrics/traces) с tenant routing | `https://otel.stit.tech` |
 | Gitea | Source + container registry | `https://git.stit.tech` |
 
 Backup может писать в любой restic-совместимый endpoint (`RESTIC_REPOSITORY` в Vault `kv/projects/<p>/<env>/backup.repository`). Local-default отсутствует by design — на single-VPS он не даёт DR, host failure уносит и репо. Рекомендация: external managed S3 / corp Minio / bare-IP S3 на другом хосте. App-uploads bucket (`minio-data`) — **не** покрыт backup'ом; если нужен — настрой `mc mirror` job в external storage отдельно.
@@ -77,11 +72,11 @@ Per-env AppRole + KV-scope (`kv/data/projects/<p>/<env>/*`) выдаёт `corp-i
    - entrypoint пишет `role-id`/`secret-id` в `.runtime/secrets-bootstrap/`.
    - `auto_auth` логинится по AppRole, получает Vault token (TTL 10m, max 30m).
    - `scripts/render-configs.sh` собирает финальный `configs/vault-agent/agent.hcl` из `agent.hcl.parts/{head,<active-profile>,tail}.hcl` под активный `COMPOSE_PROFILES`.
-   - Always-on templates (рендерятся всегда): `traefik.yml.tpl` → `.runtime/configs/traefik.yml` (ACME email/caServer из Vault `meta`), `otel.env.tpl` → `.runtime/secrets/otel.env`.
+   - Always-on template (рендерится всегда): `traefik.yml.tpl` → `.runtime/configs/traefik.yml` (ACME email/caServer из Vault `meta`).
    - Per-profile templates: `postgres.env`, `backend.env`, `minio.env`, `backup.env` — рендерятся только если соответствующий profile активен (через `agent.hcl.parts/<profile>.hcl`).
-   - Все templates читают `kv/data/projects/<p>/<env>/{meta,otel,db,oidc,jwt,minio,backup}` (только то, что нужно под profile-набор).
+   - Все templates читают `kv/data/projects/<p>/<env>/{meta,db,oidc,jwt,minio,backup}` (только то, что нужно под profile-набор).
    - Healthcheck = `.runtime/configs/vault-health.sh` (генерится render-configs.sh под активный profile-набор) — проверяет non-empty все expected output-файлы.
-3. Consumer-сервисы (postgres / backend / otel-agent / minio / backup) ждут `vault-agent: condition: service_healthy`, потом стартуют и читают `env_file: .runtime/secrets/<svc>.env`.
+3. Consumer-сервисы (postgres / backend / minio / backup) ждут `vault-agent: condition: service_healthy`, потом стартуют и читают `env_file: .runtime/secrets/<svc>.env`.
 4. На rotation секрета (например `vault kv patch kv/projects/<p>/<env>/db password=NEW` на корп-стороне):
    - vault-agent на проектном VPS видит изменение, перерендеривает `.runtime/secrets/<svc>.env`.
    - Но `env_file` фиксируется при container CREATE — простой `restart` старый ENV не пересоздаст. Нужен `make recreate SVC=<consumer>`.
@@ -136,14 +131,14 @@ Postgres / MinIO+backup / edge+app на отдельных VPS (нескольк
 
 - **Эндпоинты бэкендов — в Vault KV** (не в compose): Postgres `host`/`port` —
   опц. поля `kv/.../db` (vault-agent рендерит `PG_DSN`; дефолт `postgres:5432`);
-  restic — `kv/.../backup.repository`; OTLP-коллектор — `OTEL_EXPORTER_OTLP_ENDPOINT`
-  в `.env`. При split наводятся на целевые хосты, compose не трогается.
+  restic — `kv/.../backup.repository`. При split наводятся на целевые хосты,
+  compose не трогается.
 - **Таргетинг compose по ролям** (`HOST_ROLE` в `.env`, карта в `scripts/deploy.sh`):
 
   | Роль | сервисы | профиль |
   |---|---|---|
   | `all` | весь стек (single-host, дефолт) | как в `.env` |
-  | `edge` | traefik, crowdsec, vault-agent, otel-agent, node-exporter, cadvisor, landing, backend | `backend` |
+  | `edge` | traefik, crowdsec, vault-agent, node-exporter, cadvisor, landing, backend | `backend` |
   | `db` | postgres (+ vault-agent) | `postgres` |
   | `storage` | minio, backup (+ vault-agent) | `storage` |
 

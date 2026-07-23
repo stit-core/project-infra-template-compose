@@ -31,8 +31,6 @@ ref: docs/project/stack.md
 - minio Console и S3 разнесены на `minio.` и `s3.`, потому что
   S3-клиенты не понимают subpath; Console на отдельном сабдомене для
   ясности доступа.
-- otel endpoint = корп `otel.stit.tech`, не project-specific, потому
-  что project-specific OTel-stack для одного проекта нерентабелен.
 
 ## Что копать дальше
 - Уточнить acme_email с заказчиком (значение пойдёт в meta KV).
@@ -40,7 +38,7 @@ ref: docs/project/stack.md
 
 ## Host layout
 - Режим: split (single-host — секцию опускаем).
-- vps-app (HOST_ROLE=edge): traefik, vault-agent, otel-agent, backend, landing.
+- vps-app (HOST_ROLE=edge): traefik, vault-agent, backend, landing.
 - vps-db (HOST_ROLE=db): postgres; backend достаёт PG через db.host/db.port из KV.
 - vps-storage (HOST_ROLE=storage): minio, backup; restic.repository → этот хост.
 ```
@@ -94,10 +92,10 @@ stack'а, но важны для будущих сессий.
 секцию **не заводим**. Появляется, когда оператор выбрал split в `§ Networks`.
 
 - Одна строка на хост: `<имя-хоста> (HOST_ROLE=<роль>): <сервисы>`.
-- Роли: `edge` (traefik/vault-agent/otel-agent/backend/landing) / `db`
+- Роли: `edge` (traefik/vault-agent/backend/landing) / `db`
   (postgres) / `storage` (minio/backup). vault-agent — на каждом хосте.
 - Эндпоинты не дублируем: PG host/port — в KV `db`, restic — в KV
-  `backup.repository`, otel — `OTEL_EXPORTER_OTLP_ENDPOINT` в `.env`.
+  `backup.repository`.
 - Граница (репликация/HA/cross-host сеть = дело потребителя) — фиксируется как
   факт, не проектируется здесь. Детали — `references/multi-host.md`.
 
@@ -120,7 +118,7 @@ stack'а, но важны для будущих сессий.
 - Открытые вопросы, доменные решения, что копать дальше.
 
 ❌ Никогда не пишем сюда:
-- Значения секретов (acme_email, otel-токен, restic-пароль). Только
+- Значения секретов (acme_email, restic-пароль). Только
   ссылки на KV-пути.
 - Содержимое `.env`, `.env.local`, `.runtime/`.
 - Личные данные оператора.

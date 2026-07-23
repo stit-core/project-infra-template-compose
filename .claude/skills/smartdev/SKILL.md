@@ -125,7 +125,7 @@ make ship MSG="feat(foo): bar"
 4. **vault-agent first** — рендерит `.runtime/secrets/*.env` ДО старта consumer'ов (`env_file` фиксируется при CREATE).
 5. **crowdsec early** — bouncer auto-register если `CROWDSEC_BOUNCER_API_KEY=` пуст.
 6. `docker compose up -d --remove-orphans --wait --wait-timeout 180`.
-7. Diff `prev_sha..new_sha`: `configs/vault-agent/**` → force-recreate consumer'ов; `configs/{traefik,crowdsec,postgres,otel-agent}/**` → restart их.
+7. Diff `prev_sha..new_sha`: `configs/vault-agent/**` → force-recreate consumer'ов; `configs/{traefik,crowdsec,postgres}/**` → restart их.
 
 ### Hot-fix прямо на VPS
 

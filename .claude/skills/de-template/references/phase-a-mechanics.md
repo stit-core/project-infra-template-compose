@@ -52,7 +52,6 @@ A — Phase B (печать cross-repo next-steps).
 - `traefik.yml`
 - `crowdsec.yml`
 - `vault-agent.yml`
-- `otel-agent.yml`
 - `node-exporter.yml`
 - `cadvisor.yml`
 - `landing.yml`
@@ -102,7 +101,6 @@ A — Phase B (печать cross-repo next-steps).
 - `tail.hcl`
 
 `configs/vault-agent/templates/`:
-- `otel.env.tpl`
 - `traefik.yml.tpl`
 
 ### Per profile — таблица прунинга
@@ -140,8 +138,7 @@ A — Phase B (печать cross-repo next-steps).
 ### Anti-patterns
 
 - Удалить `head.hcl`/`tail.hcl` (фундамент).
-- Удалить `otel.env.tpl`/`traefik.yml.tpl` (от корп-онбординга, всегда
-  нужны).
+- Удалить `traefik.yml.tpl` (от корп-онбординга, всегда нужен).
 - Удалить template без проверки ссылок в `compose/<name>.yml`
   (`env_file: .runtime/secrets/<x>.env`).
 
@@ -229,7 +226,7 @@ A — Phase B (печать cross-repo next-steps).
      (требуют seed) → `/request-secret`;
    - в `stack/Edge` упомянут source-IP whitelist → `/corp-handoff`;
    - в `stack/Domains` — сабдомены, нужны A-записи под LE-HTTP-01;
-   - корп-онбординг не сделан (нет `kv/.../meta`/`kv/.../otel`) →
+   - корп-онбординг не сделан (нет `kv/.../meta`) →
      `onboard-project.sh`.
 
 ### Формат чеклиста в чат

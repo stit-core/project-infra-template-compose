@@ -5,7 +5,7 @@
 # .env минимален: identity (PROJECT_NAME, ENV, DOMAIN) + AppRole-bootstrap
 # + image-теги (<SVC>_TAG — бампаются строго через .env, `make bump`).
 # Всё остальное (acme email/caServer, restic endpoint, runtime секреты)
-# живёт в Vault — корп-сторона засеивает при онбординге (meta+otel)
+# живёт в Vault — корп-сторона засеивает при онбординге (meta)
 # и по запросу через skill `/request-secret` (печатает блок vault kv put).
 #
 # Non-interactive:
@@ -82,8 +82,8 @@ fi
 cat <<EOF
 
 ================================================================================
-Минимальный стек (traefik + vault-agent + crowdsec + otel-agent + node-exporter
-+ cadvisor + landing) поднимется как только корп засеит kv/projects/$PROJECT_NAME/$ENV/{meta,otel}.
+Минимальный стек (traefik + vault-agent + crowdsec + node-exporter
++ cadvisor + landing) поднимется как только корп засеит kv/projects/$PROJECT_NAME/$ENV/meta.
 Это происходит при \`onboard-project --envs $ENV\` на корп-стороне.
 
 Запусти:

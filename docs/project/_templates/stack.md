@@ -42,8 +42,8 @@ conflict-free на shared VPS. Кто в какой сети.>
 crond, retention. `N/A` если storage-профиль не включён.>
 
 ## Observability
-<otel-agent → otel.stit.tech (OTLP + Prom-scrape host-метрик), resource attrs, accountID/token
-из kv otel. cadvisor + node-exporter (always-on).>
+<Локальные метрики: cadvisor + node-exporter (always-on, endpoint'ы в `backend-net`). Куда идут
+логи (docker logs / свой стек проекта). `N/A` если ничего сверх фундамента не решено.>
 
 ## Environments
 <Какие среды у проекта (dev/staging/prod) — каждая = отдельный VPS с одним ENV. Чем отличаются

@@ -34,7 +34,7 @@ services:
       # Healthy = ВСЕ expected outputs под активный COMPOSE_PROFILES непустые.
       # Список output'ов profile-зависим; render-configs.sh генерит конкретный
       # health-script в .runtime/configs/vault-health.sh при каждом deploy.
-      # Always-on проверки: /configs/traefik.yml, /secrets/otel.env.
+      # Always-on проверка: /configs/traefik.yml.
       # Per-profile добавки: postgres.env / backend.env / minio.env / backup.env.
       test: ["CMD", "sh", "/configs/vault-health.sh"]
       interval: 5s

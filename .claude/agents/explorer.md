@@ -45,7 +45,7 @@ Read-only research-агент для шаблона проектной инфр�
 - "Что сейчас в стеке — что healthy / что в restart-loop'е?"
 - "Сколько LE-cert'ов в `traefik-acme` volume и когда истекают?"
 - "Размер restic-репо (`docker exec backup restic stats`)?"
-- "Все места где упоминается порт 9000 / `backend-net` / `OTEL_TENANT`."
+- "Все места где упоминается порт 9000 / `backend-net` / `RESTIC_REPOSITORY`."
 
 ## Когда НЕ вызывать
 

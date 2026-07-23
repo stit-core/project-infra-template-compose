@@ -75,7 +75,6 @@ health=.runtime/configs/vault-health.sh
   echo 'set -e'
   echo '# always-on'
   echo 'test -s /configs/traefik.yml'
-  echo 'test -s /secrets/otel.env'
   for p in "${active_profiles[@]}"; do
     case "$p" in
       postgres) echo 'test -s /secrets/postgres.env' ;;

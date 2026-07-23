@@ -43,7 +43,7 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
 **Что НЕ**:
 
 - Заводить строку для always-on фундамента (traefik/crowdsec/vault-agent/
-  otel-agent/cadvisor/node-exporter/landing) — это не «часть продукта».
+  cadvisor/node-exporter/landing) — это не «часть продукта».
 - Авторить здесь продуктовые surfaces — они в `<org>/strategy`, читаются
   cross-repo (карта — про инфра-инвентарь, не про UX-поверхности).
 - `hosting: here` строка без последующего `services/<name>.md`.
@@ -258,45 +258,35 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
 
 **Что фиксируем**:
 
-- otel-agent → endpoint (поле `OTEL_EXPORTER_OTLP_ENDPOINT`): корп-default
-  (managed `otel.stit.tech:443`) или свой коллектор (self-hosted форк
-  corp-infra-template / project-specific). Managed-дефолт в `.env.example`/
-  compose, self-hosted переопределяет в `.env`. См. `references/multi-host.md`.
-- Resource attributes: `service.namespace=<project>` / `deployment.env`
-  / `host.name`.
-- KV otel: token + accountID (через `kv/.../otel`, корп-онбординг).
-- Host metrics: `cadvisor` + `node-exporter` (always-on фундамент).
-- Логи: уходят через otel-agent или local-only.
+- Host metrics: `cadvisor` + `node-exporter` (always-on фундамент,
+  endpoint'ы в `backend-net`: `cadvisor:8080`, `node-exporter:9100`).
+- Куда идут метрики: local-only (никто не скрейпит) или свой
+  коллектор/Prometheus проекта (project-specific сервис в карте).
+- Логи: local-only (`docker logs`) или свой стек проекта.
 
 **Опции опрашиваются как**:
 
-- otel endpoint: 2 опции (`otel.stit.tech` (default корп) / другой
-  Other).
-- Resource attrs: Other (свободная форма).
-- Логи: 2 опции («через otel-agent» / «local-only»).
+- Метрики: 2 опции («local-only» / «свой коллектор» Other).
+- Логи: 2 опции («local-only» / «свой стек» Other).
 
 **Что НЕ**:
 
 - Описывать always-on (`cadvisor`/`node-exporter` есть в фундаменте) —
   фиксируем только их конфигурацию, если она кастомная.
-- Захардкодить otel-токен — он в KV `otel`.
 - Дублировать `Generates` поля sub-сервисов.
 
 **Тест-критерий**:
 
-- ✅ «`otel.stit.tech`; resource attrs `service.namespace=acme,
-  deployment.env=${ENV}`; KV otel (через корп-онбординг); cadvisor +
-  node-exporter (дефолт)».
-- ❌ «Без resource attrs» — телеметрия безымянная.
-- ❌ «Без указания KV otel» — токен теряется.
+- ✅ «local-only; cadvisor + node-exporter (дефолт)».
+- ✅ «свой Prometheus (сервис в карте) скрейпит cadvisor +
+  node-exporter; логи local-only».
+- ❌ «Просто \"есть мониторинг\"» — не сказано кто и что собирает.
 
 **Порядок копания**:
 
-1. Endpoint (enum + Other).
-2. Resource attrs (Other).
-3. KV otel (next-step через корп-онбординг).
-4. Логи (enum).
-5. Anti-patterns.
+1. Метрики (enum + Other).
+2. Логи (enum).
+3. Anti-patterns.
 
 ---
 

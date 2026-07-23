@@ -81,7 +81,7 @@ status: draft
 | `frontend` (`hosting: here`) | — (always-on `landing`) | `compose/landing.yml` |
 | `frontend`/`backend` (`hosting: external`) | — | cross-repo next-step |
 
-Always-on edge/телеметрия (`traefik`/`crowdsec`/`vault-agent`/`otel-agent`/`node-exporter`/
+Always-on edge/host-метрики (`traefik`/`crowdsec`/`vault-agent`/`node-exporter`/
 `cadvisor`) — фиксированный фундамент шаблона, не описывается service-doc'ами. `stack § Generates`
 несёт только cross-cutting: traefik dynamic routes, `DOMAIN`, crowdsec source-IP next-step.
 

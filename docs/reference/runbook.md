@@ -4,7 +4,7 @@ Common failure modes на проектном VPS и что делать. Ordered
 
 ## vault-agent unhealthy / `.ready` отсутствует
 
-**Симптом:** backend, postgres, otel-agent в статусе `created` или `restarting`, depends_on на vault-agent.
+**Симптом:** backend, postgres в статусе `created` или `restarting`, depends_on на vault-agent.
 
 ```bash
 docker logs vault-agent --tail=50
@@ -14,7 +14,7 @@ docker logs vault-agent --tail=50
 - **AppRole creds невалидны** — `Code: 400. Errors: invalid role or secret ID`. Проверь в `.env` что `VAULT_ROLE_ID`/`VAULT_SECRET_ID` совпадают с тем что вернул `onboard-project.sh`. Если оператор крутил `secret-id` — нужно обновить в `.env` + перезапустить vault-agent.
 - **Vault корп-стороны sealed** — `* error performing token check: vault is sealed`. Ничего не починишь с проектной стороны. Эскалировать на корп: оператор делает `vault operator unseal <key>`.
 - **Network unreachable** — `dial tcp: lookup vault.stit.tech: no such host`. Проверь DNS на VPS, проверь outbound-доступ к корпу.
-- **Path не существует в KV** — `* permission denied` на `kv/data/projects/<p>/<env>/<name>`. Значит корп-сторона не засеяла этот KV-объект (онбординг создаёт только `meta` + `otel`; `db` / `oidc` / `jwt` / `minio` / `backup` запрашиваются по мере включения profile'ов). Запроси seed через skill `/request-secret` — он сформирует `vault kv put` блок для корп-админа.
+- **Path не существует в KV** — `* permission denied` на `kv/data/projects/<p>/<env>/<name>`. Значит корп-сторона не засеяла этот KV-объект (онбординг создаёт только `meta`; `db` / `oidc` / `jwt` / `minio` / `backup` запрашиваются по мере включения profile'ов). Запроси seed через skill `/request-secret` — он сформирует `vault kv put` блок для корп-админа.
 
 **Recovery:** после исправления — `make restart SVC=vault-agent`, дальше healthcheck подтянется и зависимые сервисы стартуют сами.
 
@@ -25,7 +25,6 @@ docker logs backend --tail=100
 ```
 
 - **PG_DSN ошибка:** проверь `.runtime/secrets/backend.env` (под root: `cat /opt/<p>-infra/.runtime/secrets/backend.env`). Если `password` там пустой — vault не отдал поле; `vault kv get kv/projects/<p>/<env>/db` покажет что в Vault.
-- **OTLP timeout:** некритично, backend должен запускаться даже без otel-agent (Init не падает на network ошибках). Если падает — баг в backend, поднимай issue в `<org>/backend`.
 
 ## Traefik не выдаёт LE-cert
 
@@ -139,7 +138,6 @@ Backup, который ни разу не тестировался, не раб�
 ## Когда эскалировать на корп
 
 - Vault sealed.
-- otel.stit.tech не принимает данные (tenant 401).
 - git.stit.tech registry pull fails.
 
 Эскалация в `#corp-infra` Slack или ntfy.stit.tech.

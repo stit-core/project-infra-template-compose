@@ -12,7 +12,7 @@ paths:
 
 Один проект может иметь несколько сред (`dev`, `prod`, опционально `staging`/etc). Каждая среда — **отдельный VPS** с одним и тем же compose-шаблоном, но со своим `ENV` в `.env` и своим набором AppRole-credentials. Шаблон агностичен к именам env'ов — это произвольные слаги.
 
-Этот документ описывает **проектную сторону** контракта: как vault-agent в этом шаблоне разрешает KV-paths, как оператор запрашивает seed'ы, как срабатывает profile-based opt-in. Общая карта контрактов tenant/AppRole/KV (что одинаково для всех репо экосистемы) — `corp-infra-template/docs/ecosystem.md`. Корп-side имплементация — `corp-infra-template/scripts/onboard-project.sh` + `corp-infra-template/scripts/seed-project-secrets.sh`.
+Этот документ описывает **проектную сторону** контракта: как vault-agent в этом шаблоне разрешает KV-paths, как оператор запрашивает seed'ы, как срабатывает profile-based opt-in. Общая карта контрактов AppRole/KV (что одинаково для всех репо экосистемы) — `corp-infra-template/docs/ecosystem.md`. Корп-side имплементация — `corp-infra-template/scripts/onboard-project.sh` + `corp-infra-template/scripts/seed-project-secrets.sh`.
 
 ## Принцип: max в Vault
 
@@ -24,12 +24,12 @@ Vault — единственный источник правды по конфи
 |---|---|---|
 | Identity | `.env` | `PROJECT_NAME`, `ENV`, `DOMAIN` |
 | Bootstrap auth | `.env` | `VAULT_ROLE_ID`, `VAULT_SECRET_ID` |
-| Корп-эндпоинты | `.env` (managed-дефолт в коде; self-hosted override) | `VAULT_ADDR=https://vault.stit.tech`, `OTEL_EXPORTER_OTLP_ENDPOINT=https://otel.stit.tech:443`, `REGISTRY_HOST=git.stit.tech` |
+| Корп-эндпоинты | `.env` (managed-дефолт в коде; self-hosted override) | `VAULT_ADDR=https://vault.stit.tech`, `REGISTRY_HOST=git.stit.tech` |
 | Локально-сгенерированные | `.env` (auto после первого deploy) | `CROWDSEC_BOUNCER_API_KEY` |
 | Оператор-управление | `.env` | `COMPOSE_PROFILES` |
 | Image-теги | `.env` (**строго**, не Vault; бамп — `make bump SVC= TAG=`) | `BACKEND_TAG` (конвенция `<SVC>_TAG`) |
 | Non-secret конфиг | **Vault** `kv/projects/<p>/<env>/meta` | `acme_email`, `acme_caserver` |
-| Runtime-секреты | **Vault** `kv/projects/<p>/<env>/<kind>` | `db`, `oidc`, `jwt`, `minio`, `backup`, `otel` |
+| Runtime-секреты | **Vault** `kv/projects/<p>/<env>/<kind>` | `db`, `oidc`, `jwt`, `minio`, `backup` |
 
 Любое значение, которое **меняется реже раза в неделю** и должно ротироваться корп-стороной → переезжает в Vault. Любое значение, которое **нужно ДО Vault-login'а** или генерится локально → остаётся в `.env`. **Исключение — image-теги:** они бампаются строго через `.env` (`<SVC>_TAG`, верб `make bump`) и через Vault не ходят — деплой тега остаётся операцией проектной стороны, без участия корп-админа.
 
@@ -40,7 +40,6 @@ kv/projects/<p>/
   _meta                       # { env_<env1>=1, env_<env2>=1, ..., created=<ISO> } — corp-only
   <env>/
     meta                      # { acme_email, acme_caserver, ... } — image-тегов тут НЕТ (они в .env)
-    otel                      # { token, accountID }
     db                        # { user, password, database }
     oidc                      # { client_id, client_secret }
     jwt                       # { signing_key }
@@ -62,11 +61,10 @@ kv/projects/<p>/
       path "kv/metadata/projects/<p>/<env>/*" { capabilities = ["read", "list"] }
       ```
       Token TTL 10m / max 30m, secret_id без срока.
-   2. `kv/projects/<p>/<env>/otel` — `{ token, accountID }` (accountID авто-инкрементируется корп-стороной).
-   3. `kv/projects/<p>/<env>/meta` с дефолтами:
+   2. `kv/projects/<p>/<env>/meta` с дефолтами:
       - `acme_email=ops@<placeholder>`
       - `acme_caserver=https://acme-v02.api.letsencrypt.org/directory`
-3. Если передан `--source-ip <env>=<ip>` — egress IP проектной VPS дописывается в `configs/crowdsec/whitelists.yaml` корп-side и crowdsec рестартится. Без этого CrowdSec ловит otel-collector UA на `crowdsecurity/http-bad-user-agent` и режет метрики/логи 403'ами. См. `corp-infra-template/.claude/rules/crowdsec-whitelist.md`.
+3. Если передан `--source-ip <env>=<ip>` — egress IP проектной VPS дописывается в `configs/crowdsec/whitelists.yaml` корп-side и crowdsec рестартится. Без этого CrowdSec может ловить служебный трафик проектной VPS к корп-сервисам и резать его 403'ами. См. `corp-infra-template/.claude/rules/crowdsec-whitelist.md`.
 4. Печатает per-env блок для оператора:
    ```
    === <p> / <env> ===
@@ -84,10 +82,10 @@ kv/projects/<p>/
 
 ```bash
 make new-env             # prompt: PROJECT_NAME, ENV, DOMAIN, VAULT_ROLE_ID, VAULT_SECRET_ID
-make ship                # минимальный стек: traefik + vault-agent + crowdsec + otel + node-exporter + cadvisor
+make ship                # минимальный стек: traefik + vault-agent + crowdsec + node-exporter + cadvisor
 ```
 
-Стек сразу виден в OTEL (token уже засеян). Postgres/minio/backup/backend — в `compose.profiles`, не стартуют пока оператор их явно не включит.
+Postgres/minio/backup/backend — в `compose.profiles`, не стартуют пока оператор их явно не включит.
 
 ## Operator flow — запросить secret для нового сервиса
 
@@ -96,7 +94,7 @@ make ship                # минимальный стек: traefik + vault-agen
 - выяснит поля + значения (случайные пароли генерит сам через `openssl rand`);
 - напечатает готовый блок `vault kv put kv/projects/<p>/<env>/<name> field=value ...` для копи-паста.
 
-Skill намеренно не имеет hardcoded enum'а имён — это позволяет одним механизмом seed'ить как стандартные секреты (`db`/`oidc`/`jwt`/`minio`/`backup`/`meta`/`otel`), так и project-specific (`stripe-key`, `sendgrid-creds`). Стандартные имена + их поля задокументированы в SKILL.md как cookbook.
+Skill намеренно не имеет hardcoded enum'а имён — это позволяет одним механизмом seed'ить как стандартные секреты (`db`/`oidc`/`jwt`/`minio`/`backup`/`meta`), так и project-specific (`stripe-key`, `sendgrid-creds`). Стандартные имена + их поля задокументированы в SKILL.md как cookbook.
 
 Оператор отправляет блок корп-админу (Slack/PR/ticket — внеконтрактно). Админ выполняет `vault kv put` (либо `corp-infra-template/scripts/seed-project-secrets.sh` с env-like файлом — он патчит существующие paths, не перезатирая). После seed'а:
 
@@ -113,15 +111,15 @@ Image-теги под ротацию НЕ попадают: rollout нового
 
 ## Profile-based opt-in
 
-Default-стек поднимается **без** секретов (кроме `otel` и `meta`, которые засеяны при онбординге). Сервисы с runtime-секретами сидят за `compose.profiles`:
+Default-стек поднимается **без** секретов (кроме `meta`, который засеян при онбординге). Сервисы с runtime-секретами сидят за `compose.profiles`:
 
 | Сервис | Profile | Зависит от KV |
 |---|---|---|
-| `traefik`, `vault-agent`, `crowdsec`, `otel-agent`, `node-exporter`, `cadvisor`, `landing` | **always-on** | `otel`, `meta` |
+| `traefik`, `vault-agent`, `crowdsec`, `node-exporter`, `cadvisor`, `landing` | **always-on** | `meta` |
 | `postgres` | `postgres` | `db` |
 | `minio` | `storage` | `minio` |
 | `backup` | `storage` | `backup`, `minio`, `db` |
-| `backend` | `backend` | `db`, `oidc`, `jwt`, `otel` |
+| `backend` | `backend` | `db`, `oidc`, `jwt` |
 
 `COMPOSE_PROFILES=postgres,backend make ship` = включить postgres + backend (и их KV-зависимости должны быть засеяны).
 

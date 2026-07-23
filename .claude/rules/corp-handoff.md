@@ -12,7 +12,7 @@ paths:
 
 Этот репо **и есть** таргет деплоя (`ship → deploy → контейнер`). Но часть
 конфига живёт не здесь, а на корп-стороне: Vault (`kv/projects/<p>/<env>/*`),
-AppRole/онбординг, CrowdSec-whitelist, OTLP-tenant. Любое изменение, которое
+AppRole/онбординг, CrowdSec-whitelist. Любое изменение, которое
 **требует действия корп-стороны** (или владельца DNS), обязано быть зафиксировано
 явно — иначе стек молча не поднимется (vault-agent retry-loop / cert не выпишется).
 
@@ -27,8 +27,8 @@ AppRole/онбординг, CrowdSec-whitelist, OTLP-tenant. Любое изме
 | Класс | Триггер | Кому |
 |---|---|---|
 | **Vault KV** | новый профиль в `COMPOSE_PROFILES` / новый сервис, которому нужен KV-объект (`db`/`oidc`/`jwt`/`minio`/`backup`/project-specific); новое поле в существующем объекте; новый `${VAR}` из vault-agent template | корп (Vault) — через skill `request-secret` |
-| **Env-онбординг** | новый `ENV`/проект (новый VPS) — нужен AppRole `projects-<p>-<env>` + seed `meta`+`otel` | корп (`onboard-project.sh --envs`) |
-| **CrowdSec whitelist** | новый egress-IP проектной VPS (иначе otel-collector UA ловит `http-bad-user-agent`, метрики режутся 403) | корп (whitelist corp-side в `corp-infra-template` + crowdsec restart) |
+| **Env-онбординг** | новый `ENV`/проект (новый VPS) — нужен AppRole `projects-<p>-<env>` + seed `meta` | корп (`onboard-project.sh --envs`) |
+| **CrowdSec whitelist** | новый egress-IP проектной VPS (иначе служебный трафик к корп-сервисам режется 403) | корп (whitelist corp-side в `corp-infra-template` + crowdsec restart) |
 | **DNS** | новый сабдомен `<name>.${DOMAIN}` под LE HTTP-01 | владелец DNS (A-record `*.${DOMAIN}` → VPS IP) |
 
 Не-corp: чисто локальная правка (compose-логика без нового KV/профиля, .tpl-рефактор
@@ -41,7 +41,7 @@ AppRole/онбординг, CrowdSec-whitelist, OTLP-tenant. Любое изме
 WHAT   <что изменилось: имя объекта/поля/профиля/IP, required?>
 WHY    <фича/причина — ссылка на коммит/план-атом>
 ACTION <что корп обязан сделать: vault kv put/patch <path> / onboard-project --envs / whitelist IP / DNS A-record>
-WHO    <корп (Vault/AppRole/CrowdSec/OTLP) | владелец DNS>
+WHO    <корп (Vault/AppRole/CrowdSec) | владелец DNS>
 DECIDE <нужно ли решение: значение/выбор; или «дефолт N годится?»>
 RISK   <что будет, если не сделано: стек не поднимется / cert не выпишется / метрики режутся>
 ===

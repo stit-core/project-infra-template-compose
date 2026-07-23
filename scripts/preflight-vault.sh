@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Vault preflight: проверка что AppRole логинится и core KV-paths существуют.
 #
-# Если корп ещё не засеял kv/projects/<p>/<env>/{otel,meta,db} — vault-agent
+# Если корп ещё не засеял kv/projects/<p>/<env>/{meta,db} — vault-agent
 # залипнет в retry-loop'е, traefik / backend.env не отрендерятся и стек не
 # поднимется. Лучше поймать с friendly-error здесь, чем после 3 минут compose-wait.
 #
@@ -53,11 +53,11 @@ token=$(printf '%s' "$login_json" | jq -r '.auth.client_token // empty')
 }
 
 # 3. Profile-aware required KV paths:
-#    - always-on: meta (ACME_EMAIL, ACME_CASERVER) + otel (token).
+#    - always-on: meta (ACME_EMAIL, ACME_CASERVER).
 #    - profile postgres: + db (POSTGRES_*)
 #    - profile backend:  + db, oidc, jwt
 #    - profile storage:  + minio, backup (+ db через postgres-валидацию deploy.sh)
-required=("meta" "otel")
+required=("meta")
 case ",${COMPOSE_PROFILES:-}," in *,postgres,*) required+=("db") ;; esac
 case ",${COMPOSE_PROFILES:-}," in *,backend,*)  required+=("db" "oidc" "jwt") ;; esac
 case ",${COMPOSE_PROFILES:-}," in *,storage,*)  required+=("minio" "backup") ;; esac
@@ -87,7 +87,7 @@ vault-preflight: ВНИМАНИЕ — в Vault отсутствуют paths дл
 $(printf '  • %s\n' "${missing[@]}")
 
 Стек не поднимется до seed'а. Что делать:
-  meta/otel    — корп-сторона онбординга (onboard-project --envs $ENV)
+  meta         — корп-сторона онбординга (onboard-project --envs $ENV)
   всё остальное — Claude skill /request-secret (.claude/skills/request-secret/) → корп-админ
 
 EOF

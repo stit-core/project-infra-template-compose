@@ -8,10 +8,10 @@
 одному на `ENV`. Шаги 1–8 проходите на каждый VPS отдельно (корп-онбординг env'ов —
 один раз, шаг 1).
 
-**Два пути control-plane.** Корп control-plane (Vault, OTLP, registry) — это либо **managed**
+**Два пути control-plane.** Корп control-plane (Vault, registry) — это либо **managed**
 stit (`*.stit.tech`; корп-онбординг на шаге 1 делает stit), либо **self-hosted** — ваш форк
 `corp-infra-template` на своём VPS (корп-шаги делаете вы на нём). Куда смотрит проектная VPS,
-задаётся в `.env` через `VAULT_ADDR` / `OTEL_EXPORTER_OTLP_ENDPOINT` / `REGISTRY_HOST`
+задаётся в `.env` через `VAULT_ADDR` / `REGISTRY_HOST`
 (managed-дефолты в `.env.example`). Вендор-лока нет — архитектура та же, меняется только хост.
 
 **Где вы работаете.** Репо живёт на **рабочей станции оператора** — здесь authoring / validate /
@@ -52,7 +52,6 @@ ssh root@<corp-host> 'cd /opt/corp-infra && \
 Создаёт per-env:
 - AppRole `projects-acme-<env>` (flat — Vault не принимает слеши в `auth/approle/role/<name>`) +
   policy read-only на `kv/data/projects/acme/<env>/*` и `kv/metadata/projects/acme/<env>/*`.
-- `kv/projects/acme/<env>/otel` — bearer token + accountID для OTLP-ingest.
 - `kv/projects/acme/<env>/meta` — дефолты (`acme_email`, `acme_caserver`; image-тегов в `meta` нет — они живут в `.env`, см. `make bump`).
 
 Возвращает по блоку на env — **сохраните**, нужно в шаге 4:
@@ -115,7 +114,7 @@ make new-env
 Создаёт `.env` (chmod 600) с переменными identity+auth. Всё остальное — в Vault
 (засеивается по необходимости, шаг 6). `CROWDSEC_BOUNCER_API_KEY` заполняется автоматически на
 первом деплое. На self-hosted допишите в `.env` адреса своего control-plane (`VAULT_ADDR` /
-`OTEL_EXPORTER_OTLP_ENDPOINT` / `REGISTRY_HOST` — см. `.env.example`). Строка
+`REGISTRY_HOST` — см. `.env.example`). Строка
 `# COMPOSE_PROFILES=` закомментирована — раскомментируете по мере активации сервисов.
 
 ## 5. Первый деплой — минимальный стек
@@ -130,14 +129,13 @@ make ship          # commit + check + push + (на main) ssh-deploy
 1. `render-configs.sh` собирает `agent.hcl` из `agent.hcl.parts/` под активный
    `COMPOSE_PROFILES` (на старте — пусто, только always-on) + envsubst для middlewares/landing.
 2. vault-agent логинится по AppRole, рендерит `.runtime/{env,secrets,configs}/*` из
-   `kv/projects/<p>/<env>/{meta,otel}`.
-3. Always-on (traefik / crowdsec / otel-agent / node-exporter / cadvisor / landing) стартуют
+   `kv/projects/<p>/<env>/meta`.
+3. Always-on (traefik / crowdsec / node-exporter / cadvisor / landing) стартуют
    после vault-agent healthy.
 4. Traefik запрашивает LE-cert на `${DOMAIN}` (landing).
 5. CrowdSec bouncer auto-register на первом подъёме — заполняет `CROWDSEC_BOUNCER_API_KEY`.
 
 Проверка: `make ps` (все healthy), `curl -fsS https://${DOMAIN}/` (landing через traefik+LE).
-Стек сразу виден в корп-Grafana (`$tenant=<project>-<env>`) — otel-token уже засеян.
 
 ## 6. Активация дополнительных профилей
 

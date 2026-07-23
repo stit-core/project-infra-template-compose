@@ -34,7 +34,7 @@
 
 | ссылка | где | как проверить |
 |---|---|---|
-| KV-kind в `Secrets` | имена `db`/`minio`/`backup`/`jwt`/`oidc`/`meta`/`otel`/прочее | kind читается существующим vault-agent template'ом (`configs/vault-agent/templates/*.tpl`; шаблоны именуются по consumer-сервису: `db` рендерят `postgres.env.tpl`/`backend.env.tpl`) ИЛИ явный stub-next-step «через /request-secret» |
+| KV-kind в `Secrets` | имена `db`/`minio`/`backup`/`jwt`/`oidc`/`meta`/прочее | kind читается существующим vault-agent template'ом (`configs/vault-agent/templates/*.tpl`; шаблоны именуются по consumer-сервису: `db` рендерят `postgres.env.tpl`/`backend.env.tpl`) ИЛИ явный stub-next-step «через /request-secret» |
 | vault-agent template имя | `Secrets` | то же |
 | `<sub>.${DOMAIN}` в `Route` | публичный сервис | сабдомен упомянут в `stack.md § Domains` ИЛИ явный stub «допилить stack» |
 | `COMPOSE_PROFILES`-профиль в `Hosting` | имя профиля | соответствует таблице маппинга `subtype → профиль` (см. `docs/project/README.md`) |

@@ -7,23 +7,16 @@ services:
     # git.stit.tech/<project>/backend `compose up --wait` упадёт на pull'е,
     # поэтому стартуем только когда image реально доступен.
     profiles: [backend]
-    # OTEL_TENANT, OTEL_TOKEN, PG_DSN, OIDC_*, JWT_SECRET — из vault-agent
-    # rendered backend.env (env_file ниже).
+    # PG_DSN, OIDC_*, JWT_SECRET — из vault-agent rendered backend.env
+    # (env_file ниже).
     environment:
       APP_ENV: ${ENV}
-      OTEL_SERVICE_NAME: backend
-      # Backend → local otel-agent → корп otel.stit.tech.
-      OTEL_EXPORTER_OTLP_ENDPOINT: otel-agent:4318
-      OTEL_EXPORTER_OTLP_INSECURE: "true"
     env_file:
-      - .runtime/secrets/otel.env      # OTEL_TOKEN + OTEL_TENANT (always-on)
       - .runtime/secrets/backend.env   # PG_DSN, OIDC_*, JWT_SECRET (profile=backend)
     depends_on:
       vault-agent:
         condition: service_healthy
       postgres:
-        condition: service_healthy
-      otel-agent:
         condition: service_healthy
     networks:
       - proxy

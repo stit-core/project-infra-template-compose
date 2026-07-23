@@ -37,7 +37,7 @@ kind: init-project-journey
   `git.stit.tech/<org>/backend`, tag → `BACKEND_TAG` в `.env`
   (`make bump SVC=backend TAG=…`).
 - Корп-онбординг: `onboard-project.sh --name acme --envs dev,prod`
-  (AppRole + meta + otel).
+  (AppRole + meta).
 - Seed `kv/projects/acme/dev/db` (user/password/database) через
   /request-secret.
 - crowdsec-whitelist: egress IP VPS (после /bootstrap-vps) через
@@ -95,7 +95,7 @@ kind: init-project-journey
 - форки бэкенда/фронта (для `hosting: external`);
 - seed KV (через `/request-secret`);
 - корп-онбординг (`onboard-project.sh` на корп-VPS);
-- corp-handoff (через `/corp-handoff` для crowdsec, acme, otel);
+- corp-handoff (через `/corp-handoff` для crowdsec, acme);
 - LE-DNS A-записи для сабдоменов.
 
 На финале (этап 5) — выводится оператору списком.

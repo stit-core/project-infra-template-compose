@@ -33,7 +33,7 @@ description: Оформить CORP-HANDOFF-блок, когда изменени
 
 ### 2. Определить адресата
 
-- Vault KV / AppRole / OTLP / CrowdSec → **корп-админ** (`corp-infra-template`).
+- Vault KV / AppRole / CrowdSec → **корп-админ** (`corp-infra-template`).
 - Новый сабдомен под LE → **владелец DNS** (A-record `*.${DOMAIN}` → VPS IP).
 
 ### 3. Сформировать блок

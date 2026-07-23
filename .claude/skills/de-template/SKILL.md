@@ -124,7 +124,7 @@ A.2/A.3, обнуление roadmap в A.5, удаление getting-started) и
 ### A.2. Прунить неиспользуемые `compose/*.yml`
 
 - Always-on (никогда не прунятся): `traefik`, `crowdsec`, `vault-agent`,
-  `otel-agent`, `node-exporter`, `cadvisor`, `landing`.
+  `node-exporter`, `cadvisor`, `landing`.
 - Profiled — каскад: показать список `compose/<x>.yml` для удаления +
   все ссылки на эти файлы (Makefile, скрипты, доки) → через
   `AskUserQuestion` подтвердить.
@@ -134,8 +134,7 @@ A.2/A.3, обнуление roadmap в A.5, удаление getting-started) и
 
 ### A.3. Прунить vault-agent parts/templates
 
-- Сохраняются всегда: `head.hcl`+`tail.hcl`, `otel.env.tpl`+
-  `traefik.yml.tpl`.
+- Сохраняются всегда: `head.hcl`+`tail.hcl`, `traefik.yml.tpl`.
 - Per profile (см. `phase-a-mechanics.md`) — каскад прунинга:
   показать parts/templates, которые исчезают, + проверить, что нет
   ссылок в `scripts/render-configs.sh` или other configs → через
@@ -185,7 +184,7 @@ de-template **не делает** cross-repo действий — печатае
   `git.stit.tech/<org>/backend`, tag → `BACKEND_TAG` в `.env`
   (`make bump SVC=backend TAG=…`).
 - **Корп-онбординг** (если ещё нет): `onboard-project.sh --name <p>
-  --envs …` на корп-VPS → AppRole + otel + meta.
+  --envs …` на корп-VPS → AppRole + meta.
 - **Seed вторичных KV** под активные профили: чейн `/request-secret`
   на `db`/`minio`/`backup`/`jwt`/`oidc` → блок `vault kv put`
   корп-админу.
@@ -231,9 +230,9 @@ State — **коммитбл артефакт**, не приватная пам�
 
 - **Не запускать на каноническом шаблоне.** Gate первая защита.
 - **Не стартовать до `stable`-артефактов** — gate вторая защита.
-- **Не прунить always-on edge/телеметрию** (`traefik`/`crowdsec`/
-  `vault-agent`/`otel-agent`/`node-exporter`/`cadvisor`/`landing`) —
-  это фиксированный фундамент шаблона.
+- **Не прунить always-on фундамент** (`traefik`/`crowdsec`/
+  `vault-agent`/`node-exporter`/`cadvisor`/`landing`) —
+  это фиксированная база шаблона.
 - **Не удалять без каскада.** Каждое `git rm` идёт после показа
   каскада + явного подтверждения через `AskUserQuestion`.
 - **Не выполнять cross-repo (форки/seed) самому** — только печатать

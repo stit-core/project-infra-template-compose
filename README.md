@@ -5,8 +5,8 @@
 ### Проектная VPS-инфра одним docker-compose стеком
 
 IaC-шаблон проектной инфры: один форк = один проект = один VPS на среду. Edge,
-Postgres, MinIO, backend, vault-agent, otel-agent, backup — декларативно,
-секреты из Vault, телеметрия в control-plane. Форк → `<org>/infra`, разворот за день.
+Postgres, MinIO, backend, vault-agent, backup — декларативно,
+секреты из Vault. Форк → `<org>/infra`, разворот за день.
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-2563eb)](LICENSE)
 [![Часть stit](https://img.shields.io/badge/stit-открытые_шаблоны-6366f1)](https://git.stit.tech/stit-core/stit-public)
@@ -22,7 +22,7 @@ Postgres, MinIO, backend, vault-agent, otel-agent, backup — декларати
 ## Место в экосистеме
 
 ```
-corp-infra-template          control plane — Vault · OTLP · registry
+corp-infra-template          control plane — Vault · registry
       │  onboard-project.sh → AppRole projects-<p>-<env> + KV seed
       ▼
 project-infra-template-compose   ← вы здесь   (форк → <org>/infra, один VPS на среду)
@@ -41,14 +41,14 @@ project-infra-template-compose   ← вы здесь   (форк → <org>/infra
 Вендор-лока нет — control-plane может быть наш или ваш:
 
 - **Managed (stit).** Наводите эндпоинты на наш контур (`vault.stit.tech`,
-  `otel.stit.tech`, `git.stit.tech`); мы онбордим проект (`onboard-project.sh`) и
+  `git.stit.tech`); мы онбордим проект (`onboard-project.sh`) и
   держим uptime. Меньше всего возни.
 - **Self-hosted.** Поднимаете **свой** control-plane из
   [`corp-infra-template`](https://git.stit.tech/stit-core/corp-infra-template)
-  (свой Vault, OTLP/Grafana, registry, онбординг) и наводите эти же эндпоинты на
+  (свой Vault, registry, онбординг) и наводите эти же эндпоинты на
   него — ни от кого не зависите.
 
-Технически меняется только хост Vault / OTLP / registry — он в `.env` и KV, не
+Технически меняется только хост Vault / registry — он в `.env` и KV, не
 зашит. Стек и контракты одинаковы в обоих путях.
 
 ## Что внутри
@@ -57,14 +57,14 @@ project-infra-template-compose   ← вы здесь   (форк → <org>/infra
 |---|---|---|
 | **Edge** | Traefik v3 + CrowdSec — HTTP-01 LE, WAF, IP-bans | always-on |
 | **Secrets** | vault-agent sidecar — рендерит секреты из Vault на VPS | always-on |
-| **Telemetry** | otel-agent → OTLP (Bearer из Vault) · cadvisor · node-exporter | always-on |
+| **Host metrics** | cadvisor · node-exporter — локальные метрики хоста/контейнеров | always-on |
 | **Landing** | заглушка корня `${DOMAIN}` под LE-cert | always-on |
 | **DB** | Postgres 17 | profile `postgres` |
 | **Storage** | MinIO (S3 + Console) | profile `storage` |
 | **Backup** | restic + pg_dumpall + crond (alpine), daily → restic-репо | profile `storage` |
 | **App** | backend, образ из вашего registry | profile `backend` |
 
-Always-on поднимается на минимальном seed'е (`meta` + `otel`); остальное — opt-in
+Always-on поднимается на минимальном seed'е (`meta`); остальное — opt-in
 через `COMPOSE_PROFILES`, по мере seed'а их KV. Дефолт — single-host; Postgres /
 MinIO можно вынести на отдельные хосты (split) — см.
 [`docs/reference/architecture.md`](docs/reference/architecture.md).
@@ -78,7 +78,7 @@ MinIO можно вынести на отдельные хосты (split) — �
 ```bash
 VAULT_TOKEN=<root> make onboard NAME=acme ENVS=dev,prod
 ```
-Создаёт per-env AppRole + сеет `kv/projects/acme/<env>/{meta,otel}`; возвращает
+Создаёт per-env AppRole + сеет `kv/projects/acme/<env>/meta`; возвращает
 `PROJECT_NAME / ENV / VAULT_ROLE_ID / VAULT_SECRET_ID` на каждую среду.
 
 **2. Форк + bootstrap VPS** (один VPS на среду): `Use this template` →
@@ -96,7 +96,7 @@ PROJECT_NAME=acme ENV=prod DOMAIN=acme.com VAULT_ROLE_ID=<id> VAULT_SECRET_ID=<i
 ```bash
 make ship        # check + push + (на main) ssh-deploy. На чистом дереве MSG не нужен.
 ```
-Минимальный стек (traefik / vault-agent / crowdsec / otel / metrics / landing)
+Минимальный стек (traefik / vault-agent / crowdsec / metrics / landing)
 живёт сразу. Дальше — активация профилей: `/request-secret` → блок `vault kv put`
 корп-админу → `COMPOSE_PROFILES` + `make ship`.
 
@@ -104,16 +104,15 @@ make ship        # check + push + (на main) ssh-deploy. На чистом де
 
 - **Конфиг → код.** Всё декларативно в `compose/*.yml` и `configs/`. Нет «только на сервере».
 - **Максимум в Vault.** `.env` минимален (identity + AppRole-bootstrap). Image-теги,
-  ACME, restic endpoint, OTEL token, runtime-секреты — в `kv/projects/<p>/<env>/*`,
+  ACME, restic endpoint, runtime-секреты — в `kv/projects/<p>/<env>/*`,
   ротируются централизованно.
 - **Multi-env через KV-dimension.** Один шаблон, N VPS, у каждого свой `ENV` и scope в Vault.
-- **Lazy stack.** Минимальный стек на meta+otel seed'е; profiled-сервисы — по мере seed'ов.
+- **Lazy stack.** Минимальный стек на meta seed'е; profiled-сервисы — по мере seed'ов.
 - **Локальный CI.** Backend-образ собирает разработчик; `make ship` пушит код + ssh-деплоит.
 
 ## Контракт с control-plane
 
 - **Vault** — secrets backend; AppRole per `(project, env)` от `onboard-project.sh`.
-- **OTLP-ingest** — tenant по `service.namespace=<project>-<env>` + Bearer из KV.
 - **Registry** — образы backend / worker / frontend.
 
 KV-layout, onboarding-флоу и multi-env — [`.claude/rules/multi-env.md`](.claude/rules/multi-env.md).

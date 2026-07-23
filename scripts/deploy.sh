@@ -28,7 +28,7 @@ HOST_ROLE=$(sed -nE 's/^HOST_ROLE=//p' .env | tail -1)
 HOST_ROLE="${HOST_ROLE:-all}"
 declare -A ROLE_FILES=(
   [all]="docker-compose.yml compose/*.yml"
-  [edge]="docker-compose.yml compose/traefik.yml compose/crowdsec.yml compose/vault-agent.yml compose/otel-agent.yml compose/node-exporter.yml compose/cadvisor.yml compose/landing.yml compose/backend.yml"
+  [edge]="docker-compose.yml compose/traefik.yml compose/crowdsec.yml compose/vault-agent.yml compose/node-exporter.yml compose/cadvisor.yml compose/landing.yml compose/backend.yml"
   [db]="docker-compose.yml compose/vault-agent.yml compose/postgres.yml"
   [storage]="docker-compose.yml compose/vault-agent.yml compose/minio.yml compose/backup.yml"
 )
@@ -78,7 +78,7 @@ fi
 # реальный контент — без заглушек compose отказывается стартовать. Vault-agent
 # перепишет их по мере рендера. Если добавляешь новый template в
 # configs/vault-agent/templates/ — добавь имя в этот список.
-for f in otel postgres backend minio backup; do
+for f in postgres backend minio backup; do
   [ -e ".runtime/secrets/$f.env" ] || touch ".runtime/secrets/$f.env"
 done
 [ -e ".runtime/configs/traefik.yml" ]   || touch ".runtime/configs/traefik.yml"
@@ -187,13 +187,12 @@ fi
 docker compose "${args[@]}" up -d --remove-orphans --wait --wait-timeout 180
 
 # Рестарт сервисов с изменёнными bind-mounted конфигами (не vault-templates —
-# их обработали выше; это про traefik/crowdsec/postgres/otel-agent configs).
+# их обработали выше; это про traefik/crowdsec/postgres configs).
 if [ "$prev_sha" != "$new_sha" ] && [ "$prev_sha" != "none" ]; then
   declare -A configmap=(
     [traefik]="traefik"
     [crowdsec]="crowdsec"
     [postgres]="postgres"
-    [otel-agent]="otel-agent"
   )
   mapfile -t changed_dirs < <(git diff --name-only "$prev_sha" "$new_sha" -- configs/ \
     | awk -F/ 'NF>=2 {print $2}' | sort -u)

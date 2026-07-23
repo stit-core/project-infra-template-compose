@@ -7,7 +7,7 @@ description: Добавить новый сервис в проектную ин
 
 Чек-лист добавления сервиса в проектный compose-стек. Цель — каждый сервис из коробки имеет healthcheck, корректные networks, доступ к секретам через vault-agent (если нужно), traefik labels с WAF (если public).
 
-В отличие от корп-вского `add-service` — здесь нет Authentik OIDC, alerting rules, prom scrape config (это всё на корп-стороне через otel-routing).
+В отличие от корп-вского `add-service` — здесь нет Authentik OIDC, alerting rules, prom scrape config (это корп-вещи, не проектные).
 
 ## Когда применять
 

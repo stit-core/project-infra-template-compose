@@ -54,11 +54,11 @@ make ship  # vault-agent перерендерит traefik.yml, traefik поды�
 
 > **Где живёт корп-сторона — два пути (спроси заранее).**
 > - **managed:** control-plane держит stit на `*.stit.tech`; `onboard-project.sh` запускает
->   корп-оператор stit, тебе возвращают per-env блок creds. OTLP/Vault/registry-эндпоинты —
->   managed-дефолты из `.env.example` (`otel.stit.tech` / `vault.stit.tech` / `git.stit.tech`).
+>   корп-оператор stit, тебе возвращают per-env блок creds. Vault/registry-эндпоинты —
+>   managed-дефолты из `.env.example` (`vault.stit.tech` / `git.stit.tech`).
 > - **self-hosted:** ты сам держишь форк `corp-infra-template` (свой `<org>/infra`-control-plane);
 >   `onboard-project.sh` запускаешь **в нём**, эндпоинты в проектном `.env` наводишь на свой
->   домен (`OTEL_EXPORTER_OTLP_ENDPOINT` / `VAULT_ADDR` / `REGISTRY_HOST` — см. `.env.example`).
+>   домен (`VAULT_ADDR` / `REGISTRY_HOST` — см. `.env.example`).
 >
 > Шаги ниже одинаковы для обоих путей; различие — чей это control-plane и какие эндпоинты в `.env`.
 > Вендор-лока нет: managed = инстанс того же шаблона, self-hosted = твой форк.
@@ -70,9 +70,9 @@ make ship  # vault-agent перерендерит traefik.yml, traefik поды�
      --name <p> --envs dev,prod \
      --source-ip dev=<vps-egress-ip>,prod=<vps-egress-ip>
    ```
-   Создаст per-env AppRole + засеит `kv/projects/<p>/<env>/{meta,otel}`. Вернёт блок `PROJECT_NAME / ENV / VAULT_ROLE_ID / VAULT_SECRET_ID` для каждого env. Без этого делать нечего.
+   Создаст per-env AppRole + засеит `kv/projects/<p>/<env>/meta`. Вернёт блок `PROJECT_NAME / ENV / VAULT_ROLE_ID / VAULT_SECRET_ID` для каждого env. Без этого делать нечего.
 
-   `--source-ip` пишет egress-IP проектной VPS в корп CrowdSec whitelist. Без него otel-collector UA попадает под `crowdsecurity/http-bad-user-agent` и весь трафик с проектной VPS режется 403'ами (метрики/логи перестанут доходить до `otel.stit.tech`). Можно опустить флаг, если IP заранее неизвестен — добавляется потом `echo` в `configs/crowdsec/whitelists.yaml` + `docker compose restart crowdsec` на корп-VPS (см. `corp-infra-template/.claude/rules/crowdsec-whitelist.md`).
+   `--source-ip` пишет egress-IP проектной VPS в корп CrowdSec whitelist. Без него служебный трафик с проектной VPS к корп-сервисам может резаться 403'ами. Можно опустить флаг, если IP заранее неизвестен — добавляется потом `echo` в `configs/crowdsec/whitelists.yaml` + `docker compose restart crowdsec` на корп-VPS (см. `corp-infra-template/.claude/rules/crowdsec-whitelist.md`).
 
 2. **VPS provisioned**, у тебя есть IP и root-доступ по SSH ключу (минимум один ключ в `/root/.ssh/authorized_keys`).
 
@@ -166,13 +166,13 @@ make deploy
 
 Что произойдёт:
 1. `render-configs.sh` собирает `agent.hcl` из `agent.hcl.parts/` под пустой `COMPOSE_PROFILES` (только always-on блок) + envsubst для middlewares/landing + генерит `.runtime/configs/vault-health.sh`.
-2. `compose up vault-agent` → AppRole-логин, рендер `.runtime/{configs/traefik.yml, secrets/otel.env, secrets/.ready}` из `kv/projects/<p>/<env>/{meta,otel}`.
+2. `compose up vault-agent` → AppRole-логин, рендер `.runtime/{configs/traefik.yml, secrets/.ready}` из `kv/projects/<p>/<env>/meta`.
 3. CrowdSec early для bouncer auto-register.
-4. Остальные always-on: traefik / otel-agent / node-exporter / cadvisor / landing.
+4. Остальные always-on: traefik / node-exporter / cadvisor / landing.
 5. Traefik запрашивает LE-cert на `${DOMAIN}` (landing).
 
 **Если что-то не поднимается:**
-- vault-agent не healthy / retry-loop на `kv/.../meta` или `kv/.../otel` → корп не онбоарднул env (см. предусловия). `make doctor` (секция «vault KV») покажет какие KV-paths отсутствуют.
+- vault-agent не healthy / retry-loop на `kv/.../meta` → корп не онбоарднул env (см. предусловия). `make doctor` (секция «vault KV») покажет какие KV-paths отсутствуют.
 - LE cert не выпустился → DNS не указывает на VPS, или 80/443 закрыты файрволом.
 - crowdsec bouncer auto-register не сработал → fallback `docker exec crowdsec cscli bouncers add traefik` (cscli внутри контейнера — make-first исключение), прописать в `.env`, `make deploy`.
 
@@ -214,7 +214,6 @@ make ship MSG="feat(foo): bar"   # add -A + commit + push + (на main) ssh-depl
 - `make ps` — always-on сервисы healthy.
 - `https://${DOMAIN}/` — landing отдаётся через traefik + LE.
 - `docker exec vault-agent ls -la /secrets/ /env /configs` — rendered файлы (`ls` внутри контейнера — make-first исключение).
-- `make logs SVC=otel-agent` — нет auth-ошибок при экспорте в `otel.stit.tech`.
 - `make logs SVC=vault-agent` — successful render, нет re-auth циклов.
 
 ### Backup smoke-test (после активации storage профиля)

@@ -2,7 +2,7 @@
 
 Шаблон проектной инфры stit: docker-compose стек одного VPS на клиентский
 проект. Edge (Traefik v3 + CrowdSec) + Postgres + Minio + backend + vault-agent +
-otel-agent + backup. Копируется в `<client-org>/infra`, адаптируется под домен/стек.
+backup. Копируется в `<client-org>/infra`, адаптируется под домен/стек.
 
 Этот файл — **always-on ядро + роутер**: здесь только то, что должно быть в контексте всегда
 (точка входа, где запускается, жёсткие границы) и карта, куда идти за остальным. Система слоится так:
@@ -42,8 +42,7 @@ authoring-проверок без `.env`/docker — норма, не паден�
 **Роль:** шаблон проектной VPS. Один форк (`<client-org>/infra`) — один проект, один VPS на
 env (dev/staging/prod).
 **Зависит от:** `corp-infra-template` — выдаёт AppRole `projects-<p>-<env>` + KV
-`kv/projects/<p>/<env>/*` (через `onboard-project.sh`), принимает OTLP на `otel.stit.tech`,
-хостит registry `git.stit.tech`.
+`kv/projects/<p>/<env>/*` (через `onboard-project.sh`), хостит registry `git.stit.tech`.
 **Image-теги:** бампаются **строго через `.env`** (`<SVC>_TAG`, верб `make bump SVC= TAG=`),
 через Vault теги не ходят.
 **Обслуживает:** `<client-org>/backend` (форк `go-backend-template`) — runtime для его образа;
@@ -61,13 +60,12 @@ surfaces); sibling-checkout рядом с этим репо, read-only. Резо
 | DB | Postgres 17 | `compose/postgres.yml` |
 | App | Backend (`git.stit.tech/<client-org>/backend`) | `compose/backend.yml` |
 | Secrets | vault-agent sidecar | `compose/vault-agent.yml` |
-| Telemetry | otel-agent → `otel.stit.tech` (OTLP + Prom-scrape host-метрик) | `compose/otel-agent.yml` |
-| Host metrics | cadvisor + node-exporter | `compose/cadvisor.yml`, `compose/node-exporter.yml` |
+| Host metrics | cadvisor + node-exporter (локальные метрики хоста/контейнеров) | `compose/cadvisor.yml`, `compose/node-exporter.yml` |
 | Storage | Minio (S3 + Console) на `s3.${DOMAIN}` / `minio.${DOMAIN}` | `compose/minio.yml` |
 | Backup | restic + pg_dumpall + crond в alpine, пишет в `$RESTIC_REPOSITORY` | `compose/backup.yml`, `containers/backup/` |
 
-Always-on (traefik / vault-agent / crowdsec / otel-agent / node-exporter / cadvisor / landing)
-поднимается на минимальном seed'е (`meta` + `otel` от корпа при онбординге). `postgres` /
+Always-on (traefik / vault-agent / crowdsec / node-exporter / cadvisor / landing)
+поднимается на минимальном seed'е (`meta` от корпа при онбординге). `postgres` /
 `storage` (minio + backup) / `backend` — opt-in через `COMPOSE_PROFILES`, активируются после
 seed'а соответствующих KV. Сети: `proxy` (наружу), `backend-net` (internal). См.
 `.claude/rules/multi-env.md` + `docs/reference/architecture.md`.
@@ -116,7 +114,7 @@ VAULT_TOKEN=<root> bash scripts/onboard-project.sh --name <p> --envs dev,prod
 ```
 
 Per env создаёт: AppRole `projects-<p>-<env>` (flat) + policy read-only на
-`kv/data/projects/<p>/<env>/*`; `kv/.../otel` (token + accountID); `kv/.../meta`
+`kv/data/projects/<p>/<env>/*`; `kv/.../meta`
 (`acme_email`, `acme_caserver`; image-теги в `meta` НЕ живут — они в `.env`).
 Возвращает per-env блок `PROJECT_NAME` /
 `ENV` / `VAULT_ROLE_ID` / `VAULT_SECRET_ID` для проектного `.env`.

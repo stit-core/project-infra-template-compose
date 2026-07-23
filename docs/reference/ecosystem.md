@@ -13,7 +13,7 @@ self-hosted = ваш форк). Канон карты контрактов жи�
 
 | Репо | Роль |
 |---|---|
-| `stit-core/corp-infra-template` | Корп control-plane: Vault, OTel ingest, Gitea registry, CrowdSec, SSO. Source of truth контрактов. Managed = инстанс на `*.stit.tech`, self-hosted = ваш форк. |
+| `stit-core/corp-infra-template` | Корп control-plane: Vault, Gitea registry, CrowdSec, SSO. Source of truth контрактов. Managed = инстанс на `*.stit.tech`, self-hosted = ваш форк. |
 | `stit-core/go-backend-template` | Шаблон Go-бэкенда. Форк `<org>/backend` собирает образ в `git.stit.tech`. |
 | `stit-core/business-strategy-template` | Шаблон бизнес-стратегии (business → ajtbd → swot → hypothesis-map → опц. продукт `projects/<slug>/`: vision/**surface** → interface → screens). Форк `<org>/strategy`. |
 | `stit-core/project-infra-template-compose` | **Этот.** Шаблон проектной VPS — runtime стека одного проекта. Форк `<org>/infra`. |
@@ -24,13 +24,12 @@ self-hosted = ваш форк). Канон карты контрактов жи�
 | Что корп выдаёт | Как | Адрес |
 |---|---|---|
 | AppRole `projects-<p>-<env>` + KV `kv/projects/<p>/<env>/*` (read-only) | `onboard-project.sh --name <p> --envs ...` | `vault.stit.tech` |
-| Telemetry ingest (OTLP, tenant routing) | otel-token в `kv/.../otel` | `otel.stit.tech` |
 | Source + container registry | deploy-key + PAT login | `git.stit.tech` |
 | CrowdSec whitelist egress-IP проектной VPS | `--source-ip <env>=<ip>` при онбординге | corp-side |
 
-Адреса `vault.stit.tech` / `otel.stit.tech` / `git.stit.tech` — managed-инстанс; на
+Адреса `vault.stit.tech` / `git.stit.tech` — managed-инстанс; на
 self-hosted это адреса вашего форка `corp-infra-template`, задаются через `VAULT_ADDR` /
-`OTEL_EXPORTER_OTLP_ENDPOINT` / `REGISTRY_HOST` (см. `.env.example`). Вендор-лока нет.
+`REGISTRY_HOST` (см. `.env.example`). Вендор-лока нет.
 
 Один VPS = одна среда, своя AppRole-пара. Детали проектной стороны контракта (KV-layout,
 lazy-seed, profile-opt-in) — `.claude/rules/multi-env.md`.

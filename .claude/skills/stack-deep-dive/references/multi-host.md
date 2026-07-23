@@ -18,7 +18,6 @@ vault-agent) — при split их наводят на целевой хост, 
 |---|---|---|---|
 | Postgres host/port | KV `kv/.../db` поля `host`/`port` (опц.) | `postgres` / `5432` | db-хост |
 | restic-репозиторий | KV `kv/.../backup.repository` | MinIO на этом VPS | storage-хост / managed S3 |
-| OTLP-коллектор | `.env` `OTEL_EXPORTER_OTLP_ENDPOINT` | managed `otel.stit.tech:443` | свой коллектор |
 
 `backend.env.tpl` рендерит `PG_DSN` через `{{ or .Data.data.host "postgres" }}:{{
 or .Data.data.port "5432" }}` — существующие KV `db` без `host`/`port` дают
@@ -34,7 +33,7 @@ or .Data.data.port "5432" }}` — существующие KV `db` без `host`
 | Роль | compose-файлы | несёт |
 |---|---|---|
 | `all` | `docker-compose.yml` + все `compose/*.yml` | весь стек (single-host, дефолт) |
-| `edge` | docker-compose + traefik + crowdsec + vault-agent + otel-agent + node-exporter + cadvisor + landing + backend | edge + app + телеметрия-агент |
+| `edge` | docker-compose + traefik + crowdsec + vault-agent + node-exporter + cadvisor + landing + backend | edge + app |
 | `db` | docker-compose + vault-agent + postgres | Postgres |
 | `storage` | docker-compose + vault-agent + minio + backup | MinIO + restic-backup |
 
@@ -56,7 +55,7 @@ or .Data.data.port "5432" }}` — существующие KV `db` без `host`
   хоста. При split backend (edge) ходит в Postgres (db) и MinIO (storage) по
   адресам из KV — нужна private LAN / wireguard / overlay между VPS. Шаблон даёт
   KV-эндпоинты, не сетевую фабрику.
-- **TLS/шифрование трафика между хостами** (PG, S3, OTLP по сети).
+- **TLS/шифрование трафика между хостами** (PG, S3 по сети).
 - **Репликация / HA / failover** (Postgres master+replica, MinIO distributed).
 - **Cross-host vault-agent.** Каждый хост запускает свой vault-agent с той же
   AppRole-парой — оператор раскладывает `.env` (identity + AppRole) на каждый VPS.

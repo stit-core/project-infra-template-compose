@@ -143,7 +143,7 @@ stack — singleton, режим B используется реже (типич�
     имя сети из `compose/`).
 - **Свободная форма** (через Other) — для **значения**: корневой
   `DOMAIN`, конкретные сабдомены, `RESTIC_REPOSITORY` URI, retention
-  политика, имя сети если кастомное, otel resource attrs.
+  политика, имя сети если кастомное.
 - **Никогда** не подсказывать конкретные домены/имена от себя.
   Anti-patterns — да. Сами значения — нет.
 
@@ -296,8 +296,7 @@ stack-сессии. Если видит рассинхрон (Route сабдом
 ## Запреты
 
 - Не редактировать stack.md вслепую — всегда сначала `Read`.
-- Не выдумывать значения: домены, retention, otel resource attrs,
-  имена сетей.
+- Не выдумывать значения: домены, retention, имена сетей.
 - Не дублировать `COMPOSE_PROFILES` явным списком в `stack.md` — их
   выводит `/de-template` из `stack § Service map` (subtype+hosting), не из
   захардкоженного списка.
@@ -305,9 +304,9 @@ stack-сессии. Если видит рассинхрон (Route сабдом
   они read-only отсюда; рассинхрон surface↔карта фикси через
   `AskUserQuestion`/state, а не правкой соседнего репо.
 - Не описывать always-on сервисы (traefik/crowdsec/vault-agent/
-  otel-agent/cadvisor/node-exporter/landing) как «отдельный сервис» —
+  cadvisor/node-exporter/landing) как «отдельный сервис» —
   это фундамент шаблона; в stack описывается их конфигурация
-  (middleware, source-IP, otel endpoint), не их «наличие».
+  (middleware, source-IP), не их «наличие».
 - Не оставлять `Generates` пустым.
 - Не повышать `draft → stable` без явного подтверждения архитектора и
   зелёного `make project-check`.

@@ -73,7 +73,7 @@ surfaces) живёт в соседнем `<org>/strategy` и **читается*
 - Если `Service map` содержит `hosting: external` — добавить в
   `## Cross-repo next-steps` строки «форкнуть `<repo>` для `<name>`».
 - Слить cross-repo next-steps из stack-сессии (corp-handoff для crowdsec,
-  acme через meta, otel через корп).
+  acme через meta).
 
 ---
 

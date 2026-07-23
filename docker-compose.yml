@@ -18,4 +18,3 @@ volumes:
   minio-data:
   vault-agent-secrets:
   vault-agent-bootstrap:
-  otel-agent-data:

@@ -27,7 +27,7 @@ C по секциям. B — реже, для разбора сырья (опи�
    - **Networks** (имена `proxy`/`backend-net`) →
    - **Backup** (restic-репо, расписание, retention; `N/A` если нет
      storage в карте) →
-   - **Observability** (otel endpoint, resource attrs) →
+   - **Observability** (host-метрики, логи) →
    - **Environments** (среды dev/prod → VPS/домен; `N/A` если одна) →
    - **Generates** (контракт для `/de-template`).
 4. Для каждой секции — раунд 3–5 `AskUserQuestion` (≤4 за tool-call)
@@ -81,7 +81,7 @@ oбa под `*.acme.dev`, public только backend и minio Console»).
    - Edge: crowdsec@file (дефолт), source-IP — TBD;
    - Networks: дефолтные proxy/backend-net;
    - Backup: restic репо `s3://restic.acme.dev/<env>`, расписание TBD;
-   - Observability: дефолтный otel.stit.tech (KV otel из корп-онбординга);
+   - Observability: local-only (cadvisor + node-exporter, дефолт);
    - Generates: traefik dynamic для api/minio, DOMAIN в .env.example.
    ```
 4. Раунд `AskUserQuestion` — подтвердить разнос / попросить корректировку
@@ -122,8 +122,8 @@ oбa под `*.acme.dev`, public только backend и minio Console»).
      реально есть).
    - **backup** → `compose/backup.yml` (если уже есть),
      `containers/backup/` (cron + restic).
-   - **observability** → `compose/otel-agent.yml`,
-     `configs/otel-agent/`.
+   - **observability** → `compose/cadvisor.yml`,
+     `compose/node-exporter.yml`.
    - **generates** → `configs/traefik/dynamic/`, `.env.example`,
      crowdsec source-IP next-step (corp-side).
 4. Применить `field-checklists.md § <секция>` к строкам. Найти:
@@ -170,7 +170,6 @@ oбa под `*.acme.dev`, public только backend и minio Console»).
 | конкретный сабдомен (`api.<...>`, `minio.<...>`) | стратегия именования проекта |
 | `RESTIC_REPOSITORY` URI | конкретный bucket — архитектор называет |
 | retention политика (`keep-daily 7 keep-weekly 4 …`) | бизнес-решение |
-| otel resource attrs | контекст проекта |
 | имена кастомных сетей | стратегия conflict-free |
 
 ### Чего не делать

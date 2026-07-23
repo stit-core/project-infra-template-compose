@@ -181,7 +181,7 @@ service-deep-dive, но напомни юзеру в конце сессии: «
    содержимым). Опциональные значения — `N/A` явной строкой.
 3. Все ссылки валидны:
    - `Secrets` упоминает существующий KV-kind (`db`/`minio`/`backup`/
-     `backend`/`otel`/`meta`/`jwt`/`oidc`) либо явный
+     `backend`/`meta`/`jwt`/`oidc`) либо явный
      stub-next-step «нужен `vault kv put` через /request-secret»;
    - `Route` ссылается на сабдомен — должен быть упомянут в
      `stack § Domains` (либо явный «допилить stack»);
