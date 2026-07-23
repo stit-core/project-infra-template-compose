@@ -37,10 +37,10 @@ if ! make check; then
   exit 1
 fi
 
-# --- Corp-handoff агрегация (.claude/rules/corp-handoff.md) ---
+# --- Corp impact агрегация ---
 # Печатает агрегированный Corp impact из активных планов; если corp-поверхность
 # тронута в неотправленных коммитах, а блока нет — warn.
-# Advisory: пуш не блокирует (передача корп-админу — out-of-band).
+# Advisory: пуш не блокирует (передача оператору корп-инфры — out-of-band).
 #
 # Single-file модель: единый .claude/plans/roadmap.md. На каждую `### <slug>`-секцию
 # под `## Active` — захватываем подсекцию `**Corp impact.**` (bold-лейбл) до следующего
@@ -78,20 +78,20 @@ if up=$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null); the
 fi
 touched=""
 # CrowdSec-whitelist здесь не фильтруется: файл живёт corp-side (corp-infra-template),
-# в проектном репо его нет — corp-handoff по нему оформляется вручную (skill corp-handoff).
+# в проектном репо его нет — egress-IP передаётся оператору корп-инфры out-of-band.
 [ -n "$range" ] && touched=$(git diff --name-only "$range" 2>/dev/null \
   | grep -E '^compose/[^/]+\.ya?ml$|^\.env\.example$|^ansible/roles/stit-onboard/' || true)
 
 if [ -n "$corp_impact" ]; then
   echo
-  echo "=== CORP HANDOFF · агрегировано из активных планов · передай корп-админу ==="
+  echo "=== CORP IMPACT · агрегировано из активных планов · передай оператору корп-инфры ==="
   printf '%s' "$corp_impact"
   echo "=== (out-of-band: Slack / тикет / PR в corp-infra-template) ==="
 elif [ -n "$touched" ]; then
   echo
   echo "⚠ corp-поверхность тронута в этом push, но **Corp impact.** пуст:" >&2
   printf '    %s\n' $touched >&2
-  echo "  Оформи CORP-HANDOFF (skill corp-handoff) и передай корп-админу до claim «готово»." >&2
+  echo "  Заполни **Corp impact.** в плане и передай оператору корп-инфры до claim «готово»." >&2
 fi
 
 echo "→ push origin $branch"

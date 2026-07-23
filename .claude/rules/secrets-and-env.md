@@ -25,7 +25,7 @@ envsubst'ом (`scripts/render-configs.sh`).
 | Local-managed | `CROWDSEC_BOUNCER_API_KEY`, `COMPOSE_PROFILES`, `HOST_ROLE` | auto-register / оператор |
 | Image-теги | `BACKEND_TAG` (конвенция `<SVC>_TAG`) | оператор (`make bump SVC= TAG=`) |
 | Registry | `REGISTRY_HOST` (managed-дефолт в коде; self-hosted переопределяет) | оператор (self-hosted) |
-| Секреты профилей | `POSTGRES_*`, `OIDC_*`, `JWT_SECRET`, `MINIO_*`, `APP_S3_*`, `BACKUP_S3_*`, `RESTIC_*`, `BACKUP_AWS_*` | оператор (scaffold — skill `/request-secret`) |
+| Секреты профилей | `POSTGRES_*`, `OIDC_*`, `JWT_SECRET`, `MINIO_*`, `APP_S3_*`, `BACKUP_S3_*`, `RESTIC_*`, `BACKUP_AWS_*` | оператор (по `.env.example`) |
 
 ## Multi-env
 
@@ -61,8 +61,8 @@ envsubst'ом (`scripts/render-configs.sh`).
 1. `${VAR}` в `compose/<svc>.yml` (`environment:`) или в `configs/<svc>/<file>.tpl`.
 2. Декларация в `.env.example` с комментарием как сгенерировать.
 
-После — `make ship`; на VPS оператор дописывает значение в `.env` (scaffold
-блока — skill `/request-secret`) и `make deploy`.
+После — `make ship`; на VPS оператор дописывает значение в `.env` по
+`.env.example` (комментарий там объясняет, как сгенерировать) и `make deploy`.
 
 ### Ротация
 
@@ -84,8 +84,8 @@ make deploy           # compose пересоздаст сервисы с изм�
 
 ### Profile-based opt-in
 
-Минимальный стек (always-on) — traefik / crowdsec / node-exporter / cadvisor /
-landing. Поднимается на identity + ACME из `.env`, других секретов не требует.
+Минимальный стек (always-on) — traefik / crowdsec / landing. Поднимается на
+identity + ACME из `.env`, других секретов не требует.
 
 Опциональные сервисы за `COMPOSE_PROFILES`:
 
@@ -95,9 +95,9 @@ landing. Поднимается на identity + ACME из `.env`, других �
 | `storage` | minio, minio-init, backup | `MINIO_*`, `APP_S3_*`, `BACKUP_S3_*`, `RESTIC_*`, `BACKUP_AWS_*` (+ обязательно `postgres` профиль) |
 | `backend` | backend | `OIDC_*`, `JWT_SECRET` (+ секция postgres) + `BACKEND_TAG` |
 
-Scaffold значений — Claude skill `/request-secret`
-(`.claude/skills/request-secret/SKILL.md`): печатает stdout-блок переменных
-с сгенерированными паролями — оператор дописывает его в `.env` на VPS.
+Значения оператор берёт из `.env.example` (комментарии объясняют, как
+сгенерировать каждое), генерирует пароли (`openssl rand`) и дописывает в
+`.env` на VPS.
 
 ## Что нельзя коммитить (cross-check)
 

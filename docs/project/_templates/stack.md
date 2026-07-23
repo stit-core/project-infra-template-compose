@@ -42,8 +42,8 @@ conflict-free на shared VPS. Кто в какой сети.>
 crond, retention. `N/A` если storage-профиль не включён.>
 
 ## Observability
-<Локальные метрики: cadvisor + node-exporter (always-on, endpoint'ы в `backend-net`). Куда идут
-логи (docker logs / свой стек проекта). `N/A` если ничего сверх фундамента не решено.>
+<Куда идут логи (docker logs). Метрики / трейсы — вне фундамента шаблона; если проекту нужны,
+он поднимает свой стек сам. `N/A` если ничего сверх фундамента не решено.>
 
 ## Environments
 <Какие среды у проекта (dev/staging/prod) — каждая = отдельный VPS с одним ENV. Чем отличаются
@@ -54,6 +54,6 @@ crond, retention. `N/A` если storage-профиль не включён.>
 - COMPOSE_PROFILES — выводится из Service map выше (subtype + hosting)
 - configs/traefik/dynamic/* — клиент-специфичные routers/middlewares
 - DOMAIN в .env.example
-- crowdsec source-IP next-step (corp-handoff: egress IP в whitelist)
+- crowdsec source-IP next-step (egress IP передать оператору корп-инфры для whitelist)
 - acme_email/caserver — meta KV next-step
 - для external-строк карты: cross-repo next-step (форкни <repo>)>

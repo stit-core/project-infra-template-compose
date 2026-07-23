@@ -20,8 +20,8 @@
 ## Точка входа
 
 - **`/smartdev`** — cockpit сессии: за один проход `make status`, поднимает активный план
-  и **сам переключает** в нужный режим (triage / corp-handoff / plan / add-service /
-  request-secret / dr-restore / bootstrap-vps). Запускай в начале / после `/clear`.
+  и **сам переключает** в нужный режим (triage / plan / add-service /
+  dr-restore / bootstrap-vps). Запускай в начале / после `/clear`.
 - **Planning-first.** Любое содержательное изменение идёт через план — секцию в едином
   `.claude/plans/roadmap.md` (skill `/plan`). Прямая правка — только truly-atomic и багфиксы
   (skill `triage`, RED-first). План переживает `/clear`.
@@ -58,11 +58,10 @@ surfaces); sibling-checkout рядом с этим репо, read-only. Резо
 | Edge | Traefik v3 + CrowdSec | `compose/traefik.yml`, `compose/crowdsec.yml` |
 | DB | Postgres 17 | `compose/postgres.yml` |
 | App | Backend (`git.stit.tech/<client-org>/backend`) | `compose/backend.yml` |
-| Host metrics | cadvisor + node-exporter (локальные метрики хоста/контейнеров) | `compose/cadvisor.yml`, `compose/node-exporter.yml` |
 | Storage | Minio (S3 + Console) на `s3.${DOMAIN}` / `minio.${DOMAIN}` | `compose/minio.yml` |
 | Backup | restic + pg_dumpall + crond в alpine, пишет в `$RESTIC_REPOSITORY` | `compose/backup.yml`, `containers/backup/` |
 
-Always-on (traefik / crowdsec / node-exporter / cadvisor / landing) поднимается
+Always-on (traefik / crowdsec / landing) поднимается
 на identity + ACME из `.env`. `postgres` / `storage` (minio + backup) / `backend`
 — opt-in через `COMPOSE_PROFILES`, активируются после заполнения их секций
 секретов в `.env` (единственный источник секретов, живёт только на VPS). Сети:
@@ -78,7 +77,7 @@ Always-on (traefik / crowdsec / node-exporter / cadvisor / landing) подним
 |---|---|---|
 | LOOP | `validate` / `doctor` / `check` | syntax+tpl+.env coverage / live preflight / validate+doctor+plan-check+project-check |
 | SHIP | `ship MSG="..."` | commit + check + push + (на main) ssh-deploy. Канон |
-| | `deploy` / `render` | server-side: git pull → render → compose up --wait / envsubst+agent.hcl |
+| | `deploy` / `render` | server-side: git pull → render → compose up --wait / envsubst для `*.tpl` |
 | OPS | `ps` / `logs SVC=` / `restart SVC=` / `recreate SVC=` / `build SVC=` | статус / логи / рестарт / пересоздать (env_file pickup) / сборка образа сервиса |
 | | `bump SVC= TAG=` | бамп image-тега: правит `<SVC>_TAG` в `.env` на VPS + force-recreate. Единственный канон бампа |
 | | `backup` / `restore-pg SNAPSHOT=` | one-shot backup / restore postgres из restic |
@@ -98,7 +97,7 @@ Always-on (traefik / crowdsec / node-exporter / cadvisor / landing) подним
 | Per-env `.env`-контракт, multi-env, профили | `.claude/rules/multi-env.md` |
 | Compose-инварианты сервиса | `.claude/rules/compose-and-services.md` |
 | Секреты и `.env` | `.claude/rules/secrets-and-env.md` |
-| Корп-handoff (когда тронул corp-поверхность) | `.claude/rules/corp-handoff.md` + skill `/corp-handoff` |
+| Корп-контракт (registry + CrowdSec-whitelist) | секция «Корп-контракт» ниже |
 | Онбординг / путь потребителя | `docs/getting-started.md` |
 | Runbook / инциденты | `docs/reference/runbook.md` |
 | Экосистема репо, контракты | `docs/reference/ecosystem.md` (→ канон `corp-infra-template/docs/ecosystem.md`) |
@@ -110,10 +109,11 @@ Always-on (traefik / crowdsec / node-exporter / cadvisor / landing) подним
 1. **Registry** `git.stit.tech` — pull образов `git.stit.tech/<p>/backend:<tag>`
    (push — разработчик backend-форка).
 2. **CrowdSec whitelist** — egress-IP проектной VPS, иначе служебный трафик к
-   корп-сервисам режется 403 (оформляется через `/corp-handoff`).
+   корп-сервисам режется 403. egress-IP передаётся оператору корп-инфры
+   out-of-band для внесения в whitelist.
 
-Секреты корп не выдаёт и не хранит: все секреты — в `.env` на VPS (scaffold
-значений — skill `/request-secret`). Подробности — `.claude/rules/multi-env.md`.
+Секреты корп не выдаёт и не хранит: все секреты оператор пишет сам в `.env` на
+VPS по контракту `.env.example`. Подробности — `.claude/rules/multi-env.md`.
 
 ## Стиль
 
@@ -143,10 +143,9 @@ Always-on (traefik / crowdsec / node-exporter / cadvisor / landing) подним
 ### Делать всегда
 - Перед claim «готово» — `make check` (validate + doctor + plan-check + project-check); после деплоя — `make ps`.
 - **Изменение — через план** (planning-first; skill `/plan`). Отклонение — осознанное, проговаривается.
-- Тронул corp-поверхность (`compose/*.yml` профили, `.env.example`, `ansible/`)
-  или изменение требует CrowdSec-whitelist'а egress-IP корп-side (файл живёт в
-  `corp-infra-template`, не здесь) — оформи **CORP-HANDOFF**-блок до claim «готово»
-  (skill `/corp-handoff`; `make status → == Infra-touch ==` это ловит).
+- Изменение требует CrowdSec-whitelist'а egress-IP корп-side (whitelist живёт в
+  `corp-infra-template`, не здесь) — передай egress-IP оператору корп-инфры
+  out-of-band до claim «готово».
 - Любая новая `${VAR}` в compose/configs — в `.env.example` сразу.
 - Bumps версий образов — отдельным коммитом после явного OK.
 

@@ -27,7 +27,7 @@ ship-поверхность. Приложения и живого стека л�
   всё ещё описывает продуктового соседа как `project-docs-template` / `<org>/docs` («DDD-артефакты»).
   Реальность: `business-strategy-template` → форк `<org>/strategy` (бизнес-стратегия + опц. продукт
   `docs/projects/<slug>/`). Правится на корп-стороне (другой репо, corp-surface, свой ревью) —
-  оформлено CORP-HANDOFF-нотой оператору.
+  передаётся оператору корп-инфры out-of-band.
 - **smoke-пороги в `.env.local`.** Серверный смок (`smoke.d/10-host.sh`) уже читает env-override
   `SMOKE_LOAD_FACTOR` / `SMOKE_RAM_MIN_PCT` / `SMOKE_DISK_PCT` (дефолты в коде). Если понадобится
   per-VPS тюнинг — добавить их в `.env.local.example` + прокинуть через `ssh.sh smoke`. Опционально,

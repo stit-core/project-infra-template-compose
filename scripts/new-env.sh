@@ -4,8 +4,7 @@
 # Multi-env: на каждом VPS свой ENV (dev/prod/...) и свой .env.
 # Стартовый .env — identity (PROJECT_NAME, ENV, DOMAIN) + ACME. Секреты
 # профилей (postgres/storage/backend) оператор дописывает руками по мере
-# активации — контракт и комментарии как сгенерировать в .env.example,
-# scaffold блока значений — skill `/request-secret`.
+# активации — контракт и комментарии как сгенерировать в .env.example.
 #
 # Non-interactive:
 #   PROJECT_NAME=acme ENV=prod DOMAIN=acme.com ACME_EMAIL=ops@acme.com \
@@ -50,7 +49,7 @@ else
 # Сгенерировано scripts/new-env.sh. См. .env.example для контракта.
 # Единственный источник конфига и секретов стека — этот файл (chmod 600,
 # gitignored). Секреты профилей дописывай руками по мере активации
-# (комментарии как сгенерировать — в .env.example; scaffold — /request-secret).
+# (комментарии как сгенерировать — в .env.example).
 # Image-теги — строго здесь (<SVC>_TAG, бамп через \`make bump\`).
 
 PROJECT_NAME=$PROJECT_NAME
@@ -80,16 +79,14 @@ fi
 cat <<EOF
 
 ================================================================================
-Минимальный стек (traefik + crowdsec + node-exporter + cadvisor + landing)
+Минимальный стек (traefik + crowdsec + landing)
 готов к подъёму — секретов сверх ACME ему не нужно.
 
 Запусти:
   make ship      # с workstation; либо \`make deploy\` напрямую на VPS
 
-По мере необходимости — добавляй секреты профилей через Claude:
-  /request-secret               # skill в .claude/skills/request-secret/
-
-Claude сформирует блок переменных для .env (генерит пароли где надо) —
-допиши его в .env на VPS, обнови COMPOSE_PROFILES и \`make ship\`.
+По мере необходимости — добавляй секреты профилей руками: заполни блок
+переменных нужного профиля в .env по контракту .env.example (там же — как
+сгенерировать каждое значение), обнови COMPOSE_PROFILES и \`make ship\`.
 ================================================================================
 EOF

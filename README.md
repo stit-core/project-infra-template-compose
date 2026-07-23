@@ -55,7 +55,6 @@ project-infra-template-compose   ← вы здесь   (форк → <org>/infra
 | Слой | Что | Активация |
 |---|---|---|
 | **Edge** | Traefik v3 + CrowdSec — HTTP-01 LE, WAF, IP-bans | always-on |
-| **Host metrics** | cadvisor · node-exporter — локальные метрики хоста/контейнеров | always-on |
 | **Landing** | заглушка корня `${DOMAIN}` под LE-cert | always-on |
 | **DB** | Postgres 17 | profile `postgres` |
 | **Storage** | MinIO (S3 + Console) | profile `storage` |
@@ -72,8 +71,9 @@ MinIO можно вынести на отдельные хосты (split) — �
 Полный путь (corp Day-0 → bootstrap VPS → профили → `/init-project`) —
 **[`docs/getting-started.md`](docs/getting-started.md)**. Коротко, три шага:
 
-**1. Корп-handoff** (один раз на среду): egress-IP будущей VPS — в корп
-CrowdSec-whitelist; доступ к registry `git.stit.tech` для pull/push образов.
+**1. Контракт с control-plane** (один раз на среду): egress-IP будущей VPS
+передаётся оператору корп-инфры out-of-band для корп CrowdSec-whitelist; доступ
+к registry `git.stit.tech` для pull/push образов.
 
 **2. Форк + bootstrap VPS** (один VPS на среду): `Use this template` →
 `<org>/infra`, клон, поднять чистый VPS и завести identity:
@@ -90,9 +90,9 @@ PROJECT_NAME=acme ENV=prod DOMAIN=acme.com ACME_EMAIL=ops@acme.com \
 ```bash
 make ship        # check + push + (на main) ssh-deploy. На чистом дереве MSG не нужен.
 ```
-Минимальный стек (traefik / crowdsec / metrics / landing)
-живёт сразу. Дальше — активация профилей: `/request-secret` → блок `VAR=value`
-в `.env` на VPS → `COMPOSE_PROFILES` + `make ship`.
+Минимальный стек (traefik / crowdsec / landing)
+живёт сразу. Дальше — активация профилей: допиши переменные профиля (см.
+`.env.example`) в `.env` на VPS → `COMPOSE_PROFILES` + `make ship`.
 
 ## Принципы
 

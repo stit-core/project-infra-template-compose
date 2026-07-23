@@ -26,8 +26,8 @@ Progressive disclosure: на холодном старте — только им
 Правило без `paths:` грузится всегда. Проверь, что новое правило path-scoped.
 
 Правила сейчас: `make-first`, `multi-env`, `compose-and-services`, `secrets-and-env`,
-`traefik-routing`, `corp-handoff`, `ansible-style`, `env-local`, `forward-only`. Skills:
-`smartdev` (cockpit), `plan`, `triage`, `add-service`, `request-secret`, `corp-handoff`,
+`traefik-routing`, `ansible-style`, `env-local`, `forward-only`. Skills:
+`smartdev` (cockpit), `plan`, `triage`, `add-service`,
 `dr-restore`, `bootstrap-vps`, `init-project`, `stack-deep-dive`, `service-deep-dive`, `de-template`.
 Subagent'ы: `explorer` (read-many), `reviewer` (severity-graded review) — оба read-only, sonnet.
 
@@ -36,7 +36,7 @@ Subagent'ы: `explorer` (read-many), `reviewer` (severity-graded review) — о�
 ```
 prompt → /smartdev (cockpit: make status, читает roadmap, чейнит режим)
        → plan (planning-first: изменение идёт через секцию в .claude/plans/roadmap.md)
-       → act (RED→GREEN: make validate/doctor; тронул corp-поверхность → corp-handoff)
+       → act (RED→GREEN: make validate/doctor; нужен CrowdSec-whitelist egress-IP → передать оператору корп-инфры out-of-band)
        → verify (claim «готово» → make check = validate + doctor + plan-check + project-check)
        → ship (make ship MSG="…": commit + check + push + на main ssh-deploy)
 ```

@@ -5,8 +5,8 @@
 
 Принцип: **поднимите платформу скриптами, спроектируйте проект скиллами — не правьте фундамент
 руками.** Multi-env: один проект имеет N сред (`dev`, `prod`, ...) — **N отдельных VPS**, по
-одному на `ENV`. Шаги 1–8 проходите на каждый VPS отдельно (корп-handoff —
-один раз, шаг 1).
+одному на `ENV`. Шаги 1–8 проходите на каждый VPS отдельно (координация с
+корп-стороной — один раз, шаг 1).
 
 **Два пути control-plane.** Корп control-plane (registry) — это либо **managed**
 stit (`git.stit.tech`; корп-шаги на шаге 1 делает stit), либо **self-hosted** — ваш форк
@@ -39,7 +39,7 @@ fallback `ansible/inventory.ini`).
 
 На self-hosted замените `git.stit.tech` на git вашего control-plane (`REGISTRY_HOST`).
 
-## 1. Day-0 — корп-handoff (один раз на все env)
+## 1. Day-0 — корп-контракт (один раз на все env)
 
 Корп-стороне нужно от проекта две вещи (**managed:** делает stit по запросу;
 **self-hosted:** делаете вы на своём форке `corp-infra-template`):
@@ -47,8 +47,8 @@ fallback `ansible/inventory.ini`).
 - **Registry-доступ** к `git.stit.tech` — pull для VPS + push для разработчика
   backend-форка (Gitea-аккаунт/PAT).
 - **CrowdSec-whitelist** egress-IP каждой проектной VPS — иначе служебный трафик
-  к корп-сервисам режется 403 (`configs/crowdsec/whitelists.yaml` corp-side +
-  restart crowdsec).
+  к корп-сервисам режется 403. egress-IP передаёте оператору корп-инфры
+  out-of-band; он вносит его в whitelist corp-side.
 
 Секреты проекта корп не выдаёт — они целиком в `.env` на VPS (шаги 4 и 6).
 Подробности контракта — `.claude/rules/multi-env.md`.
@@ -113,7 +113,7 @@ make ship          # commit + check + push + (на main) ssh-deploy
 
 Или на VPS с пошаговым stdout: `make deploy`. Что произойдёт:
 1. `render-configs.sh` — envsubst для traefik.yml / middlewares / landing из `.env`.
-2. Always-on (traefik / crowdsec / node-exporter / cadvisor / landing) стартуют.
+2. Always-on (traefik / crowdsec / landing) стартуют.
 3. Traefik запрашивает LE-cert на `${DOMAIN}` (landing).
 4. CrowdSec bouncer auto-register на первом подъёме — заполняет `CROWDSEC_BOUNCER_API_KEY`.
 
@@ -123,9 +123,9 @@ make ship          # commit + check + push + (на main) ssh-deploy
 
 По мере того как нужны postgres / storage / backend — заполняете секреты и активируете profile.
 
-1. Skill `/request-secret` — определит набор переменных профиля (контракт —
-   `.env.example`), сгенерит случайные значения где нужно (`openssl rand`).
-   Печатает блок `VAR=value` — допишите его в `.env` на VPS.
+1. Возьмите набор переменных профиля из `.env.example` (контракт с комментариями,
+   как что сгенерировать — `openssl rand` где нужен случайный секрет). Допишите
+   заполненные `VAR=value` в `.env` на VPS.
 2. Там же в `.env` отредактируйте:
    ```
    COMPOSE_PROFILES=postgres,storage,backend

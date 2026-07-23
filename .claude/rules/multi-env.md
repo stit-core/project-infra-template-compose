@@ -11,7 +11,7 @@ paths:
 
 Один проект может иметь несколько сред (`dev`, `prod`, опционально `staging`/etc). Каждая среда — **отдельный VPS** с одним и тем же compose-шаблоном, но со своим `ENV` и своим `.env`. Шаблон агностичен к именам env'ов — это произвольные слаги.
 
-Этот документ описывает контракт per-env `.env`: что где живёт, как активируются профили, как ротируются значения. Механика секретов (имена, рендер, что нельзя коммитить) — `.claude/rules/secrets-and-env.md`. Контракт с корпом (registry + CrowdSec) — `.claude/rules/corp-handoff.md`.
+Этот документ описывает контракт per-env `.env`: что где живёт, как активируются профили, как ротируются значения. Механика секретов (имена, рендер, что нельзя коммитить) — `.claude/rules/secrets-and-env.md`. Контракт с корпом (registry + CrowdSec) — секция ниже.
 
 ## Принцип: всё в .env
 
@@ -37,17 +37,17 @@ paths:
 
 ```bash
 make new-env             # prompt: PROJECT_NAME, ENV, DOMAIN, ACME_EMAIL
-make ship                # минимальный стек: traefik + crowdsec + node-exporter + cadvisor + landing
+make ship                # минимальный стек: traefik + crowdsec + landing
 ```
 
 Минимальному стеку секретов сверх ACME не нужно. Postgres/minio/backup/backend — в `compose.profiles`, не стартуют пока оператор их явно не включит.
 
 ## Operator flow — добавить секреты для нового профиля
 
-Когда стек дозрел до `postgres`/`storage`/`backend` — зовёшь Claude skill `/request-secret` (`.claude/skills/request-secret/SKILL.md`). Skill:
-- определяет по профилю/запросу нужный набор переменных (контракт — `.env.example`);
-- генерит случайные пароли сам (`openssl rand`), внешние значения (OIDC-креды, external S3) спрашивает;
-- печатает готовый блок `VAR=value` для дописывания в `.env` на VPS (без эха секретов в git).
+Когда стек дозрел до `postgres`/`storage`/`backend` — оператор:
+- берёт набор переменных профиля из `.env.example` (контракт с комментариями, как сгенерировать каждое);
+- генерирует случайные пароли (`openssl rand`), внешние значения (OIDC-креды, external S3) подставляет свои;
+- дописывает блок `VAR=value` в `.env` на VPS (в git секреты не уезжают — `.env` gitignored).
 
 После:
 
@@ -75,7 +75,7 @@ Default-стек поднимается **без** секретов профил
 
 | Сервис | Profile | Требует в .env |
 |---|---|---|
-| `traefik`, `crowdsec`, `node-exporter`, `cadvisor`, `landing` | **always-on** | identity + `ACME_*` |
+| `traefik`, `crowdsec`, `landing` | **always-on** | identity + `ACME_*` |
 | `postgres` | `postgres` | `POSTGRES_*` |
 | `minio` | `storage` | `MINIO_*`, `APP_S3_*`, `BACKUP_S3_*` |
 | `backup` | `storage` | `RESTIC_*`, `BACKUP_AWS_*`, `POSTGRES_*` |

@@ -65,9 +65,8 @@ make ship  # render-configs перерендерит traefik.yml, traefik под
 
 1. **Корп-сторона знает egress-IP проектной VPS?** Egress-IP пишется в корп CrowdSec
    whitelist — без него служебный трафик с проектной VPS к корп-сервисам (registry-pull)
-   может резаться 403'ами. Добавляется `echo` в `configs/crowdsec/whitelists.yaml` +
-   `docker compose restart crowdsec` на корп-VPS (см.
-   `corp-infra-template/.claude/rules/crowdsec-whitelist.md`). Оформи через `/corp-handoff`.
+   может резаться 403'ами. Оператор передаёт egress-IP оператору корп-инфры out-of-band
+   (тот дописывает whitelist на корп-VPS).
 
 2. **VPS provisioned**, у тебя есть IP и root-доступ по SSH ключу (минимум один ключ в `/root/.ssh/authorized_keys`).
 
@@ -161,7 +160,7 @@ make deploy
 Что произойдёт:
 1. `render-configs.sh` — envsubst для traefik.yml/middlewares/landing из `.env`.
 2. CrowdSec early для bouncer auto-register.
-3. Остальные always-on: traefik / node-exporter / cadvisor / landing.
+3. Остальные always-on: traefik / landing.
 4. Traefik запрашивает LE-cert на `${DOMAIN}` (landing).
 
 **Если что-то не поднимается:**
@@ -172,10 +171,12 @@ make deploy
 ### 7. Активация дополнительных профилей (по мере необходимости)
 
 Каждый сервис кроме always-on'а — за `COMPOSE_PROFILES`. Активация — два шага:
-1. Дописать секцию секретов профиля в `.env` на VPS (контракт — `.env.example`).
+1. Дописать секцию секретов профиля в `.env` на VPS (контракт — `.env.example`;
+   комментарии там объясняют, как сгенерировать каждое значение).
 2. Обновить `COMPOSE_PROFILES` в `.env` и `make ship`.
 
-Scaffold блока значений — Claude skill `/request-secret` (см. `.claude/skills/request-secret/SKILL.md`). Skill определит набор переменных профиля, сгенерит случайные пароли где надо, напечатает блок `VAR=value` для копи-паста в `.env`.
+Оператор берёт набор переменных профиля из `.env.example`, генерирует случайные
+пароли где надо (`openssl rand`), дописывает блок `VAR=value` в `.env`.
 
 После дописывания — на VPS:
 ```bash

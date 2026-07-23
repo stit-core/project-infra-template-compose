@@ -19,7 +19,7 @@ paths:
 | Группа | Верб | Что |
 |---|---|---|
 | LOOP | `validate` / `doctor` / `check` | compose syntax+tpl+.env / live preflight / `validate`+`doctor`+`plan-check`+`project-check` |
-| SHIP | `ship MSG="…"` / `deploy` / `render` | commit+check+push+(main)ssh-deploy / server-side / envsubst+agent.hcl |
+| SHIP | `ship MSG="…"` / `deploy` / `render` | commit+check+push+(main)ssh-deploy / server-side / envsubst для `.tpl` |
 | OPS | `ps` / `logs SVC=` / `restart SVC=` / `recreate SVC=` / `build SVC=` | статус / логи / рестарт / пересоздать (env_file/тег pickup) / сборка образа сервиса (на VPS) |
 | | `bump SVC= TAG=` | бамп image-тега: `<SVC>_TAG` в `.env` на VPS + force-recreate. Теги — строго через `.env` |
 | | `backup` / `restore-pg SNAPSHOT=` | one-shot backup / restore postgres из restic |

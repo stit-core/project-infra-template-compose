@@ -27,7 +27,7 @@ C по секциям. B — реже, для разбора сырья (опи�
    - **Networks** (имена `proxy`/`backend-net`) →
    - **Backup** (restic-репо, расписание, retention; `N/A` если нет
      storage в карте) →
-   - **Observability** (host-метрики, логи) →
+   - **Observability** (метрики, логи) →
    - **Environments** (среды dev/prod → VPS/домен; `N/A` если одна) →
    - **Generates** (контракт для `/de-template`).
 4. Для каждой секции — раунд 3–5 `AskUserQuestion` (≤4 за tool-call)
@@ -50,8 +50,8 @@ minio Console под `minio.`. Скилл предлагает четыре во
 
 - **crowdsec middleware** — две опции: «`crowdsec@file` на всех public
   роутах (дефолт шаблона)» / «исключения есть» (Other → какие).
-- **source-IP whitelist** — две опции: «нужен — `Generates` next-step
-  через /corp-handoff» / «не нужен (нет CrowdSec central-LAPI)».
+- **source-IP whitelist** — две опции: «нужен — `Generates` next-step:
+  egress-IP корп-оператору out-of-band» / «не нужен (нет CrowdSec central-LAPI)».
 - **rate-limit** — две опции: «дефолт traefik» / «кастомный
   middleware» (Other → подробнее).
 - **acme провайдер** — две опции: «LE prod (acme_caserver=prod)» /
@@ -81,7 +81,7 @@ oбa под `*.acme.dev`, public только backend и minio Console»).
    - Edge: crowdsec@file (дефолт), source-IP — TBD;
    - Networks: дефолтные proxy/backend-net;
    - Backup: restic репо `s3://restic.acme.dev/<env>`, расписание TBD;
-   - Observability: local-only (cadvisor + node-exporter, дефолт);
+   - Observability: метрик нет (дефолт), логи local-only;
    - Generates: traefik dynamic для api/minio, DOMAIN в .env.example.
    ```
 4. Раунд `AskUserQuestion` — подтвердить разнос / попросить корректировку
@@ -122,8 +122,8 @@ oбa под `*.acme.dev`, public только backend и minio Console»).
      реально есть).
    - **backup** → `compose/backup.yml` (если уже есть),
      `containers/backup/` (cron + restic).
-   - **observability** → `compose/cadvisor.yml`,
-     `compose/node-exporter.yml`.
+   - **observability** → метрик нет по дефолту; логи — `docker logs`
+     (json-file). Свой стек метрик/логов — сервисы в карте.
    - **generates** → `configs/traefik/dynamic/`, `.env.example`,
      crowdsec source-IP next-step (corp-side).
 4. Применить `field-checklists.md § <секция>` к строкам. Найти:

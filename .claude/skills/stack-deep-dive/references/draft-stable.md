@@ -38,7 +38,7 @@
 | имена сетей | `Networks` | соответствуют тому, что есть в `compose/` (или явный rename-план в `Generates`) |
 | `Backup: N/A` ↔ карта | `Backup` | в карте нет `datastore` И нет volume'ов под бэкап |
 | `Generates` пути | `Generates` | реалистичны (`configs/traefik/dynamic/*`, `.env.example`, crowdsec source-IP next-step corp-side) |
-| `acme_email`/`acme_caserver` | `Domains` / `Generates` | значения отмечены как next-step через `meta` KV (corp-handoff) |
+| `ACME_EMAIL`/`ACME_CASERVER` | `Domains` / `Generates` | значения отмечены как next-step: оператор заполняет `.env` на VPS по `.env.example` |
 
 ### 4. `Generates` содержит хотя бы один реальный артефакт
 
@@ -47,8 +47,8 @@
 
 - `configs/traefik/dynamic/*` (динамические роуты),
 - `DOMAIN` в `.env.example` (либо проектный default),
-- crowdsec source-IP next-step (corp-handoff),
-- acme `meta` next-step (для `meta.acme_email`/`acme_caserver`).
+- crowdsec source-IP next-step (egress-IP корп-оператору out-of-band),
+- acme next-step (`ACME_EMAIL`/`ACME_CASERVER` в `.env` на VPS).
 
 Если ни одного — `Generates` бесполезен, `/de-template` не из чего
 разворачивать. Это блокер.

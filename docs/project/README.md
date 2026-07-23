@@ -27,7 +27,7 @@ docs/project/
 
 | kind | файл | что описывает |
 |---|---|---|
-| `stack` | `stack.md` | cross-cutting инфры VPS (домены, edge, сети, бэкап, телеметрия) + **карта сервисов** + среды |
+| `stack` | `stack.md` | cross-cutting инфры VPS (домены, edge, сети, бэкап, логи) + **карта сервисов** + среды |
 | `service` | `services/<name>.md` | один **hosted** сервис: хостинг, идентичность, секреты, роут |
 
 `stack § Service map` — авторитетный перечень всех частей продукта на стороне инфры. Сервис с
@@ -81,9 +81,9 @@ status: draft
 | `frontend` (`hosting: here`) | — (always-on `landing`) | `compose/landing.yml` |
 | `frontend`/`backend` (`hosting: external`) | — | cross-repo next-step |
 
-Always-on edge/host-метрики (`traefik`/`crowdsec`/`node-exporter`/
-`cadvisor`) — фиксированный фундамент шаблона, не описывается service-doc'ами. `stack § Generates`
-несёт только cross-cutting: traefik dynamic routes, `DOMAIN`, crowdsec source-IP next-step.
+Always-on edge (`traefik`/`crowdsec`/`landing`) — фиксированный фундамент шаблона, не
+описывается service-doc'ами. `stack § Generates` несёт только cross-cutting: traefik
+dynamic routes, `DOMAIN`, crowdsec source-IP next-step.
 
 ## Cross-repo: продуктовый контекст
 
@@ -125,4 +125,4 @@ domain/stack-gate эталона. `scripts/git-hooks/pre-commit` гонит ва
   читается cross-repo.
 - ❌ Оставлять `Generates` пустым — движку `de-template` не из чего разворачивать.
 - ❌ Промоутить `status: stable` руками без зелёного валидатора.
-- ❌ Описывать always-on edge/телеметрию service-doc'ом — это фиксированный фундамент шаблона.
+- ❌ Описывать always-on edge (traefik/crowdsec/landing) service-doc'ом — это фиксированный фундамент шаблона.

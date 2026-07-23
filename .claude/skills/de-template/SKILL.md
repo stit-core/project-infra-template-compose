@@ -123,8 +123,7 @@ A.2/A.3, обнуление roadmap в A.5, удаление getting-started) и
 
 ### A.2. Прунить неиспользуемые `compose/*.yml`
 
-- Always-on (никогда не прунятся): `traefik`, `crowdsec`,
-  `node-exporter`, `cadvisor`, `landing`.
+- Always-on (никогда не прунятся): `traefik`, `crowdsec`, `landing`.
 - Profiled — каскад: показать список `compose/<x>.yml` для удаления +
   все ссылки на эти файлы (Makefile, скрипты, доки) → через
   `AskUserQuestion` подтвердить.
@@ -183,10 +182,11 @@ de-template **не делает** cross-repo действий — печатае
   `<org>/backend` / `<org>/frontend`; backend-образ пушится в
   `git.stit.tech/<org>/backend`, tag → `BACKEND_TAG` в `.env`
   (`make bump SVC=backend TAG=…`).
-- **Секреты активных профилей**: чейн `/request-secret` → блок
-  `VAR=value` для `.env` на VPS.
+- **Секреты активных профилей**: оператор дописывает блок `VAR=value`
+  в `.env` на VPS по `.env.example` (комментарии там объясняют, как
+  сгенерировать каждое значение).
 - **Edge** из `stack § Generates`: egress-IP VPS в crowdsec-whitelist
-  (`/corp-handoff`); сабдомены под LE-DNS.
+  (оператор передаёт корп-оператору out-of-band); сабдомены под LE-DNS.
 
 ## Verify
 
@@ -227,8 +227,7 @@ State — **коммитбл артефакт**, не приватная пам�
 
 - **Не запускать на каноническом шаблоне.** Gate первая защита.
 - **Не стартовать до `stable`-артефактов** — gate вторая защита.
-- **Не прунить always-on фундамент** (`traefik`/`crowdsec`/
-  `node-exporter`/`cadvisor`/`landing`) —
+- **Не прунить always-on фундамент** (`traefik`/`crowdsec`/`landing`) —
   это фиксированная база шаблона.
 - **Не удалять без каскада.** Каждое `git rm` идёт после показа
   каскада + явного подтверждения через `AskUserQuestion`.
@@ -248,4 +247,4 @@ State — **коммитбл артефакт**, не приватная пам�
   профиль».
 - `.claude/skills/init-project/SKILL.md` — оркестратор, чейнит сюда
   последним шагом.
-- `.claude/rules/multi-env.md` — profile-based opt-in, lazy-seed KV.
+- `.claude/rules/multi-env.md` — profile-based opt-in, секреты в `.env`.

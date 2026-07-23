@@ -32,7 +32,7 @@ VPS (несколько серверов на одну среду). **Шабло
 | Роль | compose-файлы | несёт |
 |---|---|---|
 | `all` | `docker-compose.yml` + все `compose/*.yml` | весь стек (single-host, дефолт) |
-| `edge` | docker-compose + traefik + crowdsec + node-exporter + cadvisor + landing + backend | edge + app |
+| `edge` | docker-compose + traefik + crowdsec + landing + backend | edge + app |
 | `db` | docker-compose + postgres | Postgres |
 | `storage` | docker-compose + minio + backup | MinIO + restic-backup |
 

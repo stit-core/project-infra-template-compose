@@ -137,4 +137,4 @@ Local-default `s3:http://minio:9000/backups` отсутствует by design �
 
 - Restore прошёл, healthchecks зелёные → `/smartdev` (вернуться в cockpit) и залогировать инцидент в `docs/incidents/` (шаг 4 выше).
 - Restore не сходится (snapshot не читается, `restic check` падает, репо потерян) → `/triage` с собранным выводом `restic snapshots` / логами; разобрать корневую причину, не замазывать.
-- Тронул corp-поверхность по ходу DR (новый egress-IP под CrowdSec-whitelist, новый сабдомен, re-seed KV) → `/corp-handoff` до claim «готово».
+- Тронул corp-поверхность по ходу DR (новый egress-IP под CrowdSec-whitelist, новый сабдомен) → оператор передаёт данные корп-оператору out-of-band до claim «готово».

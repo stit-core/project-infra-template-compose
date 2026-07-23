@@ -31,9 +31,9 @@ description: Red-арм cockpit'а — структурированный раз
 |---|---|---|
 | **compose не стартует** | `docker compose up` error, сервис не создаётся | `make validate` → `make doctor` → `docker compose config` (raw — debug-исключение make-first) |
 | **healthcheck red** | `make ps` unhealthy / restarting | `make logs SVC=<svc>` — последние строки перед рестартом |
-| **пустые секреты** | сервис падает на auth/DSN; env-значения пустые | `make doctor` (.env identity/coverage) — переменные профиля не заполнены в `.env` (`/request-secret`) |
+| **пустые секреты** | сервис падает на auth/DSN; env-значения пустые | `make doctor` (.env identity/coverage) — переменные профиля не заполнены в `.env` (оператор дописывает по `.env.example`) |
 | **cert не выписан** | HTTPS не открывается, traefik спамит acme | `make logs SVC=traefik` + `grep -i acme` — DNS NXDOMAIN / LE rate-limit / HTTP-01 |
-| **render fail** | `make render`/deploy падает на envsubst / agent.hcl | `scripts/render-configs.sh` — отсутствующий `${VAR}` в `.env`, .tpl-синтаксис, профиль |
+| **render fail** | `make render`/deploy падает на envsubst | `scripts/render-configs.sh` — отсутствующий `${VAR}` в `.env`, .tpl-синтаксис, профиль |
 | **deploy.sh fail** | `make ship`/`make deploy` non-zero | где упал: `git pull --ff-only` (drift) / render-configs / compose `--wait` timeout |
 | **on-server drift** | оператор правил на хосте, следующий deploy затрёт | backport в git **в тот же день** |
 
@@ -68,8 +68,8 @@ description: Red-арм cockpit'а — структурированный раз
   guard/проверку, чтобы не повторилось молча; верификация — `make check`.
 - Баг в compose/configs → правь декларативно, не хот-фиксь на хосте.
 - Причина на корп-стороне (registry-доступ / DNS / crowdsec whitelist)
-  → это **не чинится здесь**: оформи `CORP-HANDOFF` (skill `corp-handoff`),
-  передай корп-админу. Не workaround'ь обходом политики.
+  → это **не чинится здесь**: оператор передаёт данные (egress-IP / нужный образ)
+  оператору корп-инфры out-of-band. Не workaround'ь обходом политики.
 
 ### 5. Re-verify зелёный
 
@@ -90,8 +90,8 @@ make logs SVC=<svc>      # подтверди, что ретраи прекра�
 
 ### 7. Коммит
 
-`fix(<scope>): <одна строка>`. Если задело corp-поверхность — `CORP-HANDOFF`
-блок до claim «готово».
+`fix(<scope>): <одна строка>`. Если задело corp-поверхность (egress-IP / образ из
+registry) — оператор передаёт данные корп-оператору out-of-band до claim «готово».
 
 ### 8. Когда застрял (2+ попытки)
 
@@ -106,5 +106,5 @@ make logs SVC=<svc>      # подтверди, что ретраи прекра�
 - ❌ Правка на хосте без backport в git в тот же день.
 - ❌ `docker compose down -v` / `docker volume rm` — теряет данные (блокирует `permissions.deny`, и правильно).
 - ❌ Раздуть healthcheck-timeout вместо фикса причины unhealthy.
-- ❌ Workaround'ить отсутствующий KV / политику вместо `corp-handoff`.
+- ❌ Workaround'ить отсутствующий registry-доступ / whitelist вместо out-of-band handoff корп-оператору.
 - ❌ «while we're at it» — расширение скоупа в багфиксе. Фикс = маленький коммит; большое — `plan`.

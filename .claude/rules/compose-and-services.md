@@ -19,7 +19,7 @@ paths:
 | Сеть | external | internal | Кто |
 |---|---|---|---|
 | `proxy` | — | нет | Traefik + публичные сервисы (backend) + outbound (backup → внешний S3) |
-| `backend-net` | — | да | postgres, backend, cadvisor, node-exporter |
+| `backend-net` | — | да | postgres, backend |
 
 Если новый сервис нужен только внутрь — `backend-net`. Если публичный — `proxy + backend-net` (backend-net чтобы видеть БД), не складывай только в `proxy`.
 

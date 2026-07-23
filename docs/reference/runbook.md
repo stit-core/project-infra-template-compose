@@ -7,7 +7,7 @@ Common failure modes на проектном VPS и что делать. Ordered
 **Симптом:** postgres/backend/minio в restart-loop сразу после старта, в логах — пустой пароль / невалидный DSN / auth failed.
 
 Возможные причины:
-- **Секция профиля не заполнена в `.env`** — профиль включён в `COMPOSE_PROFILES`, а его переменные (см. `.env.example`) пустые. Сформируй блок через skill `/request-secret`, допиши в `.env`, `make deploy`.
+- **Секция профиля не заполнена в `.env`** — профиль включён в `COMPOSE_PROFILES`, а его переменные (см. `.env.example`) пустые. Возьми набор переменных профиля из `.env.example`, заполни в `.env`, `make deploy`.
 - **Контейнер создан до заполнения `.env`** — environment фиксируется при container CREATE. `make deploy` пересоздаст сам; точечно — `make recreate SVC=<svc>`.
 - **Опечатка в имени переменной** — `make doctor` (секция `.env coverage`) покажет незаполненные ключи из `.env.example`.
 

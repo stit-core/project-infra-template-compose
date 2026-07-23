@@ -93,18 +93,17 @@ services:
 2. Задекларировать переменные в `.env.example` (закомментированными, в секции
    профиля) с комментарием как сгенерировать / откуда взять.
 
-3. Сформировать блок значений для `.env` на VPS через skill `/request-secret`
-   (генерит пароли сам, печатает copy-paste блок). Без заполненных значений
-   сервис стартует с пустым env и падает.
+3. Оператор дописывает значения в `.env` на VPS по `.env.example` (генерирует
+   пароли где нужно). Без заполненных значений сервис стартует с пустым env и падает.
 
 4. В compose добавь `profiles:` (если сервис opt-in):
    ```yaml
    profiles: [<profile>]
    ```
 
-> **Corp-handoff.** Секреты — не corp-поверхность (живут в `.env` на VPS).
-> `/corp-handoff` нужен только когда сервису нужен новый образ из registry
-> `git.stit.tech` или меняется egress-IP под CrowdSec-whitelist.
+> **Corp-поверхность.** Секреты живут в `.env` на VPS — корп не участвует.
+> Корп-оператору передаётся out-of-band только новый образ из registry
+> `git.stit.tech` или изменившийся egress-IP под CrowdSec-whitelist.
 
 ### 3. Конфиг сервиса (если нужен)
 
@@ -148,10 +147,10 @@ services:
 - [ ] Healthcheck указан
 - [ ] `networks:` явный список
 - [ ] Если public — `proxy` сеть + traefik labels с минимум `crowdsec@file`
-- [ ] Если читает секреты — `${VAR}` в `environment:` + декларация в `.env.example` + блок значений для `.env` через `/request-secret`
+- [ ] Если читает секреты — `${VAR}` в `environment:` + декларация в `.env.example` + оператор дописал значения в `.env` на VPS
 - [ ] Все `${VAR}` есть в `.env.example`
 - [ ] Если новый Postgres — добавлен ещё один `pg_dumpall` блок в `containers/backup/backup-now` (с другим `-h` host'ом и `--stdin-filename`)
-- [ ] Если нужен новый образ из registry / новый egress-IP — оформлен `/corp-handoff`-блок **до** claim «готово»
+- [ ] Если нужен новый образ из registry / новый egress-IP — оператор передал данные корп-оператору out-of-band **до** claim «готово»
 - [ ] `make validate` зелёный
 - [ ] (Если bespoke-сигнал вне `docker ps`) — `scripts/tools/smoke.d/90-<svc>.sh` для `== Server ==`
 

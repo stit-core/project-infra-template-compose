@@ -30,7 +30,7 @@ ref: docs/project/services/backend.md
   ландинг через CDN; `/healthz` явно отвечает backend-инстанс.
 
 ## Что копать дальше
-- Раскрыть KV-поля `jwt` после seed'а через /request-secret.
+- Заполнить `JWT_SECRET` в `.env` на VPS по `.env.example`.
 ```
 
 ## Frontmatter

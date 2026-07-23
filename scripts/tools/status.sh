@@ -3,7 +3,7 @@
 # git / roadmap / fragments, БЕЗ docker и БЕЗ SSH. Секции парсятся smartdev'ом
 # детерминированно для чейнинга:
 #   == Critical ==     ATTENTION: <…> (git/deploy-drift) → чейн в triage (none = чисто)
-#   == Infra-touch ==  список corp-классов → чейн в corp-handoff (none = чисто)
+#   == Infra-touch ==  список corp-классов → передать оператору корп-инфры (none = чисто)
 #   == Plan ==         активный план из roadmap → продолжить атомы
 # Серверный смок (host-витали + здоровье контейнеров) — НЕ здесь: его собирает
 # таргет `make status` секцией == Server == (smoke-run.sh на VPS / ssh.sh smoke
@@ -50,7 +50,7 @@ fi
 
 echo
 echo "== Infra-touch =="
-# Working tree задел corp-поверхность? → smartdev чейнит в corp-handoff.
+# Working tree задел corp-поверхность? → передать оператору корп-инфры out-of-band.
 paths=$(git status --porcelain 2>/dev/null | cut -c4-)
 declare -a hits=()
 grep -qE '^compose/.*\.ya?ml'                 <<<"$paths" && hits+=("compose-topology/profiles")
@@ -61,7 +61,7 @@ if [ ${#hits[@]} -eq 0 ]; then
   echo "none"
 else
   printf '%s\n' "${hits[*]}"
-  echo "(тронута corp-поверхность — оформи CORP-HANDOFF до claim «готово», skill corp-handoff)"
+  echo "(тронута corp-поверхность — заполни **Corp impact.** в плане и передай оператору корп-инфры)"
 fi
 
 echo

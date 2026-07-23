@@ -43,7 +43,7 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
 **Что НЕ**:
 
 - Заводить строку для always-on фундамента (traefik/crowdsec/
-  cadvisor/node-exporter/landing) — это не «часть продукта».
+  landing) — это не «часть продукта».
 - Авторить здесь продуктовые surfaces — они в `<org>/strategy`, читаются
   cross-repo (карта — про инфра-инвентарь, не про UX-поверхности).
 - `hosting: here` строка без последующего `services/<name>.md`.
@@ -119,16 +119,16 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
   - rate-limit (дефолт traefik или кастомный);
   - другие middleware (custom headers, redirect, etc.).
 - CrowdSec source-IP whitelist: нужен ли (если CrowdSec central-LAPI на
-  корп-стороне) — egress IP **этого** VPS в их whitelist. Это
-  corp-handoff.
+  корп-стороне) — egress IP **этого** VPS в их whitelist. Оператор
+  передаёт IP корп-оператору out-of-band.
 - Особые роуты (sticky, retry, custom resolver).
 
 **Опции опрашиваются как**:
 
 - Дефолтный middleware: 2 опции «`crowdsec@file` на всех public» /
   «исключения есть» (Other).
-- Source-IP whitelist: 2 опции «нужен → /corp-handoff next-step» / «не
-  нужен».
+- Source-IP whitelist: 2 опции «нужен → egress-IP корп-оператору
+  out-of-band» / «не нужен».
 - Rate-limit: 2 опции «дефолт» / «кастомный» (Other).
 
 **Что НЕ**:
@@ -141,8 +141,7 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
 **Тест-критерий**:
 
 - ✅ «`crowdsec@file` на всех public-роутах; source-IP whitelist
-  нужен — next-step через /corp-handoff (egress IP VPS в whitelist);
-  rate-limit дефолтный».
+  нужен — egress-IP VPS корп-оператору out-of-band; rate-limit дефолтный».
 - ✅ «`crowdsec@file` на всех public; whitelist не нужен (no central
   LAPI)».
 - ❌ «Public-роут без middleware».
@@ -192,8 +191,7 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
 **Тест-критерий**:
 
 - ✅ «`acme-proxy` / `acme-backend`; backend в обеих, postgres в
-  `acme-backend`, minio в обеих (Console + S3), вспомогательные
-  (cadvisor/node-exporter) — `acme-backend`».
+  `acme-backend`, minio в обеих (Console + S3)».
 - ❌ «Без явных имён на shared VPS» — конфликт.
 - ❌ «postgres в `proxy`» — лишняя поверхность.
 
@@ -257,28 +255,23 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
 
 **Что фиксируем**:
 
-- Host metrics: `cadvisor` + `node-exporter` (always-on фундамент,
-  endpoint'ы в `backend-net`: `cadvisor:8080`, `node-exporter:9100`).
-- Куда идут метрики: local-only (никто не скрейпит) или свой
+- Метрики: none по дефолту (шаблон host-метрики не собирает) или свой
   коллектор/Prometheus проекта (project-specific сервис в карте).
 - Логи: local-only (`docker logs`) или свой стек проекта.
 
 **Опции опрашиваются как**:
 
-- Метрики: 2 опции («local-only» / «свой коллектор» Other).
+- Метрики: 2 опции («none (дефолт)» / «свой коллектор» Other).
 - Логи: 2 опции («local-only» / «свой стек» Other).
 
 **Что НЕ**:
 
-- Описывать always-on (`cadvisor`/`node-exporter` есть в фундаменте) —
-  фиксируем только их конфигурацию, если она кастомная.
 - Дублировать `Generates` поля sub-сервисов.
 
 **Тест-критерий**:
 
-- ✅ «local-only; cadvisor + node-exporter (дефолт)».
-- ✅ «свой Prometheus (сервис в карте) скрейпит cadvisor +
-  node-exporter; логи local-only».
+- ✅ «метрик нет (дефолт); логи local-only».
+- ✅ «свой Prometheus (сервис в карте) + свои exporter'ы; логи local-only».
 - ❌ «Просто \"есть мониторинг\"» — не сказано кто и что собирает.
 
 **Порядок копания**:
@@ -334,7 +327,7 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
 
 - `configs/traefik/dynamic/*` — клиент-специфичные routers/middlewares.
 - `DOMAIN` в `.env.example` (либо дефолт).
-- crowdsec source-IP next-step (corp-handoff: egress IP в whitelist).
+- crowdsec source-IP next-step (egress IP корп-оператору out-of-band для whitelist).
 - ACME next-step (`ACME_EMAIL`/`ACME_CASERVER` в `.env` на VPS).
 - Кастомные имена сетей (если не дефолт) — `.env.example`.
 
@@ -351,8 +344,8 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
 **Тест-критерий**:
 
 - ✅ «`configs/traefik/dynamic/middlewares.yml` (rate-limit override),
-  `DOMAIN=acme.dev` в `.env.example`, crowdsec next-step через
-  /corp-handoff, acme `meta` next-step (через /request-secret)».
+  `DOMAIN=acme.dev` в `.env.example`, crowdsec next-step: egress-IP
+  корп-оператору out-of-band, acme next-step: `ACME_*` в `.env` на VPS».
 - ❌ «`Generates` пуст».
 - ❌ «`COMPOSE_PROFILES=postgres,storage,backend` в stack».
 

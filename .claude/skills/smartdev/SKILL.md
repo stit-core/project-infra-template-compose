@@ -1,6 +1,6 @@
 ---
 name: smartdev
-description: Ведущий cockpit проектной инфры (<client-org>/infra шаблон). Не «сводка и стоп» — за один проход собирает состояние (make status), поднимает контекст (активный план + память) и САМ переключает в нужный режим (init-project / triage / corp-handoff / plan / add-service / request-secret / dr-restore / bootstrap-vps), ведя RED→GREEN по дефолту. Запускай в начале сессии, после /clear, когда непонятно с чего начать, или когда «вроде сломалось». Активируй на "/smartdev", "что у нас?", "статус", "с чего начать?", "введи в курс дела".
+description: Ведущий cockpit проектной инфры (<client-org>/infra шаблон). Не «сводка и стоп» — за один проход собирает состояние (make status), поднимает контекст (активный план + память) и САМ переключает в нужный режим (init-project / triage / plan / add-service / dr-restore / bootstrap-vps), ведя RED→GREEN по дефолту. Запускай в начале сессии, после /clear, когда непонятно с чего начать, или когда «вроде сломалось». Активируй на "/smartdev", "что у нас?", "статус", "с чего начать?", "введи в курс дела".
 ---
 
 # Skill: smartdev
@@ -72,10 +72,9 @@ Split и `.env.local` — rules `make-first`/`env-local`. `make doctor` без `
 | `== Server ==` ATTENTION (host-pressure: disk/RAM/load/OOM, или unhealthy/exited/restart на VPS) | → skill `triage` |
 | Багфикс / «сломалось» / «не поднимается» / трейс | → skill `triage` (НЕ `plan`) |
 | Проект не инициализирован (origin ещё template ИЛИ нет stable `docs/project/stack.md`) | → skill `init-project` (первым делом) |
-| `== Infra-touch ==` ≠ none (тронута corp-поверхность) | → skill `corp-handoff` до claim «готово» |
+| `== Infra-touch ==` ≠ none (новый egress-IP под CrowdSec / новый образ из registry) | оператор передаёт данные оператору корп-инфры out-of-band до claim «готово» |
 | `== Plan ==` активный `in-progress` | продолжи со следующего открытого атома |
 | Задача = новый сервис в стек | → skill `add-service` |
-| Задача = нужны креды/seed для сервиса | → skill `request-secret` |
 | Задача = restore / потеря данных / host crashed | → skill `dr-restore` |
 | Задача = новый VPS / клиент / первый запуск | → skill `bootstrap-vps` |
 | Задача крупная (>5 шагов / security-sensitive / >2 сервиса / env-контракт) | → skill `plan` |
@@ -94,7 +93,7 @@ Security-sensitive (план + явный OK обязательны до пра�
 1. Правишь.
 2. `make validate` (синтаксис/tpl/.env-coverage) — зелёный.
 3. `make doctor` если задело live-поверхность (.env/rendered configs) — зелёный или осознанный WARN.
-4. `== Infra-touch ==` стал ≠ none → `corp-handoff` ДО claim «готово».
+4. `== Infra-touch ==` стал ≠ none (новый egress-IP / образ из registry) → оператор передаёт данные оператору корп-инфры out-of-band ДО claim «готово».
 5. Коммит (Conventional Commits). Деплой — `make ship MSG="..."` (см. ниже), только когда юзер этого хочет.
 
 ## Deploy-флоу (канон)
@@ -120,7 +119,7 @@ make ship MSG="feat(foo): bar"
 (канон — `make deploy`; raw-docker исключения — rule `make-first`).
 
 1. `git pull --ff-only origin main` — fail если remote разошлась.
-2. `scripts/render-configs.sh` — envsubst для `.tpl` + сборка `agent.hcl`.
+2. `scripts/render-configs.sh` — envsubst для `.tpl`.
 3. preflight DNS — только warnings.
 4. **crowdsec early** — bouncer auto-register если `CROWDSEC_BOUNCER_API_KEY=` пуст.
 5. `docker compose up -d --remove-orphans --wait --wait-timeout 180` (смена .env-значений → compose пересоздаёт сам).
@@ -140,7 +139,7 @@ Debug на VPS: `ssh root@<vps> 'cd /opt/<p>-infra && make deploy'` (пошаг�
 ## Что cockpit НЕ делает
 
 - Не делает развёрнутый диагноз сам — чейнит в `triage` (там TDD-петля разбора).
-- Не молчит про тронутую corp-поверхность — чейнит в `corp-handoff`.
+- Не молчит про тронутую corp-поверхность (egress-IP / образ из registry) — напоминает про out-of-band handoff корп-оператору до claim «готово».
 - Не запускает `make ship`/`deploy`/`backup` без явной воли юзера.
 - Не делает `git pull`/`fetch` без явной просьбы.
 - Не перепланирует чужой in-progress план — продолжает его.

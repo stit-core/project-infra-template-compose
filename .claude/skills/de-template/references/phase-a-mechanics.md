@@ -51,8 +51,6 @@ A — Phase B (печать cross-repo next-steps).
 
 - `traefik.yml`
 - `crowdsec.yml`
-- `node-exporter.yml`
-- `cadvisor.yml`
 - `landing.yml`
 
 ### Profiled — таблица прунинга
@@ -211,8 +209,9 @@ Identity (`PROJECT_NAME`/`ENV`/`DOMAIN`), `ACME_*`,
      `<org>/<repo>`;
    - в карте есть `backend` → tag живёт в `.env` (`BACKEND_TAG`), деплой — `make bump`;
    - в `services/*/Secrets` упоминаются переменные, не заполненные в
-     `.env` на VPS → `/request-secret`;
-   - в `stack/Edge` упомянут source-IP whitelist → `/corp-handoff`;
+     `.env` на VPS → оператор дописывает их по `.env.example`;
+   - в `stack/Edge` упомянут source-IP whitelist → оператор передаёт
+     egress-IP корп-оператору out-of-band;
    - в `stack/Domains` — сабдомены, нужны A-записи под LE-HTTP-01.
 
 ### Формат чеклиста в чат
@@ -225,13 +224,13 @@ Identity (`PROJECT_NAME`/`ENV`/`DOMAIN`), `ACME_*`,
       собрать образ `git.stit.tech/<org>/backend:<tag>`.
 - [ ] Форкнуть `<org>/frontend` (если есть external).
 
-### 2. Секреты профилей в .env на VPS (через /request-secret)
+### 2. Секреты профилей в .env на VPS (оператор дописывает по .env.example)
 - [ ] `POSTGRES_*` — для postgres профиля.
 - [ ] `MINIO_*` / `*_S3_*` / `RESTIC_*` / `BACKUP_AWS_*` — для
       storage профиля.
 - [ ] `OIDC_*` / `JWT_SECRET` — для backend профиля.
 
-### 3. Edge (через /corp-handoff)
+### 3. Edge (оператор передаёт корп-оператору out-of-band)
 - [ ] Egress IP VPS в crowdsec-whitelist (получить IP после
       /bootstrap-vps).
 - [ ] LE-HTTP-01 A-записи для сабдоменов:

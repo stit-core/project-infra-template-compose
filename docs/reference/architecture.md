@@ -5,38 +5,36 @@ Single-VPS docker-compose стек одного проекта (дефолт). �
 ## Слои
 
 ```
-                         Internet
-                            │
-                       ┌────┴────┐
-                       │ Traefik │ ──── HTTP-01 LE → Let's Encrypt
-                       │  +CrowdSec │
-                       └────┬────┘
-                            │ proxy network
-        ┌───────────────────┴───────────────┐
-        │                                   │
-  ┌─────┴─────┐                      ┌──────┴──────┐
-  │  Backend  │                      │ cadvisor +  │
-  │ (api.D)   │                      │node-exporter│
-  └─────┬─────┘                      └─────────────┘
-        │
-        │ backend-net
-        ↓
-  ┌─────────┐
-  │Postgres │
-  └─────────┘
+                    Internet
+                       │
+                  ┌────┴─────┐
+                  │ Traefik  │ ──── HTTP-01 LE → Let's Encrypt
+                  │ +CrowdSec │
+                  └────┬─────┘
+                       │ proxy network
+             ┌─────────┴─────────┐
+             │                   │
+       ┌─────┴─────┐       ┌─────┴─────┐
+       │  Landing  │       │  Backend  │
+       │    (D)    │       │  (api.D)  │
+       └───────────┘       └─────┬─────┘
+                                 │ backend-net
+                                 ↓
+                           ┌─────────┐
+                           │Postgres │
+                           └─────────┘
 ```
 
 Дополнительно:
 - **Backup** (restic, in-container crond): сидит сбоку, ежедневно делает `pg_dumpall | gzip | restic backup --stdin` (один файл-снапшот, не volume tree). `RESTIC_REPOSITORY` задаётся в `.env` без local-default'а — чтобы исключить случайный указатель на проектный minio (host failure уносит и postgres-data, и репо).
 - **Minio**: S3-storage на `s3.${DOMAIN}` / console `minio.${DOMAIN}`; bucket `app-uploads` для backend, `backups` для restic; service-accounts создаёт `minio-init`.
-- **cadvisor + node-exporter**: host-/container-метрики, доступны локально в `backend-net` (`cadvisor:8080`, `node-exporter:9100`) — endpoint'ы для любого коллектора/Prometheus, который проект решит поднять сам.
 
 ## Сети
 
 | Network | Тип | Кто в ней |
 |---|---|---|
 | `proxy` | bridge, external | Traefik (edge), backend (для входящего HTTPS), backup (исходящий к внешнему S3) |
-| `backend-net` | bridge, **internal** | postgres, backend, cadvisor, node-exporter |
+| `backend-net` | bridge, **internal** | postgres, backend |
 
 Постгрес НЕ в `proxy` — он недоступен извне. Backend стучится в постгрес по hostname `postgres` через `backend-net`.
 
@@ -64,7 +62,7 @@ Backup может писать в любой restic-совместимый endpo
 
 ## Поток секретов
 
-1. Все секреты и конфиг-значения среды оператор держит в `.env` на VPS (chmod 600, gitignored; контракт с комментариями — `.env.example`, scaffold значений — skill `/request-secret`).
+1. Все секреты и конфиг-значения среды оператор держит в `.env` на VPS (chmod 600, gitignored; контракт с комментариями — `.env.example`, откуда оператор берёт набор переменных профиля и заполняет их сам).
 2. На `make deploy`:
    - `scripts/render-configs.sh` рендерит envsubst'ом `configs/**/*.tpl` из `.env` (traefik static с `ACME_*`, middlewares с `CROWDSEC_BOUNCER_API_KEY`, landing).
    - compose интерполирует `${VAR}` из `.env` в `environment:` сервисов при `up`.
@@ -125,7 +123,7 @@ Postgres / MinIO+backup / edge+app на отдельных VPS (нескольк
   | Роль | сервисы | профиль |
   |---|---|---|
   | `all` | весь стек (single-host, дефолт) | как в `.env` |
-  | `edge` | traefik, crowdsec, node-exporter, cadvisor, landing, backend | `backend` |
+  | `edge` | traefik, crowdsec, landing, backend | `backend` |
   | `db` | postgres | `postgres` |
   | `storage` | minio, backup | `storage` |
 

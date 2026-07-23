@@ -4,8 +4,7 @@ services:
     container_name: minio
     restart: unless-stopped
     # Opt-in: COMPOSE_PROFILES=storage. Креды оператор заполняет в .env
-    # (см. .env.example § profile storage). Scaffold значений — Claude skill
-    # /request-secret.
+    # (см. .env.example § profile storage).
     #
     # BACKUP_S3_ACCESS_KEY/SECRET_KEY нужны для local-minio rehearsal:
     # minio-init создаёт `backup` SA и `backups` bucket под restic, если
@@ -19,7 +18,6 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
       MINIO_BROWSER_REDIRECT_URL: https://minio.${DOMAIN}
       MINIO_SERVER_URL: https://s3.${DOMAIN}
-      MINIO_PROMETHEUS_AUTH_TYPE: public
     volumes:
       - minio-data:/data
     networks:

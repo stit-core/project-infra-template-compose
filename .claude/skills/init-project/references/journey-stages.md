@@ -72,8 +72,8 @@ surfaces) живёт в соседнем `<org>/strategy` и **читается*
 - В `## Текущий этап` записать «3».
 - Если `Service map` содержит `hosting: external` — добавить в
   `## Cross-repo next-steps` строки «форкнуть `<repo>` для `<name>`».
-- Слить cross-repo next-steps из stack-сессии (corp-handoff для crowdsec,
-  acme через meta).
+- Слить cross-repo next-steps из stack-сессии (egress-IP для crowdsec-whitelist
+  оператору корп-инфры out-of-band, acme через meta).
 
 ---
 
@@ -114,7 +114,7 @@ surfaces) живёт в соседнем `<org>/strategy` и **читается*
 
 - В `## Текущий этап` записать «4».
 - Накопленные cross-repo next-steps от каждого `/service-deep-dive`
-  (seed KV, форки) — слить в `## Cross-repo next-steps`.
+  (секреты в `.env`, форки) — слить в `## Cross-repo next-steps`.
 
 ---
 

@@ -36,10 +36,10 @@ kind: init-project-journey
 - Форкнуть `<org>/backend` из `go-backend-template`, образ
   `git.stit.tech/<org>/backend`, tag → `BACKEND_TAG` в `.env`
   (`make bump SVC=backend TAG=…`).
-- Секреты профиля postgres (`POSTGRES_*`) в `.env` на VPS через
-  /request-secret.
-- crowdsec-whitelist: egress IP VPS (после /bootstrap-vps) через
-  /corp-handoff.
+- Секреты профиля postgres (`POSTGRES_*`) в `.env` на VPS — оператор
+  дописывает по `.env.example`.
+- crowdsec-whitelist: egress IP VPS (после /bootstrap-vps) — оператор
+  передаёт корп-оператору out-of-band.
 - Сабдомены `api.acme.dev`, `minio.acme.dev`, `s3.acme.dev` под
   LE-HTTP-01 (стандартные A-записи).
 ```
@@ -91,9 +91,8 @@ kind: init-project-journey
 по пути и требует действий **вне** этого репо:
 
 - форки бэкенда/фронта (для `hosting: external`);
-- seed KV (через `/request-secret`);
-- корп-handoff: registry-доступ + crowdsec-whitelist (через `/corp-handoff`);
-- corp-handoff (через `/corp-handoff` для crowdsec, acme);
+- секреты активных профилей в `.env` на VPS (оператор дописывает по `.env.example`);
+- корп-контракт: registry-доступ + crowdsec-whitelist egress-IP (оператор передаёт корп-оператору out-of-band);
 - LE-DNS A-записи для сабдоменов.
 
 На финале (этап 5) — выводится оператору списком.

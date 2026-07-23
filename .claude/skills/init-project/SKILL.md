@@ -164,8 +164,8 @@ ls -la .git/hooks/commit-msg .git/hooks/pre-commit 2>/dev/null
 - Перечислить накопленные cross-repo next-steps (из state):
   - склонировать/заполнить `<org>/strategy` (продуктовый слой), если не сделан;
   - форки бэкенда/фронта (`hosting: external` из карты);
-  - секреты активных профилей в `.env` на VPS (`/request-secret`);
-  - egress IP VPS в crowdsec-whitelist (`/corp-handoff`);
+  - секреты активных профилей в `.env` на VPS (оператор дописывает по `.env.example`);
+  - egress IP VPS в crowdsec-whitelist (оператор передаёт корп-оператору out-of-band);
   - сабдомены под LE-DNS.
 - Сообщить о следующем шаге: `/bootstrap-vps` (поднять VPS для env'а).
 
