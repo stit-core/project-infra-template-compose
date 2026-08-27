@@ -34,12 +34,19 @@ self-hosted = ваш форк). Канон карты контрактов жи�
 не участвует). Детали проектной стороны (`.env`-контракт, profile-opt-in) —
 `.claude/rules/multi-env.md`.
 
-## Обслуживает `<org>/backend`
+## Обслуживает сервис-форки `<org>/{backend,frontend,<bot>}`
 
-Runtime для клиентского образа `git.stit.tech/<org>/backend:<tag>`. Deploy нового тега —
-`make bump SVC=backend TAG=<tag>`: правит `BACKEND_TAG` в `.env` на VPS + force-recreate,
-compose сам пуллит образ. Image-теги живут **строго в `.env`** (конвенция `<SVC>_TAG`)
-— корп-сторона в rollout'е тега не участвует.
+Runtime для клиентских образов `git.stit.tech/<org>/<svc>:<tag>`. Из коробки в стеке —
+`compose/backend.yml`; frontend / telegram-бот / прочие сервисы проекта добавляются
+`/add-service` по карте сервисов `docs/project/stack.md`. Deploy нового тега любого сервиса —
+`make bump SVC=<svc> TAG=<tag>`: правит `<SVC>_TAG` в `.env` на VPS + force-recreate, compose
+сам пуллит образ. Image-теги живут **строго в `.env`** (конвенция `<SVC>_TAG`: `BACKEND_TAG`,
+`FRONTEND_TAG`, `BOT_TAG`, …) — корп-сторона в rollout'е тега не участвует. Сервис-репо
+останавливаются на image-in-registry (их `/release`) — деплоем занимается только этот репо.
+
+Этот репо — операционный хаб проекта: задачи входят сюда, агенты расходятся по сиблингам
+(`CLAUDE.md § Оркестрация`; канон — `corp-infra-template/docs/ecosystem.md § Операционная
+модель агентов`).
 
 ## Sibling `<org>/strategy` — продуктовый контекст
 
@@ -49,10 +56,12 @@ compose сам пуллит образ. Image-теги живут **строго
 стек к продукту, но **не редактирует** его; авторская сторона продукта — только `<org>/strategy`
 (через его deep-dive-скиллы).
 
-**Конвенция размещения — sibling-checkout:** `<org>/strategy` склонирован **рядом** с `<org>/infra`
-(`../strategy` относительно корня этого репо). Путь резолвится так:
-1. `STRATEGY_REPO_PATH` из `.env.local`, если задан (override; см. `.claude/rules/env-local.md`);
-2. иначе дефолт `../strategy`.
+**Конвенция размещения — sibling-checkout:** все форки одной org склонированы **рядом**
+(`~/git/<org>/{strategy,infra,backend,frontend,<bot>}`). Путь любого соседа резолвится так:
+1. `<NAME>_REPO_PATH` из `.env.local`, если задан (override; `STRATEGY_REPO_PATH`,
+   `BACKEND_REPO_PATH`, … — см. `.claude/rules/env-local.md`);
+2. иначе дефолт `../<name>` (`../strategy`, `../backend`, `../frontend`; имя бот-репо — по
+   карте сервисов `docs/project/stack.md § Service map`).
 
 **Кто что читает** (cross-repo, read-only):
 

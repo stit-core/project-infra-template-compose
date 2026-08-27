@@ -9,10 +9,26 @@
 #   smoke        — remote `smoke-run.sh` (серверный смок: host-витали + контейнеры)
 #   deploy       — ssh + git pull + make deploy
 #   restart SVC  — ssh + make restart SVC=<name>
-#   logs SVC     — ssh + tail логов одного сервиса
-#   exec CMD ... — ssh + произвольная команда в /opt/<project>-infra/
+#   logs SVC     — ssh + tail логов одного сервиса (без follow)
+#   exec CMD     — произвольная команда в /opt/<project>-infra/
+#
+# exec — канон произвольной команды на VPS (задокументированное исключение
+# make-first). Команду передавай ОДНОЙ строкой в кавычках — она уходит на VPS
+# без перепарса (printf %q), кавычки/пайпы/$ внутри живут как написаны:
+#   scripts/tools/ssh.sh exec 'docker ps --format "{{.Names}}" | sort'
+# Remote-команды идут через login-shell (bash -lc): non-interactive ssh не
+# грузит профиль, и make/docker могут отсутствовать в его PATH.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+
+# usage — до резолва connection (работает без .env.local).
+case "${1:-}" in
+  status|smoke|deploy|restart|logs|exec) ;;
+  *)
+    echo "usage: $0 {status|smoke|deploy|restart SVC|logs SVC|exec '<command>'}" >&2
+    exit 2
+    ;;
+esac
 
 # read_local KEY FILE — извлечь значение dotenv-ключа grep'ом (не source).
 # Возвращает 0 даже если ключа нет (пустая строка) — иначе pipefail+set -e убьёт скрипт.
@@ -51,32 +67,44 @@ SSH_PORT="${SSH_PORT:-22}"
 SSH_USER="${SSH_USER:-root}"
 
 REMOTE_DIR="/opt/${PROJECT_NAME}-infra"
-SSH="ssh -p $SSH_PORT $SSH_USER@$SSH_HOST"
+# BatchMode=yes: не зависать на password-prompt при отсутствии/неверном ключе —
+# падать сразу (ssh-agent/ключ работают, отключается только пароль).
+SSH_OPTS=(-p "${SSH_PORT}" -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new)
+
+run() {
+  ssh "${SSH_OPTS[@]}" "${SSH_USER}@${SSH_HOST}" "$@"
+}
+
+# run_dir <cmd...> — команда в REMOTE_DIR через remote login-shell (см. шапку).
+run_dir() {
+  run "bash -lc $(printf '%q' "cd $REMOTE_DIR && $*")"
+}
 
 case "${1:-}" in
   status)
-    $SSH "cd $REMOTE_DIR && make ps && bash scripts/tools/status.sh"
+    run_dir "make ps && bash scripts/tools/status.sh"
     ;;
   smoke)
-    $SSH "cd $REMOTE_DIR && bash scripts/tools/smoke-run.sh"
+    run_dir "bash scripts/tools/smoke-run.sh"
     ;;
   deploy)
-    $SSH "cd $REMOTE_DIR && make deploy"
+    run_dir "make deploy"
     ;;
   restart)
     [ -n "${2:-}" ] || { echo "usage: $0 restart <service>" >&2; exit 2; }
-    $SSH "cd $REMOTE_DIR && make restart SVC=$2"
+    run_dir "make restart SVC=$2"
     ;;
   logs)
     [ -n "${2:-}" ] || { echo "usage: $0 logs <service>" >&2; exit 2; }
-    $SSH "cd $REMOTE_DIR && docker logs --tail=200 -f $2"
+    run_dir "docker logs --tail=200 $2 2>&1 | tail -200"
     ;;
   exec)
     shift
-    $SSH "cd $REMOTE_DIR && $*"
+    [ $# -gt 0 ] || { echo "usage: $0 exec '<command>'" >&2; exit 2; }
+    run_dir "$*"
     ;;
   *)
-    echo "usage: $0 {status|smoke|deploy|restart SVC|logs SVC|exec CMD ...}" >&2
+    echo "usage: $0 {status|smoke|deploy|restart SVC|logs SVC|exec '<command>'}" >&2
     exit 2
     ;;
 esac

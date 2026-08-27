@@ -1,4 +1,4 @@
-.PHONY: help validate doctor check ship deploy render ps logs restart recreate build bump backup restore-pg ssh status search new-env setup plan-check project-check
+.PHONY: help validate doctor check ship deploy render ps logs restart recreate build bump backup restore-pg status search new-env setup plan-check project-check
 
 SHELL := /usr/bin/env bash
 
@@ -95,10 +95,6 @@ restore-pg: ## restore postgres из restic: make restore-pg SNAPSHOT=latest
 	@if [ -z "$(SNAPSHOT)" ]; then echo "usage: make restore-pg SNAPSHOT=<id|latest>"; exit 2; fi
 	@if [ -f .env ]; then bash scripts/restore-pg.sh "$(SNAPSHOT)"; \
 	else bash scripts/tools/ssh.sh exec make restore-pg SNAPSHOT=$(SNAPSHOT); fi
-
-ssh: ## выполнить команду на VPS: make ssh CMD="docker ps"
-	@if [ -z "$(CMD)" ]; then echo 'usage: make ssh CMD="<command>"'; exit 2; fi
-	@bash scripts/tools/ssh.sh exec $(CMD)
 
 ##@ INTEL
 # Оркестратор cockpit-сводки: локальный status.sh (git/roadmap/fragments, pure-local)

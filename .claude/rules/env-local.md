@@ -46,8 +46,8 @@ runtime-секреты приложения и **не** серверный `.env
 
 | Ключ | Используется | Примечание |
 |---|---|---|
-| `SSH_HOST` / `SSH_PORT` / `SSH_USER` | `scripts/tools/ssh.sh` (ops-вербы, `make ssh`, серверный смок `make status`) | куда ходить; ключ — на машине |
+| `SSH_HOST` / `SSH_PORT` / `SSH_USER` | `scripts/tools/ssh.sh` (ops-вербы, exec-канал произвольных команд, серверный смок `make status`) | куда ходить; ключ — на машине |
 | `HOST` | `ssh.sh` (override `user@ip`) | разовая сессия на другой хост |
 | `PROJECT_NAME` | `ssh.sh` (`REMOTE_DIR=/opt/<p>-infra`) | имя проекта на VPS |
-| `STRATEGY_REPO_PATH` | скиллы (init-project/stack-deep-dive/de-template/smartdev) | путь к sibling `<org>/strategy`; дефолт `../strategy`; **не секрет** (путь, читается grep'ом) |
+| `<NAME>_REPO_PATH` (`STRATEGY_`/`BACKEND_`/`FRONTEND_`/…) | скиллы (init-project/stack-deep-dive/de-template/smartdev) + оркестрация по сиблингам (`CLAUDE.md § Оркестрация`) | путь к sibling-репо `<org>/<name>`; дефолт `../<name>`; **не секрет** (путь, читается grep'ом) |
 | `<TOKEN>` | по мере необходимости | токены, присланные оператором (registry/API/…) |

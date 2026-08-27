@@ -23,7 +23,6 @@ paths:
 | OPS | `ps` / `logs SVC=` / `restart SVC=` / `recreate SVC=` / `build SVC=` | статус / логи / рестарт / пересоздать (env_file/тег pickup) / сборка образа сервиса (на VPS) |
 | | `bump SVC= TAG=` | бамп image-тега: `<SVC>_TAG` в `.env` на VPS + force-recreate. Теги — строго через `.env` |
 | | `backup` / `restore-pg SNAPSHOT=` | one-shot backup / restore postgres из restic |
-| | `ssh CMD="…"` | произвольная команда на VPS (через `ssh.sh`) |
 | INTEL | `status` / `search Q= [P=]` | cockpit-сводка (локальный `status.sh` + серверный смок `== Server ==` по SSH при `.env.local`) / поиск по compose+configs+scripts+docs |
 | PROVISION | `new-env` | bootstrap `.env` на чистом VPS |
 | SETUP | `setup` | симлинк git-хуков (commit-msg, pre-commit) в `.git/hooks/` |
@@ -53,12 +52,27 @@ paths:
 локально, живого стека тут нет. Ops-вербы (`ps`/`logs`/`restart`/`backup`/`restore-pg`)
 выполняются **на проектном VPS** и **сами проксируют туда**: sentinel — наличие `.env` (живёт
 только на сервере). Нет `.env` (workstation) → верб уходит через `scripts/tools/ssh.sh exec make
-<verb>` на VPS; есть `.env` (на VPS) → локальный `docker`. `make ssh CMD="…"` — произвольная
-команда на VPS.
+<verb>` на VPS; есть `.env` (на VPS) → локальный `docker`. Произвольная команда на VPS —
+`bash scripts/tools/ssh.sh exec '…'` (см. ниже).
 
 Connection (host/port/user/project) берётся из **`.env.local`** (workstation, gitignored —
 `.claude/rules/env-local.md`), **не хардкодится**; fallback — `ansible/inventory.ini`. `make ship`
 пушит и триггерит remote `deploy.sh`.
+
+## SSH: произвольная команда на VPS
+
+Канон произвольной remote-команды — **`bash scripts/tools/ssh.sh exec '<command>'`**, команда
+**одной строкой в кавычках**. Это задокументированное исключение из make-first: make-обёртки
+нет сознательно — make-слой добавляет лишний проход разбора (make → локальный shell → remote
+shell) и ломает вложенные кавычки/`$`. Скрипт передаёт строку на VPS без перепарса (`printf %q`
++ remote `bash -lc`; login-shell заодно гарантирует `make`/`docker` в PATH):
+
+```bash
+bash scripts/tools/ssh.sh exec 'docker ps --format "{{.Names}}" | sort'
+```
+
+Остальные сабкоманды `ssh.sh` (`status`/`smoke`/`deploy`/`restart`/`logs`) — внутренности
+make-вербов, напрямую их не зови: `make status` / `make ps` / `make logs SVC=` / `make restart SVC=`.
 
 ## Запреты
 

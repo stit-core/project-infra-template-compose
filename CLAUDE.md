@@ -44,12 +44,33 @@ env (dev/staging/prod).
 **Зависит от:** `corp-infra-template` — хостит registry `git.stit.tech` и ведёт
 CrowdSec-whitelist egress-IP проектных VPS.
 **Image-теги:** бампаются **строго через `.env`** (`<SVC>_TAG`, верб `make bump SVC= TAG=`).
-**Обслуживает:** `<client-org>/backend` (форк `go-backend-template`) — runtime для его образа;
-deploy нового тега — `make bump SVC=backend TAG=<tag>` (тег строго в `.env`).
+**Обслуживает:** сервис-форки `<client-org>/{backend,frontend,<bot>}` — runtime их образов из
+registry; из коробки в стеке — `compose/backend.yml`, frontend/bot добавляются `/add-service`.
+Deploy нового тега любого сервиса — `make bump SVC=<svc> TAG=<tag>` (тег строго в `.env`).
 **Читает:** `<client-org>/strategy` (форк `business-strategy-template`) — продуктовый контекст (vision,
 surfaces); sibling-checkout рядом с этим репо, read-only. Резолв пути — `docs/reference/ecosystem.md`.
 
 Карта репо и канонические контракты — `corp-infra-template/docs/ecosystem.md`.
+
+## Оркестрация: агенты по репо
+
+Этот репо — **операционный хаб проекта**: задачи (продуктовые и технические) входят сюда, общий
+план ведётся здесь (`.claude/plans/roadmap.md`), и отсюда агенты расходятся по sibling-checkout'ам
+(`../<name>`, резолв и graceful degradation — `docs/reference/ecosystem.md`):
+
+| Сосед | Что там | Агент там |
+|---|---|---|
+| `../strategy` | design SoT: vision/surface, домены, UX/screens, FSD-карта, инфра-периметр | проектирует его скиллами (`/entrypoint` + deep-dives); отсюда — только читаем |
+| `../backend` | Go-сервис (форк `go-backend-template`) | работает его обвязкой (`/smartdev`, `/plan`, `/scaffold`, гейт `make check`); финал — `/release` → образ в registry |
+| `../frontend` | React SPA (форк `spa-frontend-template`) | то же, гейт `pnpm check`; финал — `/release` |
+| `../<bot>` | Telegram-бот (форк `telegram-bot-template`) | то же (`/dialog-deep-dive`, `/state-migration`); финал — `/release` |
+
+Правила ходьбы: агент в сиблинге работает **обвязкой того репо** (его CLAUDE.md / вербы / скиллы /
+гейты) — чужой код в обход их гейтов из infra не правим. Сервис-репо останавливаются на
+image-in-registry; деплой тега — только здесь (`make bump`). Сквозная задача = план здесь (фаза
+на репо) → исполнение агентами в сиблингах → rollout здесь. Прямой заход человека в сервис-репо —
+нормальный режим при ролевом разделении команды. Канон модели —
+`corp-infra-template/docs/ecosystem.md § Операционная модель агентов`.
 
 ## Стек
 
@@ -81,11 +102,14 @@ Always-on (traefik / crowdsec / landing) поднимается
 | OPS | `ps` / `logs SVC=` / `restart SVC=` / `recreate SVC=` / `build SVC=` | статус / логи / рестарт / пересоздать (env_file pickup) / сборка образа сервиса |
 | | `bump SVC= TAG=` | бамп image-тега: правит `<SVC>_TAG` в `.env` на VPS + force-recreate. Единственный канон бампа |
 | | `backup` / `restore-pg SNAPSHOT=` | one-shot backup / restore postgres из restic |
-| | `ssh CMD="…"` | произвольная команда на VPS (через `ssh.sh`) |
 | INTEL | `status` / `search Q= [P=]` | cockpit-сводка / поиск по compose+configs+scripts+docs |
 | PROVISION | `new-env` | bootstrap `.env` на чистом VPS |
 | SETUP | `setup` | поставить git-хуки (commit-msg + pre-commit) |
 | META | `plan-check` / `project-check` | структура планов / инфра-слой `docs/project/` (stack + сервисы) |
+
+Произвольная команда на VPS — `bash scripts/tools/ssh.sh exec '<command>'` (одной строкой в
+кавычках; задокументированное исключение make-first — make-слой ломает вложенные кавычки,
+см. rule `.claude/rules/make-first.md § SSH`).
 
 ## Карта: где что
 

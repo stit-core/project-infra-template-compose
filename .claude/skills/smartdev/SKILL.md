@@ -42,7 +42,8 @@ make status
 
 `make status` смокает VPS на **входе сессии** (`.env`-sentinel: на VPS — `smoke-run.sh` локально;
 с workstation — `ssh.sh smoke`; connection из `.env.local`). Mid-session не пере-смокай на каждый
-микро-вопрос — точечно `make ps` / `make logs SVC=<svc>` / `make ssh CMD="…"` (тот же ssh-split).
+микро-вопрос — точечно `make ps` / `make logs SVC=<svc>` / `bash scripts/tools/ssh.sh exec '…'`
+(тот же ssh-split; exec-канон — rule `make-first`).
 Split и `.env.local` — rules `make-first`/`env-local`. `make doctor` без `.env` локально → SKIP, норма.
 
 ## 2. Поднять контекст
@@ -74,6 +75,8 @@ Split и `.env.local` — rules `make-first`/`env-local`. `make doctor` без `
 | Проект не инициализирован (origin ещё template ИЛИ нет stable `docs/project/stack.md`) | → skill `init-project` (первым делом) |
 | `== Infra-touch ==` ≠ none (новый egress-IP под CrowdSec / новый образ из registry) | оператор передаёт данные оператору корп-инфры out-of-band до claim «готово» |
 | `== Plan ==` активный `in-progress` | продолжи со следующего открытого атома |
+| Задача целиком про сервис-репо (фича бэка / фронта / бота) | → сиблинг `../<svc>`: работай его обвязкой (`CLAUDE.md § Оркестрация`); rollout тега — вернись сюда, `make bump` |
+| Задача сквозная (несколько репо) | план здесь (фаза на репо) → агенты в сиблингах → rollout здесь |
 | Задача = новый сервис в стек | → skill `add-service` |
 | Задача = restore / потеря данных / host crashed | → skill `dr-restore` |
 | Задача = новый VPS / клиент / первый запуск | → skill `bootstrap-vps` |
