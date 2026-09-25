@@ -5,14 +5,11 @@
 
 Принцип: **поднимите платформу скриптами, спроектируйте проект скиллами — не правьте фундамент
 руками.** Multi-env: один проект имеет N сред (`dev`, `prod`, ...) — **N отдельных VPS**, по
-одному на `ENV`. Шаги 1–8 проходите на каждый VPS отдельно (координация с
-корп-стороной — один раз, шаг 1).
+одному на `ENV`. Шаги 2–6 проходите на каждый VPS отдельно; 0, 1, 7 и 8 — один раз на проект.
 
-**Два пути control-plane.** Корп control-plane (registry) — это либо **managed**
-stit (`git.stit.tech`; корп-шаги на шаге 1 делает stit), либо **self-hosted** — ваш форк
-`corp-infra-template` на своём VPS (корп-шаги делаете вы на нём). Куда смотрит проектная VPS,
-задаётся в `.env` через `REGISTRY_HOST`
-(managed-дефолт в `.env.example`). Вендор-лока нет — архитектура та же, меняется только хост.
+**Место в экосистеме.** Этот форк — операционный хаб проекта: продукт проектируется раньше, в
+соседнем `<org>/strategy` (`/entrypoint`), а отсюда ведутся общий план, работа агентов в
+сервис-репо и выкатка их образов (`make bump`). Карта и флоу — `docs/reference/ecosystem.md`.
 
 **Где вы работаете.** Репо живёт на **рабочей станции оператора** — здесь authoring / validate /
 plan / ship. Живого стека локально нет: приложения и контейнеры крутятся на удалённом VPS (один
@@ -26,8 +23,7 @@ fallback `ansible/inventory.ini`).
 - Куплены VPS (Debian 12 / Ubuntu 24.04, 2–4 GB RAM, 40+ GB disk) — по одному на env.
 - Для каждого env опубликован домен с A-записью на IP соответствующего VPS (LE HTTP-01).
   Convention — `<env>.<domain>` или `<env>-<domain>`, но это вне шаблона.
-- Доступ к корп control-plane: на managed — выданный stit; на self-hosted —
-  Gitea admin вашего форка `corp-infra-template`.
+- Аккаунт в Gitea (`git.stit.tech`) с доступом к `<org>` и PAT для registry.
 - Локально: ansible 2.15+, git, ssh.
 
 ## 0. Форк
@@ -35,25 +31,18 @@ fallback `ansible/inventory.ini`).
 1. Gitea (`https://git.stit.tech`) → `stit-core/project-infra-template-compose` →
    **Use this template** → `<org>/infra`.
 2. `git clone git@git.stit.tech:<org>/infra.git && cd infra`.
-3. `make setup` — ставит git-хуки (commit-msg, pre-commit на `roadmap.md` + `docs/project/`).
+3. `make setup` — ставит git-хуки (commit-msg, pre-commit на `.claude/plans/` + `docs/project/`)
+   и PyYAML для frontmatter-проверки.
 
-На self-hosted замените `git.stit.tech` на git вашего control-plane (`REGISTRY_HOST`).
+## 1. Доступ к registry (один раз на проект)
 
-## 1. Day-0 — корп-контракт (один раз на все env)
+Образы сервис-репо (backend, frontend, site, бот) лежат в registry `REGISTRY_HOST` (дефолт
+`git.stit.tech`, Gitea): пушит их `/release` сервис-репо, VPS пуллит. Для pull каждой VPS нужен
+PAT (Gitea → Settings → Applications) — логин на шаге 3. Другой registry — `REGISTRY_HOST` в
+`.env` (шаг 4). Секреты проекта целиком живут в `.env` на VPS (шаги 4 и 6) — контракт
+`.claude/rules/multi-env.md`.
 
-Корп-стороне нужно от проекта две вещи (**managed:** делает stit по запросу;
-**self-hosted:** делаете вы на своём форке `corp-infra-template`):
-
-- **Registry-доступ** к `git.stit.tech` — pull для VPS + push для разработчика
-  backend-форка (Gitea-аккаунт/PAT).
-- **CrowdSec-whitelist** egress-IP каждой проектной VPS — иначе служебный трафик
-  к корп-сервисам режется 403. egress-IP передаёте оператору корп-инфры
-  out-of-band; он вносит его в whitelist corp-side.
-
-Секреты проекта корп не выдаёт — они целиком в `.env` на VPS (шаги 4 и 6).
-Подробности контракта — `.claude/rules/multi-env.md`.
-
-## 2. Day-1 — bootstrap чистого VPS
+## 2. Bootstrap чистого VPS
 
 Канон — skill `/bootstrap-vps` (ведёт весь шаг). Под капотом:
 
@@ -81,8 +70,7 @@ ansible-playbook -i ansible/inventory.ini ansible/bootstrap.yml
 ansible-playbook -i ansible/inventory.ini ansible/bootstrap.yml --tags onboard
 ```
 
-Логин в registry на VPS (PAT из Gitea → Settings → Applications; на self-hosted — git вашего
-control-plane):
+Логин в registry на VPS (PAT из шага 1; хост — `REGISTRY_HOST`, дефолт `git.stit.tech`):
 
 ```bash
 ssh root@<vps> 'docker login git.stit.tech -u <user> -p <PAT>'
@@ -99,8 +87,7 @@ make new-env
 
 Создаёт `.env` (chmod 600) — identity + ACME. Секреты профилей дописываются по
 необходимости (шаг 6). `CROWDSEC_BOUNCER_API_KEY` заполняется автоматически на
-первом деплое. На self-hosted допишите в `.env` адрес своего registry
-(`REGISTRY_HOST` — см. `.env.example`). Строка
+первом деплое. Другой registry — допишите `REGISTRY_HOST` (см. `.env.example`). Строка
 `# COMPOSE_PROFILES=` закомментирована — раскомментируете по мере активации сервисов.
 
 ## 5. Первый деплой — минимальный стек
@@ -130,7 +117,8 @@ make ship          # commit + check + push + (на main) ssh-deploy
    ```
    COMPOSE_PROFILES=postgres,storage,backend
    ```
-   (`storage` обязательно с `postgres` — backup делает pg_dumpall; deploy.sh валидирует.)
+   (`storage` обязательно с `postgres` — backup делает pg_dumpall; deploy.sh валидирует.
+   `backend` тянет образ из registry — нужны логин из шага 3 и `BACKEND_TAG` в `.env`.)
 3. `make ship` (без MSG, чистое дерево → push + deploy). Compose сам пересоздаёт
    сервисы, чей environment изменился.
 
@@ -145,7 +133,8 @@ Skill-оркестратор `/init-project` ведёт онбординг ин�
 (`stack.md` + `services/<name>.md`) до `status: stable`, затем чейнит развёртку.
 
 Продуктовый слой (vision / surface) **не авторится здесь** — он живёт в `<org>/strategy` (продукт
-в `docs/projects/<slug>/`) и проектируется его скиллами. Этот шаг читает его как scope. Резолв пути — `docs/reference/ecosystem.md`.
+в `docs/projects/<slug>/`) и проектируется его скиллами первым, до инфры (`/entrypoint`). Этот шаг
+читает его как scope. Резолв пути — `docs/reference/ecosystem.md`.
 
 ## 8. `/de-template` — своя инфра
 
@@ -157,5 +146,6 @@ Cross-repo (форки backend/frontend, заполнение `.env` на VPS) �
 ## Готово
 
 Проект больше ничего не помнит про шаблон: свой домен, свой набор профилей, свой `CLAUDE.md`.
-Дальше — обычный дневной флоу через `/smartdev` (устройство `.claude`-слоя — `docs/contributing.md`).
-Когда что-то сломалось — `docs/reference/runbook.md`.
+Дальше — обычный дневной флоу через `/smartdev` (устройство `.claude`-слоя — `docs/contributing.md`):
+работа в сервис-репо ведётся отсюда общим планом, агентами в сиблингах и выкаткой `make bump`
+(`CLAUDE.md § Оркестрация`). Когда что-то сломалось — `docs/reference/runbook.md`.

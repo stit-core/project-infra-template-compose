@@ -27,7 +27,8 @@ Identity / Secrets / Route / Generates. По разделу на каждую с
   - `infra` → обычно always-on, не профильное.
 - Источник: для `backend` — внешний source-репо `<org>/backend`, но
   контейнер `here`; для движков (postgres/minio) — official image; для
-  кастомного образа — `git.stit.tech/<org>/<name>`.
+  образа сервис-репо — `${REGISTRY_HOST:-git.stit.tech}/${PROJECT_NAME}/<name>`
+  с тегом `${<NAME>_TAG}` из `.env`.
 
 **Опции опрашиваются как**:
 
@@ -62,10 +63,12 @@ Identity / Secrets / Route / Generates. По разделу на каждую с
 **Что фиксируем**:
 
 - Образ: `<registry>/<image>:<tag>` **pinned** (semver / sha-prefix /
-  date-tag — НЕ `:latest`).
+  date-tag — не `:latest`). У образа сервис-репо тег живёт в `.env`
+  (`<SVC>_TAG`, выкатка `make bump`), в compose — `${<SVC>_TAG}`.
 - `container_name` (обычно `<name>`, иногда суффикс).
 - `healthcheck`: команда или path. Для postgres — `pg_isready`, для
-  HTTP-API — `wget`/`curl` + `/healthz`, для minio — `mc ready`.
+  HTTP-API — `wget`/`curl` + `/health` (Go-сервисы на golibinfra: `/health`
+  liveness, `/ready` с probes), для minio — `mc ready`.
 - Сети: `proxy` (наружу — если public) и/или `backend-net` (internal).
 
 **Опции опрашиваются как**:
@@ -90,7 +93,7 @@ Identity / Secrets / Route / Generates. По разделу на каждую с
 - ✅ «`image: postgres:17.4`, `container_name: db`, healthcheck
   `pg_isready -U postgres`, сеть `backend-net`».
 - ✅ «`image: git.stit.tech/acme/backend:abc1234`, healthcheck
-  `wget -qO- http://localhost:8080/healthz`, сети `proxy + backend-net`».
+  `wget -qO- http://127.0.0.1:8080/health`, сети `proxy + backend-net`».
 - ❌ «`image: minio/minio:latest`» — pinned обязательно.
 - ❌ «public сервис без сети `proxy`».
 
@@ -180,7 +183,7 @@ Identity / Secrets / Route / Generates. По разделу на каждую с
 **Тест-критерий**:
 
 - ✅ «public, `api.${DOMAIN}`, traefik router + `crowdsec@file`, порт
-  8080, LE через `acme_email/caserver` meta».
+  8080, LE через резолвер `letsencrypt` (ACME-значения — `.env`)».
 - ✅ «`_internal_` — backend-net only».
 - ❌ «`api.example.com` без middleware» — публичная поверхность без
   щита.

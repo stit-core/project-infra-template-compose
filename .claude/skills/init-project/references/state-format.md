@@ -38,8 +38,6 @@ kind: init-project-journey
   (`make bump SVC=backend TAG=…`).
 - Секреты профиля postgres (`POSTGRES_*`) в `.env` на VPS — оператор
   дописывает по `.env.example`.
-- crowdsec-whitelist: egress IP VPS (после /bootstrap-vps) — оператор
-  передаёт корп-оператору out-of-band.
 - Сабдомены `api.acme.dev`, `minio.acme.dev`, `s3.acme.dev` под
   LE-HTTP-01 (стандартные A-записи).
 ```
@@ -90,9 +88,9 @@ kind: init-project-journey
 Накопленные next-step'ы для финала. Сюда сливается всё, что обнаружено
 по пути и требует действий **вне** этого репо:
 
-- форки бэкенда/фронта (для `hosting: external`);
+- форки сервис-репо (для `hosting: external` и сервисов с образом сервис-репо);
 - секреты активных профилей в `.env` на VPS (оператор дописывает по `.env.example`);
-- корп-контракт: registry-доступ + crowdsec-whitelist egress-IP (оператор передаёт корп-оператору out-of-band);
+- доступ VPS к registry `REGISTRY_HOST` (`docker login` с PAT — оператор на VPS);
 - LE-DNS A-записи для сабдоменов.
 
 На финале (этап 5) — выводится оператору списком.
@@ -119,10 +117,10 @@ kind: init-project-journey
 - Текущий этап.
 - Открытые вопросы (включая `**blocker**`).
 - Доменные решения по пути.
-- Cross-repo next-steps (форки, seed, корп-handoff).
+- Cross-repo next-steps (форки, `.env` на VPS, DNS).
 
 ❌ Никогда не пишем сюда:
-- Значения секретов / KV-полей.
+- Значения секретов и переменных `.env`.
 - Содержимое `.env`, `.env.local`.
 - Личные данные оператора (хост, IP, домашняя папка).
 

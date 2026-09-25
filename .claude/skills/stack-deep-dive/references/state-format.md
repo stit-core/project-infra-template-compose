@@ -4,7 +4,7 @@
 singleton, поэтому один state-файл без подкаталога.
 
 **Коммитится в git** — это shared артефакт команды, не приватная
-память агента. Ревьюится в PR как часть продуктовой документации
+память агента. Ревьюится в PR как часть инфра-документации
 проекта.
 
 Заметка лежит **рядом со скиллом**, не в `docs/project/`:
@@ -25,7 +25,8 @@ ref: docs/project/stack.md
 
 ## Открытые вопросы
 - Retention для restic — 7-4-3 или другое? (не блокирует, дефолт 7-4-3)
-- crowdsec source-IP whitelist: нужен ли (нет central-LAPI пока)? (**blocker**)
+- Имена сетей на shared VPS: дефолт `proxy`/`backend-net` или
+  `acme-proxy`/`acme-backend`? (**blocker**)
 
 ## Доменные решения
 - minio Console и S3 разнесены на `minio.` и `s3.`, потому что
@@ -33,14 +34,14 @@ ref: docs/project/stack.md
   ясности доступа.
 
 ## Что копать дальше
-- Уточнить acme_email с заказчиком (значение пойдёт в meta KV).
+- Уточнить ACME_EMAIL с заказчиком (значение — в `.env` на VPS).
 - После /service-deep-dive backend: сверить порт API в Edge.
 
 ## Host layout
 - Режим: split (single-host — секцию опускаем).
 - vps-app (HOST_ROLE=edge): traefik, backend, landing.
-- vps-db (HOST_ROLE=db): postgres; backend достаёт PG через db.host/db.port из KV.
-- vps-storage (HOST_ROLE=storage): minio, backup; restic.repository → этот хост.
+- vps-db (HOST_ROLE=db): postgres; backend достаёт PG через PG_HOST/PG_PORT из `.env`.
+- vps-storage (HOST_ROLE=storage): minio, backup; RESTIC_REPOSITORY → этот хост.
 ```
 
 ## Frontmatter
@@ -79,7 +80,8 @@ stack'а, но важны для будущих сессий.
 
 ### `## Что копать дальше`
 
-Список локальных «следующих шагов».
+Список «следующих шагов», включая cross-repo next-steps (DNS-записи, ACME-значения
+в `.env`, форки) — их отсюда собирают `/init-project` и `/de-template` (Phase B).
 
 - Не путать с открытыми вопросами: «копать дальше» — задача архитектора;
   «открытый вопрос» — конкретный неясный смысл.
@@ -94,8 +96,8 @@ stack'а, но важны для будущих сессий.
 - Одна строка на хост: `<имя-хоста> (HOST_ROLE=<роль>): <сервисы>`.
 - Роли: `edge` (traefik/backend/landing) / `db`
   (postgres) / `storage` (minio/backup).
-- Эндпоинты не дублируем: PG host/port — в KV `db`, restic — в KV
-  `backup.repository`.
+- Эндпоинты не дублируем: PG — `PG_HOST`/`PG_PORT`, restic —
+  `RESTIC_REPOSITORY` в `.env` каждого хоста.
 - Граница (репликация/HA/cross-host сеть = дело потребителя) — фиксируется как
   факт, не проектируется здесь. Детали — `references/multi-host.md`.
 
@@ -118,8 +120,8 @@ stack'а, но важны для будущих сессий.
 - Открытые вопросы, доменные решения, что копать дальше.
 
 ❌ Никогда не пишем сюда:
-- Значения секретов (acme_email, restic-пароль). Только
-  ссылки на KV-пути.
+- Значения секретов (restic-пароль и т.п.). Только имена
+  переменных `.env`.
 - Содержимое `.env`, `.env.local`, rendered-конфигов.
 - Личные данные оператора.
 
@@ -127,8 +129,6 @@ stack'а, но важны для будущих сессий.
 
 - Историю изменений (это git).
 - Дубликаты содержимого stack.md.
-- Cross-repo next-steps, которые относятся ко всей сессии — в чате
-  завершения, не в state.
 - Ссылки на внешние материалы и транскрипты — это сырьё для режима B.
 - Анализ service-doc'ов на рассинхрон — записывай как open-question
   «сверить с `services/<name>.md`», не копию содержимого.

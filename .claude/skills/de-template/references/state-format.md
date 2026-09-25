@@ -28,9 +28,9 @@ A.3 — прунинг env-секций. Ждёт ответа оператор�
 - A.2 (compose/minio.yml, compose/backup.yml удалены) — done
 
 ## Открытые вопросы
-- A.3: судьба `templates/jwt.env.tpl` — в карте JWT нет, но в
-  state/services/backend.md упомянут как «нужен для auth-flow».
-  (**blocker**)
+- A.3: судьба секции `profile backend` в `.env.example` — в карте
+  backend `hosting: external`, но state/services/backend.md упоминает
+  `JWT_SECRET` как «нужен для auth-flow». (**blocker**)
 ```
 
 ## Frontmatter
@@ -98,7 +98,7 @@ A.3 — прунинг env-секций. Ждёт ответа оператор�
 - Текущая фаза, применённые шаги, открытые вопросы.
 
 ❌ Никогда не пишем сюда:
-- Значения секретов / KV-полей.
+- Значения секретов и переменных `.env`.
 - Содержимое `.env`, `.env.local`, rendered-конфигов.
 - Полные diff'ы фаз — они в `git log`/`git diff`.
 

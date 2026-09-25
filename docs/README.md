@@ -4,7 +4,7 @@
 
 ## Потребителю шаблона
 - [getting-started.md](getting-started.md) — путь от форка до работающей проектной VPS:
-  corp-онбординг → bootstrap нового VPS → первый деплой → активация профилей →
+  доступ к registry → bootstrap нового VPS → первый деплой → активация профилей →
   `/init-project` → своя инфра. **[META]** — удаляется при де-темплейтизации.
 
 ## Контрибьютору шаблона
@@ -14,8 +14,8 @@
 ## Reference (переезжает в проект)
 - [reference/architecture.md](reference/architecture.md) — слои, сети, профили, поток секретов,
   deploy-флоу, что НЕ в шаблоне.
-- [reference/ecosystem.md](reference/ecosystem.md) — роль проектной VPS среди репо экосистемы, контракты
-  с корпом, указатель на канон.
+- [reference/ecosystem.md](reference/ecosystem.md) — канон экосистемы: карта репо, операционный флоу,
+  резолв сиблингов, кто что читает из `<org>/strategy`, контракт сервис-репо ↔ хаб.
 - [reference/runbook.md](reference/runbook.md) — failure modes на проектном VPS, recovery, DR-drill.
 
 ## Infra design source-of-truth

@@ -1,6 +1,6 @@
 ---
 name: bootstrap-vps
-description: Поднять новый клиентский VPS с нуля — ansible-bootstrap, регистрация deploy-key в Gitea, заполнение .env, первый make deploy. Multi-env (один VPS = один ENV). Активируй на "/bootstrap-vps", "новый VPS", "подними сервер для клиента", "первый запуск".
+description: Поднять новый VPS среды проекта с нуля — ansible-bootstrap, регистрация deploy-key в Gitea, заполнение .env, первый деплой, активация профилей. Multi-env (один VPS = один ENV). Вызывай, когда нужен сервер под новый проект или новую среду, перенос на новый хост или обкатка шаблона на тестовом VPS.
 ---
 
 # Skill: bootstrap-vps
@@ -20,7 +20,7 @@ Provisioning нового VPS под клиентский проект — од�
 | Режим | Триггеры | LE endpoint | Что меняется |
 |---|---|---|---|
 | **production** | "клиентский VPS", "новый проект", "поднимаем для <client>", реальный домен заранее настроен | LE prod (`acme-v02.api.letsencrypt.org`) | Дефолт `ACME_CASERVER` в `.env` |
-| **rehearsal** | "обкатка", "обкатываю шаблон", "тестовый прогон", "пробую заново", "тестовый VPS", "буду повторять bootstrap" | LE staging (`acme-staging-v02.api.letsencrypt.org`) — untrusted, rate-limits ~100× выше | Корп-админ patch'ит `meta.acme_caserver` на staging URL перед первым deploy'ем |
+| **rehearsal** | "обкатка", "обкатываю шаблон", "тестовый прогон", "пробую заново", "тестовый VPS", "буду повторять bootstrap" | LE staging (`acme-staging-v02.api.letsencrypt.org`) — untrusted, rate-limits ~100× выше | `ACME_CASERVER` в `.env` — staging URL до первого deploy'я |
 
 **Почему важно:** LE prod лимиты тесные:
 - 5 failed validations / hostname / hour
@@ -45,34 +45,22 @@ $EDITOR .env                              # ACME_CASERVER=<new>
 make ship  # render-configs перерендерит traefik.yml, traefik подымется с новым CA
 ```
 
-## Когда НЕ применять
+## Когда не применять
 
 - Re-deploy на уже работающий хост — это `make deploy` / `make ship`.
-- Onboarding пользователя в Gitea — корп-задача (skill `onboard-user` в `corp-infra-template`).
+- Доступы людей в Gitea (аккаунты, PAT, права на репо) — их выдаёт админ Gitea, не этот скилл.
 - Bug на проде — диагностика, не bootstrap.
 
-## Предусловия (СПРОСИ юзера)
+## Предусловия (уточни у юзера)
 
-> **Где живёт корп-сторона — два пути (спроси заранее).**
-> - **managed:** registry держит stit на `git.stit.tech`; registry-эндпоинт —
->   managed-дефолт из `.env.example`.
-> - **self-hosted:** ты сам держишь форк `corp-infra-template` (свой control-plane);
->   registry-эндпоинт в проектном `.env` наводишь на свой домен (`REGISTRY_HOST` —
->   см. `.env.example`).
->
-> Шаги ниже одинаковы для обоих путей; различие — чей это control-plane и какой эндпоинт в `.env`.
-> Вендор-лока нет: managed = инстанс того же шаблона, self-hosted = твой форк.
+1. **VPS provisioned**, у тебя есть IP и root-доступ по SSH ключу (минимум один ключ в `/root/.ssh/authorized_keys`).
 
-1. **Корп-сторона знает egress-IP проектной VPS?** Egress-IP пишется в корп CrowdSec
-   whitelist — без него служебный трафик с проектной VPS к корп-сервисам (registry-pull)
-   может резаться 403'ами. Оператор передаёт egress-IP оператору корп-инфры out-of-band
-   (тот дописывает whitelist на корп-VPS).
+2. **DNS** для `${DOMAIN}` (а также `api.${DOMAIN}` etc. — по сабдоменам, которые будут активированы позже) указывает на IP VPS — нужно для HTTP-01 ACME challenge.
 
-2. **VPS provisioned**, у тебя есть IP и root-доступ по SSH ключу (минимум один ключ в `/root/.ssh/authorized_keys`).
+3. **Gitea-репо** `<client-org>/infra` существует и склонирован из шаблона `project-infra-template-compose`.
 
-3. **DNS** для `${DOMAIN}` (а также `api.${DOMAIN}` etc. — по сабдоменам, которые будут активированы позже) указывает на IP VPS — нужно для HTTP-01 ACME challenge.
-
-4. **Gitea-репо** `<client-org>/infra` существует и склонирован из шаблона `project-infra-template-compose`.
+4. **Доступ к registry** `REGISTRY_HOST` (дефолт `git.stit.tech`) — Gitea-аккаунт с PAT, которым
+   VPS будет пуллить образы сервис-репо (нужен к активации профиля `backend`, шаг 7).
 
 Без любого из этих пунктов — стопори, проси подготовить.
 
@@ -92,6 +80,9 @@ operator_ssh_pubkey="ssh-ed25519 AAAAC3Nz... operator@laptop"
 ```
 
 (Если на каждый env свой VPS — несколько inventory'ев или несколько групп в одном.)
+
+Коллекции Galaxy — один раз на рабочей станции (base-роль использует `ansible.posix`):
+`ansible-galaxy collection install -r ansible/requirements.yml`.
 
 Verify connectivity: `ansible -i ansible/inventory.ini project_vps -m ping`.
 
@@ -147,7 +138,7 @@ ACME_CASERVER=https://acme-staging-v02.api.letsencrypt.org/directory
 
 С laptop'а оператора:
 ```bash
-make ship          # commit + push + (на main) ssh-deploy
+make ship          # commit + check + push + (на main) ssh-deploy
 ```
 
 Либо на VPS (debug-mode со пошаговым stdout):
@@ -186,10 +177,15 @@ make ship
 
 **Storage обязательно с postgres** (backup делает pg_dumpall, без postgres сразу падает — deploy.sh валидирует, ругнётся явно).
 
+**Backend** (и любой образ сервис-репо) тянется из `REGISTRY_HOST`, поэтому до его профиля VPS
+логинится в registry: оператор сам выполняет на VPS `docker login <REGISTRY_HOST>` с PAT из Gitea
+(PAT в чат не попадает — rule `env-local`); тег — `BACKEND_TAG` в `.env`, дальше выкатка
+`make bump SVC=backend TAG=<tag>`.
+
 **Restic endpoint** живёт в `RESTIC_REPOSITORY` в `.env`. Оператор выбирает:
 - external managed S3 (recommended для prod): `s3:https://s3.example.com/<p>-<env>-backups`
 - bare-IP S3 на другом хосте: `s3:http://<ip>:9000/<p>-<env>-backups`
-- local project minio (ТОЛЬКО rehearsal): `s3:http://minio:9000/backups`
+- local project minio (только rehearsal — хост уносит и репо): `s3:http://minio:9000/backups`
 
 `RESTIC_PASSWORD` (в `.env`) **обязательно продублирован offsite** — без него restore из снапшотов невозможен.
 
@@ -198,7 +194,7 @@ make ship
 После bootstrap'а — стандартный цикл изменений. Детали в smartdev skill (§ Deploy-флоу). Коротко:
 
 ```bash
-make ship MSG="feat(foo): bar"   # add -A + commit + push + (на main) ssh-deploy
+make ship MSG="feat(foo): bar"   # add -A + commit + check + push + (на main) ssh-deploy
 ```
 
 На чистом дереве MSG не нужен — просто push + deploy. Смена `COMPOSE_PROFILES` / значений в `.env` подхватывается `deploy.sh` (compose пересоздаёт затронутые сервисы сам).
@@ -225,16 +221,16 @@ docker exec minio mc ls local/backups/
 ## Guard'рейлы
 
 - **Не запускай ssh-hardening без проверки** что в `/root/.ssh/authorized_keys` есть твой ключ. Роль `ssh-hardening` обязана это assert'нуть, но дополнительно проверь руками.
-- **Не публикуй deploy-key из stdout/log'а** — это секрет. Передай оператору приватным каналом.
-- **Креды tool-only.** Deploy-key, registry-PAT, токены — не эхо-ить значение в чат
+- **Приватный deploy-key** (`/root/.ssh/<project>-deploy`) с VPS не выносим: в чат и в Gitea идёт
+  только pubkey, который печатает onboard.
+- **Креды tool-only.** Registry-PAT, токены — не эхо-ить значение в чат
   (подтверждай факт, не печатай секрет; `.claude/rules/env-local.md`). Connection к VPS для ops-вербов
   после bootstrap — в `.env.local` (workstation, gitignored), не хардкодь; `ssh.sh` читает его сам.
 - **DNS-cutover до первого deploy** — иначе LE rate-limit съедает попытки выпуска.
-- **Rehearsal → ВСЕГДА staging** — production LE сжигается за день многократных итераций. Если режим rehearsal, но `ACME_CASERVER` в `.env` указывает на prod — это твоя ошибка, поправь до deploy.
-- **Production → НИКОГДА staging** — клиент получит untrusted cert. Если режим production и видишь staging в `ACME_CASERVER` — стоп, перепроверь с юзером.
+- **Rehearsal — только staging**: production-лимиты LE сжигаются за день многократных итераций. Если режим rehearsal, а `ACME_CASERVER` в `.env` указывает на prod — поправь до deploy.
+- **Production — только prod CA**: со staging клиент получит untrusted cert. Если режим production и видишь staging в `ACME_CASERVER` — стоп, перепроверь с юзером.
 
 ## После
 
 - Записать в credentials store клиента: IP VPS, deploy-key fingerprint, копию `.env` (password-manager оператора).
-- На корп-стороне — добавить uptime-kuma monitor на `https://${DOMAIN}/`.
 - Создать `docs/incidents/` skeleton (если ещё нет).

@@ -42,10 +42,9 @@ services:
       traefik.http.routers.minio-s3.middlewares: crowdsec@file,rate-limit@file
       traefik.http.services.minio-s3.loadbalancer.server.port: "9000"
 
-      # Console — minio.${DOMAIN} :9001. В шаблоне нет Authentik (проектная
-      # сторона без IDP), поэтому только crowdsec+rate-limit. Если нужен
-      # SSO — заворачивай через корп-Authentik отдельной интеграцией, либо
-      # ограничивай доступ IP-allowlist'ом / отключай маршрут.
+      # Console — minio.${DOMAIN} :9001. IDP в стеке нет, поэтому только
+      # crowdsec+rate-limit; сузить доступ — IP-allowlist'ом или отключением
+      # маршрута.
       traefik.http.routers.minio-console.rule: Host(`minio.${DOMAIN}`)
       traefik.http.routers.minio-console.entrypoints: websecure
       traefik.http.routers.minio-console.tls: "true"

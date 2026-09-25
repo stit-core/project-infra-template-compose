@@ -11,7 +11,7 @@ paths:
 
 Один проект может иметь несколько сред (`dev`, `prod`, опционально `staging`/etc). Каждая среда — **отдельный VPS** с одним и тем же compose-шаблоном, но со своим `ENV` и своим `.env`. Шаблон агностичен к именам env'ов — это произвольные слаги.
 
-Этот документ описывает контракт per-env `.env`: что где живёт, как активируются профили, как ротируются значения. Механика секретов (имена, рендер, что нельзя коммитить) — `.claude/rules/secrets-and-env.md`. Контракт с корпом (registry + CrowdSec) — секция ниже.
+Этот документ описывает контракт per-env `.env`: что где живёт, как активируются профили, как ротируются значения. Механика секретов (имена, рендер, что нельзя коммитить) — `.claude/rules/secrets-and-env.md`.
 
 ## Принцип: всё в .env
 
@@ -26,7 +26,7 @@ paths:
 | Локально-сгенерированные | `.env` (auto после первого deploy) | `CROWDSEC_BOUNCER_API_KEY` |
 | Оператор-управление | `.env` | `COMPOSE_PROFILES`, `HOST_ROLE` |
 | Image-теги | `.env` (**строго**; бамп — `make bump SVC= TAG=`) | `BACKEND_TAG` (конвенция `<SVC>_TAG`) |
-| Registry-эндпоинт | `.env` (managed-дефолт в коде; self-hosted override) | `REGISTRY_HOST=git.stit.tech` |
+| Registry образов | `.env` (дефолт `git.stit.tech` в compose; другой registry — override) | `REGISTRY_HOST=git.stit.tech` |
 | Секреты профилей | `.env` (секции в `.env.example`) | `POSTGRES_*`, `OIDC_*`, `JWT_SECRET`, `MINIO_*`, `RESTIC_*` |
 
 Полный контракт переменных с комментариями как сгенерировать — `.env.example`. Env'ы физически изолированы: разные VPS, разные `.env`, утечка значения одной среды не задевает другую.
@@ -81,13 +81,6 @@ Default-стек поднимается **без** секретов профил
 | `backup` | `storage` | `RESTIC_*`, `BACKUP_AWS_*`, `POSTGRES_*` |
 | `backend` | `backend` | `OIDC_*`, `JWT_SECRET`, `POSTGRES_*`, `BACKEND_TAG` |
 
-`COMPOSE_PROFILES=postgres,backend make ship` = включить postgres + backend (их секции в `.env` должны быть заполнены). `storage` требует одновременного `postgres` (backup делает pg_dumpall) — `deploy.sh` валидирует на single-host.
-
-## Контракт со `corp-infra-template` (что обязан гарантировать корп)
-
-1. **Registry** `git.stit.tech` — pull образов `git.stit.tech/<p>/backend:<tag>` (плюс push-доступ разработчику backend-форка).
-2. **CrowdSec whitelist** — egress-IP проектной VPS в корп-whitelist, иначе служебный трафик к корп-сервисам режется 403 (`corp-infra-template/.claude/rules/crowdsec-whitelist.md`).
-
-Секреты корп не выдаёт и не хранит — они целиком на стороне проектной VPS.
+Включить postgres + backend = `COMPOSE_PROFILES=postgres,backend` в `.env` на VPS + `make ship` (их секции в `.env` должны быть заполнены). `storage` требует одновременного `postgres` (backup делает pg_dumpall) — `deploy.sh` валидирует на single-host.
 
 Каждая среда — отдельный VPS с собственным `ENV` и `.env`. Среда не конвертируется in-place: добавление env'а проекту = bootstrap нового VPS под этот env (skill `bootstrap-vps`).

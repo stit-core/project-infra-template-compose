@@ -15,7 +15,7 @@ paths:
 
 | Роль | Что |
 |---|---|
-| `base` | Системные пакеты, swap, timezone, базовый sysctl |
+| `base` | Pubkey оператора, системные пакеты, swap, лимиты journald, базовый sysctl |
 | `ssh-hardening` | Disable password auth, root login policy, fail2ban-style |
 | `docker` | Docker engine + compose plugin, daemon.json (log driver, log rotation) |
 | `stit-onboard` | Клонирование `<client-org>/infra`, deploy-key вывод, директории `/opt/<project>-infra` |
@@ -24,7 +24,7 @@ paths:
 
 ## Required vars и assertions
 
-`pre_tasks` в playbook'е обязан проверять `assert` на required переменные (`project_name`, `project_repo_url`, `ansible_host`). Без этого playbook молча отработает с пустыми и сломается на полпути.
+`pre_tasks` в playbook'е проверяет `assert` на required переменные (`project_name`, `project_repo_url`; `ansible_host` задаёт сам inventory). Без этого playbook молча отработает с пустыми и сломается на полпути.
 
 ```yaml
 - name: Verify required vars
@@ -37,8 +37,7 @@ paths:
 
 ## Секреты
 
-- **Не клади** реальные секреты в task definitions / `vars:`. Bootstrap не должен знать секретов `.env` — их даёт оператор руками после `new-env.sh`.
-- Если когда-то понадобится — ansible-vault или (лучше) keep-out-of-ansible: оператор кладёт `.env` руками, playbook только разворачивает скелет.
+- Реальные секреты в task definitions / `vars:` не кладём: bootstrap не знает секретов `.env` — оператор заполняет `.env` руками после `make new-env`, playbook разворачивает только скелет.
 - `authorized_keys` — через файл, не inline. Templates с inline-keys ведут к мерж-конфликтам и непрозрачности.
 
 ## Fail-fast
@@ -61,7 +60,7 @@ paths:
 
 ## Tags
 
-Каждая роль имеет тег с именем роли (`tags: [base]`, `tags: [docker]`). Это позволяет re-run'ить часть playbook'а: `--tags onboard` после регистрации deploy-key.
+Каждая роль подключена в `bootstrap.yml` со своим тегом (`base`, `ssh` для `ssh-hardening`, `docker`, `onboard` для `stit-onboard`). Это позволяет re-run'ить часть playbook'а: `--tags onboard` после регистрации deploy-key.
 
 ## Хост-локальные пути
 
@@ -69,6 +68,6 @@ paths:
 
 ## После правки
 
-- Synth-проверка: `ansible-playbook --syntax-check bootstrap.yml`.
+- Syntax-проверка: `ansible-playbook --syntax-check bootstrap.yml`.
 - Dry-run: `ansible-playbook --check -i inventory.ini bootstrap.yml` (если задачи поддерживают check-mode).
 - Реальный прогон — на тестовом VPS, не на live.

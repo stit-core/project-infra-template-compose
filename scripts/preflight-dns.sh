@@ -21,7 +21,7 @@ VPS_IP=$(curl -fsS --max-time 5 https://api.ipify.org 2>/dev/null \
 
 # Хосты, которые ждут LE-cert. Корневой `$DOMAIN` — всегда (landing always-on).
 # Сабдомены — только под активные профили: s3/minio под `storage`, api под
-# `backend`. Иначе минимальный seed (без этих профилей) даёт ложный DNS-WARN на
+# `backend`. Иначе минимальный стек (без этих профилей) даёт ложный DNS-WARN на
 # ещё не маршрутизируемые хосты — их роутеры/cert'ы поднимутся только с профилем.
 hosts=("$DOMAIN")
 profiles=",${COMPOSE_PROFILES:-},"

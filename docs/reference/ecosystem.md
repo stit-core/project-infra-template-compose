@@ -1,82 +1,116 @@
-# Ecosystem — место проектной VPS среди репо
+# Экосистема — карта репо и операционный флоу
 
-Этот репо — **шаблон проектной инфры**: один форк (`<org>/infra`) = один клиентский проект,
-один VPS на среду (`dev`/`prod`/...). Экосистема — 6 форкаемых шаблонов `stit-core/`
-(`corp-infra-template`, `go-backend-template`, `spa-frontend-template`,
-`telegram-bot-template`, `business-strategy-template`, `project-infra-template-compose`) + 2 общие библиотеки
-`stit-core/golibinfra` (Go) и `stit-core/ui-lib` (`@stit/ui`, frontend design-system).
-Корп control-plane — это репо `corp-infra-template` (managed = инстанс на `*.stit.tech`;
-self-hosted = ваш форк). Канон карты контрактов живёт в
-`corp-infra-template/docs/ecosystem.md` — здесь только роль *этого* репо и его контракты.
+Канон экосистемы stit: какие репо есть, как по ним движется работа, как хаб находит соседей и что
+каждый репо отдаёт и берёт. Остальные репо держат у себя короткую версию (своя роль, соседи, как
+туда приходят агенты) и ссылаются сюда.
 
-## Репо
+## Карта
 
-| Репо | Роль |
+Шаблоны `stit-core/*` форкаются в репо клиентской орги `<org>/*`; форки одной орги лежат рядом
+sibling-checkout'ами:
+
+```
+~/git/<org>/
+├─ strategy/   ← business-strategy-template
+├─ infra/      ← project-infra-template-compose (этот репо)
+├─ backend/    ← go-backend-template
+├─ frontend/   ← spa-frontend-template
+├─ site/       ← ssr-frontend-template
+├─ <bot>/      ← telegram-bot-template
+└─ mobile/     ← mobile-template
+```
+
+| Шаблон → форк | Роль |
 |---|---|
-| `stit-core/corp-infra-template` | Корп control-plane: Gitea registry, CrowdSec, SSO. Source of truth контрактов. Managed = инстанс на `*.stit.tech`, self-hosted = ваш форк. |
-| `stit-core/go-backend-template` | Шаблон Go-бэкенда. Форк `<org>/backend` собирает образ в `git.stit.tech`. |
-| `stit-core/business-strategy-template` | Шаблон бизнес-стратегии (business → ajtbd → swot → hypothesis-map → опц. продукт `projects/<slug>/`: vision/**surface** → interface → screens). Форк `<org>/strategy`. |
-| `stit-core/project-infra-template-compose` | **Этот.** Шаблон проектной VPS — runtime стека одного проекта. Форк `<org>/infra`. |
-| `<org>/infra` + `<org>/strategy` + `<org>/backend` + ... | Клиентские форки. Один `<org>/infra` обслуживает N сервис-форков и читает `<org>/strategy`. |
+| `business-strategy-template` → `<org>/strategy` | design-time source of truth: бизнес, AJTBD, SWOT, карта гипотез, продукты (vision/surface, interface, screens, fsd, telegram-bot-flow, mobile, services + domains), ИТ-периметр |
+| `project-infra-template-compose` → `<org>/infra` | runtime проекта (docker-compose на VPS) и **операционный хаб**: общий план, рассылка агентов по сиблингам, выкатка тегов (`make bump`) |
+| `go-backend-template` → `<org>/backend` | Go-сервис |
+| `spa-frontend-template` → `<org>/frontend` | React SPA (кабинет, всё за логином) |
+| `ssr-frontend-template` → `<org>/site` | Astro SSR-сайт (индексируемый контент) |
+| `telegram-bot-template` → `<org>/<bot>` | Telegram-бот (Python, aiogram) |
+| `mobile-template` → `<org>/mobile` | KMP-приложение Android + iOS; релиз — в магазины |
 
-## Зависит от корп control-plane (`corp-infra-template`)
+Библиотеки не форкаются, а подключаются зависимостью: `golibinfra` — Go-киты для Go-сервисов,
+`pylibinfra` — Python-киты (потребитель — `telegram-bot-template`). Итого 7 шаблонов + 2 библиотеки.
+Git-хостинг и container registry — Gitea `git.stit.tech`.
 
-| Что корп выдаёт | Как | Адрес |
-|---|---|---|
-| Source + container registry | deploy-key + PAT login | `git.stit.tech` |
-| CrowdSec whitelist egress-IP проектной VPS | `configs/crowdsec/whitelists.yaml` corp-side | corp-side |
+## Операционный флоу
 
-Адрес `git.stit.tech` — managed-инстанс; на self-hosted это адрес вашего форка
-`corp-infra-template`, задаётся через `REGISTRY_HOST` (см. `.env.example`).
-Вендор-лока нет.
+1. **Старт проекта — `<org>/strategy`.** Там проектируется всё, что можно спроектировать до кода:
+   бизнес, продукт, домены, UX, FSD-карта, ИТ-периметр. Вход — `/entrypoint` (аналитик) и
+   `/entrypoint-for-business` (клиент).
+2. **Дальше работа идёт из `<org>/infra` — операционного хаба.**
+   - `/init-project` читает strategy и проектирует инфру: стек и карту сервисов, service-doc'и,
+     `/de-template`. VPS каждой среды поднимает `/bootstrap-vps`.
+   - Сквозная задача — программа в `.claude/plans/` хаба (skill `/plan`, `references/program.md`):
+     фазы по репо, у каждой фазы — свой план в сиблинге (`parent: infra:<slug>`).
+   - Из хаба агенты уходят в сиблинги (`../strategy`, `../backend`, `../frontend`, `../site`,
+     `../<bot>`, `../mobile`) и работают **обвязкой того репо**: сначала читают его CLAUDE.md,
+     дальше — его вербы, скиллы и гейты. Контракты сиблинга живут в нём, поэтому его код из хаба в
+     обход них не правят.
+   - Сервис-репо останавливаются на образе в registry — их `/release`. Выкатка тега — только из
+     хаба: `make bump SVC=<svc> TAG=<tag>`.
+   - Мобильное приложение выпускается в магазины своим `/release`; деплой из хаба его не касается,
+     но задачи в `../mobile` тоже приходят из хаба.
+   - Изменение дизайна по ходу работы — тоже агентом из хаба в `../strategy`, скиллами strategy.
+3. **Прямой заход в отдельный репо** (например, поработать только в backend) — нормальный режим:
+   репо работает своей обвязкой, а последствия для хаба оформляются INFRA-HANDOFF-блоком — его
+   печатает `/release` сервис-репо, а в backend, боте и mobile ещё и `/infra-handoff` по ходу работы.
+   В хабе блок применяется так: новый сервис — `/add-service`, новая переменная — `.env.example` и
+   `.env` на VPS, новый тег — `make bump`.
 
-Один VPS = одна среда, свой `.env` (единственный источник секретов — корп в них
-не участвует). Детали проектной стороны (`.env`-контракт, profile-opt-in) —
-`.claude/rules/multi-env.md`.
+## Резолв сиблингов
 
-## Обслуживает сервис-форки `<org>/{backend,frontend,<bot>}`
+Хаб находит соседа `<name>` так:
 
-Runtime для клиентских образов `git.stit.tech/<org>/<svc>:<tag>`. Из коробки в стеке —
-`compose/backend.yml`; frontend / telegram-бот / прочие сервисы проекта добавляются
-`/add-service` по карте сервисов `docs/project/stack.md`. Deploy нового тега любого сервиса —
-`make bump SVC=<svc> TAG=<tag>`: правит `<SVC>_TAG` в `.env` на VPS + force-recreate, compose
-сам пуллит образ. Image-теги живут **строго в `.env`** (конвенция `<SVC>_TAG`: `BACKEND_TAG`,
-`FRONTEND_TAG`, `BOT_TAG`, …) — корп-сторона в rollout'е тега не участвует. Сервис-репо
-останавливаются на image-in-registry (их `/release`) — деплоем занимается только этот репо.
+1. `<NAME>_REPO_PATH` из `.env.local`, если задан (`STRATEGY_REPO_PATH`, `BACKEND_REPO_PATH`,
+   `SITE_REPO_PATH`, …): это путь, не секрет, читается grep'ом — формат файла в
+   `.claude/rules/env-local.md`;
+2. иначе `../<name>` (`../strategy`, `../backend`, …; имя бот-репо — по карте сервисов
+   `docs/project/stack.md § Service map`).
 
-Этот репо — операционный хаб проекта: задачи входят сюда, агенты расходятся по сиблингам
-(`CLAUDE.md § Оркестрация`; канон — `corp-infra-template/docs/ecosystem.md § Операционная
-модель агентов`).
+Соседа нет на месте — скиллы не падают: печатают next-step «склонируй `<org>/<name>` рядом» и
+продолжают с тем, что есть (например, `/init-project` ведёт стек по словам оператора). Сервис-репо
+находят strategy своими полями `project-slug` / `strategy-path` (дефолт `../strategy`) / `surface`
+в `docs/stack/service.md`.
 
-## Sibling `<org>/strategy` — продуктовый контекст
+## Кто что читает из `<org>/strategy`
 
-Продуктовый слой (vision, **surface**, capability) одного продукта живёт в `<org>/strategy` (форк
-`business-strategy-template` — репо бизнес-стратегии, в `docs/projects/<slug>/`), а инфра — здесь.
-Граница чистая и **односторонняя**: инфра-репо **читает** продуктовый контекст, чтобы привязать
-стек к продукту, но **не редактирует** его; авторская сторона продукта — только `<org>/strategy`
-(через его deep-dive-скиллы).
+Чтение read-only и одностороннее: продукт авторится только в strategy её скиллами, соседи его
+читают. Пути — внутри `docs/projects/<slug>/` strategy, где `<slug>` — папка продукта.
 
-**Конвенция размещения — sibling-checkout:** все форки одной org склонированы **рядом**
-(`~/git/<org>/{strategy,infra,backend,frontend,<bot>}`). Путь любого соседа резолвится так:
-1. `<NAME>_REPO_PATH` из `.env.local`, если задан (override; `STRATEGY_REPO_PATH`,
-   `BACKEND_REPO_PATH`, … — см. `.claude/rules/env-local.md`);
-2. иначе дефолт `../<name>` (`../strategy`, `../backend`, `../frontend`; имя бот-репо — по
-   карте сервисов `docs/project/stack.md § Service map`).
+| Репо | Кто читает | Что | Зачем |
+|---|---|---|---|
+| `<org>/infra` | `/init-project` | `vision.md`, `surface.md` | scope продукта: проблема и поверхности → карта сервисов |
+| | `/stack-deep-dive` | `surface.md` (+ `vision.md § Problem`) | какие поверхности public → сабдомены и edge-роуты |
+| | `/de-template` | `vision.md § Problem` (+ `surface.md`) | шапка `CLAUDE.md` / `README.md` под проект |
+| | `/smartdev` | наличие strategy, `vision.md`, `surface.md` | sanity на старте сессии |
+| `<org>/backend` | `/init-service`, `/scaffold` | `services/<svc>/domains/<ctx>/`, `services/_shared/`, паспорт `services/<svc>/README.md` | домены → Go-код сервиса |
+| `<org>/frontend` | `/init-service`, `/de-template`, `/scaffold` | `fsd/<surface>/` (+ `interface/`, `screens/` поверхности, `services/*/domains/`) | FSD-карта → слайсы SPA |
+| `<org>/site` | `/init-service`, `/de-template`, `/scaffold` | `fsd/<surface>/` (+ `interface/`, `screens/` поверхности) | карта → страницы и коллекции сайта |
+| `<org>/<bot>` | `/dialog-deep-dive` | `telegram-bot-flow/<surface>/` (+ `interface/<surface>/`, `services/*/domains/`) | флоу диалогов → StatesGroup, окна, фичи |
+| `<org>/mobile` | `/init-service`, `/de-template`, `/scaffold` | `mobile/<surface>/` (+ `interface/<surface>/`, `services/*/domains/`) | карта приложения → `shared/`, `androidApp/`, `iosApp/` |
 
-**Кто что читает** (cross-repo, read-only):
+## Контракт сервис-репо ↔ хаб
 
-| Скилл | Читает из `<org>/strategy` | Зачем |
-|---|---|---|
-| `init-project` | `docs/projects/<slug>/{vision,surface}.md` | scope продукта на старте онбординга |
-| `stack-deep-dive` | `docs/projects/<slug>/surface.md` | какие поверхности public → сабдомены/edge |
-| `de-template` | `docs/projects/<slug>/vision.md § Problem` | кастомизация `CLAUDE.md` под проект |
-| `smartdev` | наличие `<org>/strategy` + `vision.md` | sanity при старте сессии |
+Сервис-репо собирает образ и пушит его в registry своим `/release`; хаб его выкатывает.
 
-`<slug>` — папка продукта в `<org>/strategy/docs/projects/`. Если sibling-репо не склонирован —
-скиллы деградируют gracefully (печатают next-step «склонируй `<org>/strategy` рядом»), не падают.
+| Сервис | Репо | `SVC=` | Тег в `.env` хаба |
+|---|---|---|---|
+| backend | `<org>/backend` | `backend` | `BACKEND_TAG` |
+| frontend | `<org>/frontend` | `frontend` | `FRONTEND_TAG` |
+| site | `<org>/site` | `site` | `SITE_TAG` |
+| бот | `<org>/<bot>` | `bot` | `BOT_TAG` |
 
-## Что меняешь, тронув корп-контракт
-
-Изменение, требующее действия корп-стороны (registry-доступ, CrowdSec-whitelist
-egress-IP), передаётся оператору корп-инфры out-of-band. Секреты — не корп-контракт:
-оператор пишет их сам в `.env` на VPS по контракту `.env.example`.
+- **Registry.** Образы — в registry `REGISTRY_HOST` (дефолт `git.stit.tech`). Compose-фрагмент
+  сервиса тянет `${REGISTRY_HOST:-git.stit.tech}/${PROJECT_NAME}/<svc>:${<SVC>_TAG}` (образец —
+  `compose/backend.yml`), так что `PROJECT_NAME` в `.env` совпадает с org, куда `/release` пушит
+  образ. VPS логинится в registry один раз — `docker login` с PAT из Gitea.
+- **Тег — строго в `.env`** на VPS: `<SVC>_TAG` (UPPER_SNAKE от `SVC`), не литерал в compose.
+- **Выкатка — только здесь:** `make bump SVC=<svc> TAG=<tag>` правит `<SVC>_TAG` в `.env` на VPS и
+  пересоздаёт сервис, compose сам пуллит отсутствующий образ. Rollback — тот же верб со старым тегом.
+- **Из коробки** в стеке — `compose/backend.yml`; frontend, site и бот добавляются `/add-service` по
+  карте сервисов `docs/project/stack.md`.
+- **Mobile** в этот контракт не входит: образа и compose-сервиса у приложения нет, релиз в магазины —
+  `/release` в `<org>/mobile`. Его инфра-поверхность (например, раздача `.well-known` для deep links,
+  хосты API) приходит в хаб INFRA-HANDOFF-блоком.

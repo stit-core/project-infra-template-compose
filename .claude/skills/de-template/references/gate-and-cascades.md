@@ -61,7 +61,7 @@ make project-check
 | A.2 — прунинг compose | в `compose/` нет `<name>.yml` для профилей, которых нет в карте |
 | A.3 — прунинг env-секций | в `.env.example` нет секций профилей, которых нет в карте |
 | A.4 — идентичность | `CLAUDE.md` не содержит «Шаблон проектной инфры stit» / `README.md` не «шаблон проектной инфры» |
-| A.5 — scaffolding | `docs/getting-started.md` нет; `.claude/plans/roadmap.md` пуст |
+| A.5 — scaffolding | `docs/getting-started.md` нет; в `.claude/plans/` нет планов, `backlog.md` — `_пусто_` |
 
 Прочитать `state/de-template.md`, если есть — он отражает применённые
 шаги.
@@ -148,19 +148,21 @@ make project-check
 
 ### Каскад A.5 — strip scaffolding
 
-Особый случай: `docs/getting-started.md` и `.claude/plans/roadmap.md`
-— документация / план. Каскад минимален, но всё равно через
+Особый случай: `docs/getting-started.md` и `.claude/plans/`
+— документация / планы. Каскад минимален, но всё равно через
 `AskUserQuestion`:
 
 ```
-Удалю docs/getting-started.md ([META]-шаблон) и обнулю
-.claude/plans/roadmap.md (reset к fork-start).
+Удалю docs/getting-started.md ([META]-шаблон) и сброшу
+.claude/plans/ (планы шаблона → fork-start).
 
 Ссылки в репо:
-- README.md ссылается на docs/getting-started.md в секции
-  «Развёртывание» — заменю на «см. stack.md / docs/project/ / <org>/strategy».
-- CLAUDE.md ссылается на docs/getting-started.md в «Корп-контракт» —
-  заменю на «см. init-project».
+- README.md ссылается на docs/getting-started.md в «Быстрый старт» и
+  «Навигация» — заменю на «см. stack.md / docs/project/ / <org>/strategy».
+- CLAUDE.md ссылается на docs/getting-started.md в «Карта: где что» —
+  заменю на «см. /init-project, /bootstrap-vps».
+- docs/README.md и docs/contributing.md ссылаются на getting-started —
+  уберу строки.
 
 Подтверждаешь?
 ```

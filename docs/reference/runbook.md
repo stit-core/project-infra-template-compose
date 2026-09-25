@@ -107,8 +107,8 @@ make ship
    docker exec backup restic snapshots --compact   # выбрать snapshot
    make restore-pg SNAPSHOT=latest
    ```
-6. Сверь IP в Authentik (если OIDC redirect-uri привязан) и в любых внешних webhook'ах.
-7. App-uploads (minio-data) — не покрыто backup'ом. Если есть external mirror (`mc mirror` job в корп) — оттуда; если нет — данные потеряны.
+6. Сверь новый IP во внешних системах, которые на него завязаны (webhook'и, allowlist'ы).
+7. App-uploads (minio-data) — не покрыто backup'ом. Если настроен external mirror (`mc mirror`) — оттуда; если нет — данные потеряны.
 
 ## Quarterly DR drill
 
@@ -128,9 +128,13 @@ Backup, который ни разу не тестировался, не раб�
 
 Если хотя бы один шаг сломался — это инцидент сам по себе. Чини backup-флоу до следующего prod-инцидента.
 
-## Когда эскалировать на корп
+## Образ сервиса не пуллится из registry
 
-- git.stit.tech registry pull fails.
-- Служебный трафик к корпу режется 403 (egress-IP не в CrowdSec-whitelist).
+**Симптом:** `make bump` / `make deploy` падает на pull — `manifest unknown` или `unauthorized`.
 
-Эскалация в `#corp-infra` Slack или ntfy.stit.tech.
+- **`manifest unknown`** — такого тега нет в registry: образ выпускает `/release` сервис-репо;
+  сверь тег с его релизом и повтори `make bump SVC=<svc> TAG=<tag>`.
+- **`unauthorized`** — VPS не залогинен в registry: оператор делает на VPS `docker login
+  <REGISTRY_HOST>` с PAT из Gitea (`docs/getting-started.md`, шаг 3).
+- **Путь образа** — `${REGISTRY_HOST:-git.stit.tech}/${PROJECT_NAME}/<svc>`: `PROJECT_NAME` в `.env`
+  должен совпадать с org, куда сервис-репо пушит образ (`docs/reference/ecosystem.md`).

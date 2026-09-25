@@ -3,7 +3,7 @@
 Инфра-слой проектной VPS — **source of truth для `de-template`**: из чего стек состоит и как
 этот VPS его хостит. **Продуктовый контекст** (проблема, пользователи, поверхности продукта)
 живёт в соседнем репо `business-strategy-template` (форк `<org>/strategy`, `docs/projects/<slug>/`) и
-читается **cross-repo** — здесь не дублируется. См. `docs/reference/ecosystem.md § Sibling <org>/strategy`.
+читается **cross-repo** — здесь не дублируется. См. `docs/reference/ecosystem.md § Кто что читает из <org>/strategy`.
 
 Заполняется через `/init-project` (оркестратор) → `/stack-deep-dive` + `/service-deep-dive`,
 валидируется `scripts/tools/validate-project-doc.sh`, разворачивается `/de-template`.
@@ -62,7 +62,7 @@ status: draft
 | `stack` | Service map, Domains, Edge, Networks, Backup, Observability, Environments, Generates |
 | `service` | Hosting, Identity, Secrets, Route, Generates |
 
-Пустые/неприменимые секции — явной пометкой `N/A` или `_нет_` (зеркалит domain-дисциплину).
+Пустые/неприменимые секции — явной пометкой `N/A` или `_нет_`.
 Пустых таблиц быть не должно.
 
 Каждый `service` и `stack` несёт секцию **Generates** — контракт для `de-template`: что из артефакта
@@ -83,7 +83,7 @@ status: draft
 
 Always-on edge (`traefik`/`crowdsec`/`landing`) — фиксированный фундамент шаблона, не
 описывается service-doc'ами. `stack § Generates` несёт только cross-cutting: traefik
-dynamic routes, `DOMAIN`, crowdsec source-IP next-step.
+dynamic routes, `DOMAIN`, ACME next-step (`ACME_EMAIL`/`ACME_CASERVER` в `.env` на VPS).
 
 ## Cross-repo: продуктовый контекст
 
@@ -111,9 +111,9 @@ dynamic routes, `DOMAIN`, crowdsec source-IP next-step.
 
 ## Gate
 
-`/de-template` не запускается, пока все артефакты не `stable` и валидатор не зелён — зеркалит
-domain/stack-gate эталона. `scripts/git-hooks/pre-commit` гонит валидатор на изменённых
-`docs/project/**.md`; `make check` — на весь `docs/project`.
+`/de-template` не запускается, пока все артефакты не `stable` и валидатор не зелён.
+`scripts/git-hooks/pre-commit` гонит валидатор на изменённых `docs/project/**.md`;
+`make check` — на весь `docs/project`.
 
 ## Anti-patterns
 

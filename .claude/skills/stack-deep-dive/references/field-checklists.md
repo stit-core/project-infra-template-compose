@@ -74,13 +74,13 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
 - Корневой `DOMAIN` (например, `acme.dev`).
 - Список сабдоменов: какой сервис → какой сабдомен (`backend → api.`,
   `minio → minio.`, `minio-s3 → s3.`, landing → корень).
-- LE-сертификаты: `acme_email` / `acme_caserver` (значения через `meta`
-  KV; в stack — указание «значения через meta next-step»).
+- LE-сертификаты: `ACME_EMAIL` / `ACME_CASERVER` — значения живут в `.env`
+  на VPS; в stack — указание «ACME next-step».
 - Wildcard или per-host: обычно per-host через HTTP-01 challenge.
 
 **Опции опрашиваются как**:
 
-- `acme_caserver`: 2 опции (`prod` / `staging`).
+- `ACME_CASERVER`: 2 опции (`prod` / `staging`).
 - Сабдомен на сервис: enum существующих сервисов из карты, для каждого
   — Other (имя сабдомена).
 - Сертификаты: 2 опции (`per-host HTTP-01` / `wildcard DNS-01`).
@@ -88,7 +88,7 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
 **Что НЕ**:
 
 - Описывать сабдомены, которых нет в карте public-сервисов.
-- Хардкодить `acme_email` в `stack.md` — это значение в `meta` KV.
+- Хардкодить `ACME_EMAIL` в `stack.md` — это значение `.env` на VPS.
 - Класть два разных сервиса на один сабдомен.
 - Корневой `${DOMAIN}` не на landing.
 
@@ -96,7 +96,7 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
 
 - ✅ «`DOMAIN=acme.dev`; `api.acme.dev` → backend, `minio.acme.dev` →
   minio Console, `s3.acme.dev` → minio S3, корень → landing;
-  `acme_caserver=prod`, `acme_email` через meta».
+  `ACME_CASERVER` — prod, `ACME_EMAIL` — next-step в `.env`».
 - ❌ «`DOMAIN` без указания сабдоменов» — public-сервисы есть, а
   схемы нет.
 - ❌ «два сервиса на одном сабдомене» — конфликт роутов.
@@ -105,7 +105,7 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
 
 1. Корневой `DOMAIN` (Other).
 2. Перечислить public-сервисы из карты — для каждого сабдомен (Other).
-3. `acme_caserver` (enum), `acme_email` (next-step через meta).
+3. `ACME_CASERVER` (enum), `ACME_EMAIL` (next-step: `.env` на VPS).
 4. Anti-patterns.
 
 ---
@@ -114,21 +114,17 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
 
 **Что фиксируем**:
 
-- Traefik middleware на public-роутах:
+- Traefik middleware на public-роутах (набор — `configs/traefik/dynamic/middlewares.yml.tpl`):
   - `crowdsec@file` (дефолт шаблона) — обязательный bouncer;
-  - rate-limit (дефолт traefik или кастомный);
+  - `secure-headers@file` — на HTTP-роутах сервисов (backend, landing);
+  - rate-limit (дефолт `rate-limit@file` или кастомный);
   - другие middleware (custom headers, redirect, etc.).
-- CrowdSec source-IP whitelist: нужен ли (если CrowdSec central-LAPI на
-  корп-стороне) — egress IP **этого** VPS в их whitelist. Оператор
-  передаёт IP корп-оператору out-of-band.
 - Особые роуты (sticky, retry, custom resolver).
 
 **Опции опрашиваются как**:
 
 - Дефолтный middleware: 2 опции «`crowdsec@file` на всех public» /
   «исключения есть» (Other).
-- Source-IP whitelist: 2 опции «нужен → egress-IP корп-оператору
-  out-of-band» / «не нужен».
 - Rate-limit: 2 опции «дефолт» / «кастомный» (Other).
 
 **Что НЕ**:
@@ -140,19 +136,18 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
 
 **Тест-критерий**:
 
-- ✅ «`crowdsec@file` на всех public-роутах; source-IP whitelist
-  нужен — egress-IP VPS корп-оператору out-of-band; rate-limit дефолтный».
-- ✅ «`crowdsec@file` на всех public; whitelist не нужен (no central
-  LAPI)».
+- ✅ «`crowdsec@file` на всех public-роутах, `secure-headers@file` на
+  backend и landing; rate-limit дефолтный».
+- ✅ «`crowdsec@file` на всех public; для `api.` кастомный rate-limit
+  (отдельный middleware в `configs/traefik/dynamic/`)».
 - ❌ «Public-роут без middleware».
 - ❌ «Описание правил CrowdSec» — это в `configs/`, не в stack.
 
 **Порядок копания**:
 
 1. Middleware-набор (enum + Other).
-2. Source-IP whitelist (да/нет).
-3. Rate-limit / прочее (Other если нужно).
-4. Anti-patterns.
+2. Rate-limit / прочее (Other если нужно).
+3. Anti-patterns.
 
 ---
 
@@ -179,7 +174,7 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
   «кастом» (Other → имена).
 - Сетевая раскладка: enum по subtype (`backend`, `datastore`, и т.д.).
 - Топология: 2 опции «single-host (co-located, дефолт)» / «split (postgres/
-  minio на отдельных хостах)». При split — `host` в Service map + KV host/port.
+  minio на отдельных хостах)». При split — `host` в Service map + `PG_HOST`/`PG_PORT` в `.env`.
 
 **Что НЕ**:
 
@@ -208,8 +203,8 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
 **Что фиксируем**:
 
 - Backup-движок: restic (дефолт шаблона) / pgBackRest / `N/A`.
-- `RESTIC_REPOSITORY` URI (в `.env`). Restic endpoint:
-  managed S3 (дефолт) или **MinIO на отдельном хосте** при split (`HOST_ROLE`
+- `RESTIC_REPOSITORY` URI (в `.env`; local-default нет). Restic endpoint:
+  внешний S3 (рекомендуемый) или **MinIO на отдельном хосте** при split (`HOST_ROLE`
   storage) — URI наводится на storage-хост. См. `references/multi-host.md`.
 - Что бэкапится: pg_dumpall (всегда при postgres), volume'ы (minio data,
   etc.). При split backup делает pg_dumpall к PG на db-хосте по сети —
@@ -255,8 +250,8 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
 
 **Что фиксируем**:
 
-- Метрики: none по дефолту (шаблон host-метрики не собирает) или свой
-  коллектор/Prometheus проекта (project-specific сервис в карте).
+- Метрики: none по дефолту (шаблон метрики не собирает) или свой сервис
+  метрик проекта (project-specific строка в карте).
 - Логи: local-only (`docker logs`) или свой стек проекта.
 
 **Опции опрашиваются как**:
@@ -271,7 +266,7 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
 **Тест-критерий**:
 
 - ✅ «метрик нет (дефолт); логи local-only».
-- ✅ «свой Prometheus (сервис в карте) + свои exporter'ы; логи local-only».
+- ✅ «свой сервис метрик (строка в карте) + его экспортёры; логи local-only».
 - ❌ «Просто \"есть мониторинг\"» — не сказано кто и что собирает.
 
 **Порядок копания**:
@@ -311,7 +306,7 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
   (`acme.dev`, 4GB, postgres+storage+backend) — каждая отдельный VPS».
 - ✅ «`N/A` — проект single-env (только prod)».
 - ❌ «Перечислены среды без указания, чем отличаются» — пустая карта сред.
-- ❌ «Секреты/role_id в Environments» — их место в `.env` на VPS.
+- ❌ «Секреты в Environments» — их место в `.env` на VPS.
 
 **Порядок копания**:
 
@@ -327,7 +322,6 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
 
 - `configs/traefik/dynamic/*` — клиент-специфичные routers/middlewares.
 - `DOMAIN` в `.env.example` (либо дефолт).
-- crowdsec source-IP next-step (egress IP корп-оператору out-of-band для whitelist).
 - ACME next-step (`ACME_EMAIL`/`ACME_CASERVER` в `.env` на VPS).
 - Кастомные имена сетей (если не дефолт) — `.env.example`.
 
@@ -344,8 +338,7 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
 **Тест-критерий**:
 
 - ✅ «`configs/traefik/dynamic/middlewares.yml` (rate-limit override),
-  `DOMAIN=acme.dev` в `.env.example`, crowdsec next-step: egress-IP
-  корп-оператору out-of-band, acme next-step: `ACME_*` в `.env` на VPS».
+  `DOMAIN=acme.dev` в `.env.example`, acme next-step: `ACME_*` в `.env` на VPS».
 - ❌ «`Generates` пуст».
 - ❌ «`COMPOSE_PROFILES=postgres,storage,backend` в stack».
 
@@ -353,9 +346,8 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
 
 1. traefik dynamic (если есть кастомизация).
 2. `DOMAIN` default.
-3. crowdsec next-step (если whitelist нужен).
-4. acme next-step.
-5. Anti-patterns.
+3. acme next-step.
+4. Anti-patterns.
 
 ---
 
@@ -370,14 +362,14 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
 | `COMPOSE_PROFILES` явным списком в Generates | Generates | «выводится из Service map — убрать список?» |
 | Always-on в Generates | Generates | «это фундамент шаблона — он не Generates?» |
 | Сети не описаны / без имён | Networks | «shared VPS — нужны кастомные имена?» |
-| acme значения хардкодом | Domains | «через `meta` KV — да?» |
+| acme значения хардкодом | Domains | «значения — в `.env` на VPS, да?» |
 
 ## Глобальный Тест-критерий kind=stack
 
 Через `AskUserQuestion` 1 раунд, 2 опции:
 
 - ✅ «Этот файл описывает инфру VPS целиком: карту сервисов, домены, edge,
-  сети, бэкап, телеметрию, среды, контракт для `/de-template` — карта
+  сети, бэкап, логи и метрики, среды, контракт для `/de-template` — карта
   сервисов живёт здесь, но `COMPOSE_PROFILES` явным списком не дублируется;
   отдельные сервисы детально не расписаны (это service-doc)».
 - ❌ «Это часть описания (некоторые секции `<...>`), или детально

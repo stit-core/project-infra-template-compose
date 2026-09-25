@@ -37,63 +37,6 @@ if ! make check; then
   exit 1
 fi
 
-# --- Corp impact агрегация ---
-# Печатает агрегированный Corp impact из активных планов; если corp-поверхность
-# тронута в неотправленных коммитах, а блока нет — warn.
-# Advisory: пуш не блокирует (передача оператору корп-инфры — out-of-band).
-#
-# Single-file модель: единый .claude/plans/roadmap.md. На каждую `### <slug>`-секцию
-# под `## Active` — захватываем подсекцию `**Corp impact.**` (bold-лейбл) до следующего
-# bold-лейбла / `#### `-фазы / `### `/`## `-границы. Пустой маркер `—` пропускаем.
-corp_impact=""
-roadmap=.claude/plans/roadmap.md
-if [ -f "$roadmap" ]; then
-  corp_impact=$(awk '
-    function emit(s, line,   t) {
-      t = line; gsub(/^[[:space:]]+|[[:space:]]+$/, "", t)
-      if (t == "" || t == "—" || t == "|") return
-      if (!hdr[s]) { print "--- " s " ---"; hdr[s] = 1 }
-      print line
-    }
-    /^## Active/ { inact = 1; next }
-    /^## /       { inact = 0; slug = ""; cap = 0; next }
-    !inact       { next }
-    /^### /      { slug = $0; sub(/^### /, "", slug); sub(/ .*/, "", slug); cap = 0; next }
-    slug == ""   { next }
-    /^\*\*Corp impact\.\*\*/ {
-      cap = 1
-      rest = $0; sub(/^\*\*Corp impact\.\*\*[[:space:]]*/, "", rest)
-      emit(slug, rest)            # инлайн-хвост после лейбла, если есть
-      next
-    }
-    cap && /^\*\*[^*]+\.\*\*/   { cap = 0; next }   # следующий bold-лейбл закрывает
-    cap && /^(#### |### |## )/  { cap = 0 }
-    cap                         { emit(slug, $0) }
-  ' "$roadmap")
-fi
-
-range=""
-if up=$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null); then
-  range="$up..HEAD"
-fi
-touched=""
-# CrowdSec-whitelist здесь не фильтруется: файл живёт corp-side (corp-infra-template),
-# в проектном репо его нет — egress-IP передаётся оператору корп-инфры out-of-band.
-[ -n "$range" ] && touched=$(git diff --name-only "$range" 2>/dev/null \
-  | grep -E '^compose/[^/]+\.ya?ml$|^\.env\.example$|^ansible/roles/stit-onboard/' || true)
-
-if [ -n "$corp_impact" ]; then
-  echo
-  echo "=== CORP IMPACT · агрегировано из активных планов · передай оператору корп-инфры ==="
-  printf '%s' "$corp_impact"
-  echo "=== (out-of-band: Slack / тикет / PR в corp-infra-template) ==="
-elif [ -n "$touched" ]; then
-  echo
-  echo "⚠ corp-поверхность тронута в этом push, но **Corp impact.** пуст:" >&2
-  printf '    %s\n' $touched >&2
-  echo "  Заполни **Corp impact.** в плане и передай оператору корп-инфры до claim «готово»." >&2
-fi
-
 echo "→ push origin $branch"
 git push origin "$branch"
 

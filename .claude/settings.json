@@ -50,10 +50,7 @@
       "Bash(docker volume rm*)",
       "Bash(docker compose * down -v*)",
       "Bash(docker compose * down --volumes*)",
-      "Write(**/.claude/projects/**/memory/**)",
-      "Edit(**/.claude/projects/**/memory/**)",
-      "MultiEdit(**/.claude/projects/**/memory/**)",
-      "NotebookEdit(**/.claude/projects/**/memory/**)"
+      "Edit(**/.claude/projects/**/memory/**)"
     ]
   }
 }

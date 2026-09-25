@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # pre-commit hook для project-infra-template-compose.
 # Валидирует на change:
-#   - .claude/plans/roadmap.md → структура единого плана (validate-plan.sh);
+#   - .claude/plans/           → формат планов и бэклога (validate-plan.sh);
 #   - docs/project/**.md       → продуктовый слой (validate-project-doc.sh).
 # Чтобы битый артефакт (нет обязательной секции, dangling-dep, кривой frontmatter)
 # не доезжал до push. Установка — `make setup` (симлинк в .git/hooks/).
@@ -10,9 +10,9 @@
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
-CHANGED_ROADMAP=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '^\.claude/plans/roadmap\.md$' || true)
-if [ -n "$CHANGED_ROADMAP" ]; then
-  echo "pre-commit: validating .claude/plans/roadmap.md…"
+CHANGED_PLANS=$(git diff --cached --name-only --diff-filter=ACMRD | grep -E '^\.claude/plans/' || true)
+if [ -n "$CHANGED_PLANS" ]; then
+  echo "pre-commit: validating .claude/plans/…"
   if [ -x scripts/tools/validate-plan.sh ]; then
     bash scripts/tools/validate-plan.sh
   else

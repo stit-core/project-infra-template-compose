@@ -1,6 +1,6 @@
 ---
 name: de-template
-description: Развернуть форк `project-infra-template-compose` в самостоятельную проектную инфру по stable-артефактам `docs/project` — вывести `COMPOSE_PROFILES` из `stack § Service map`, прунить неиспользуемые `compose/*.yml` + секции `.env.example`, кастомить `CLAUDE.md`/`README.md` под проект (продуктовый контекст читает cross-repo из `<org>/strategy`), печатать cross-repo next-steps. Активируй когда юзер форкнул шаблон и говорит "/de-template", "разверни инфру", "де-темплейтизируй", "убери шаблонную мету", или когда `/init-project` дошёл до развёртывания (стек+сервисы stable). Движок skill-only — reviewable edits по фазам с показом каскадов перед прунингом. НЕ запускать на каноническом шаблоне.
+description: Развернуть форк `project-infra-template-compose` в самостоятельную проектную инфру по stable-артефактам `docs/project` — вывести `COMPOSE_PROFILES` из `stack § Service map`, прунить неиспользуемые `compose/*.yml` + секции `.env.example`, кастомить `CLAUDE.md`/`README.md` под проект (продуктовый контекст читает cross-repo из `<org>/strategy`), печатать cross-repo next-steps. Вызывай, когда юзер хочет убрать шаблонную мету из своего форка, или когда `/init-project` дошёл до развёртывания (стек + сервисы stable). Движок skill-only — reviewable edits по фазам с показом каскадов перед прунингом. На каноническом репо шаблона не запускается.
 ---
 
 # de-template — движок развёртывания инфры
@@ -37,12 +37,12 @@ description: Развернуть форк `project-infra-template-compose` в �
 `a1`=profiles, `a2`=prune-compose, `a3`=prune-env,
 `a4`=identity, `a5`=strip-scaffolding.
 
-## Интерактив — норма, plain-чат запрещён
+## Интерактив — через `AskUserQuestion`
 
-**Любое подтверждение / выбор — через `AskUserQuestion`.** Особенно
-критично для этого скилла: каждое необратимое действие (`git rm` в
-A.2/A.3, обнуление roadmap в A.5, удаление getting-started) идёт через
-явный `AskUserQuestion` после показа каскада. Никаких «удалю по
+**Любое подтверждение / выбор — через `AskUserQuestion`**, потому что
+движок необратимо меняет репо: каждое такое действие (`git rm` в
+A.2/A.3, сброс планов в A.5, удаление getting-started) идёт через
+явный `AskUserQuestion` после показа каскада, а не «удалю по
 умолчанию» / «сделаю и покажу diff».
 
 Принципы:
@@ -54,7 +54,7 @@ A.2/A.3, обнуление roadmap в A.5, удаление getting-started) и
   Показать diff подробнее / Other).
 - Идемпотентность (Gate.3) → `AskUserQuestion` «продолжить с фазы X /
   прогнать заново / выход».
-- Сводки в чат коротко (≤8 строк) и сразу `AskUserQuestion`.
+- Сводки в чат — коротко, только то, что нужно для выбора, и сразу `AskUserQuestion`.
 
 ## Что делать сразу при запуске
 
@@ -156,14 +156,14 @@ A.2/A.3, обнуление roadmap в A.5, удаление getting-started) и
 ### A.5. Strip scaffolding
 
 - `docs/getting-started.md` ([META] «как форкнуть шаблон») — удалить.
-- `.claude/plans/roadmap.md` — сбросить к пустому fork-start (history
-  шаблона ≠ история форка): шапка + пустые `## Active` / `## Backlog`.
+- `.claude/plans/` — сбросить к fork-start (планы шаблона ≠ планы форка): удалить файлы
+  планов, `backlog.md` — `_пусто_`.
 - `docs/project/{services/*, stack}.md` — **оставить**: это инфра-доки
   проекта (карта сервисов + cross-cutting). Продуктовые доки — в `<org>/strategy`.
 - `docs/project/_templates/` и deep-dive/init-project скилы — тоже
   остаются (система наследуется).
 
-## Phase B — cross-repo next-steps (печатать, НЕ выполнять)
+## Phase B — cross-repo next-steps (печатать, не выполнять)
 
 См. `references/phase-a-mechanics.md § Phase B`.
 
@@ -178,15 +178,17 @@ de-template **не делает** cross-repo действий — печатае
 
 Категории чеклиста:
 
-- **Внешние сервисы из карты** (`hosting: external`): форкнуть
-  `<org>/backend` / `<org>/frontend`; backend-образ пушится в
-  `git.stit.tech/<org>/backend`, tag → `BACKEND_TAG` в `.env`
-  (`make bump SVC=backend TAG=…`).
+- **Сервисы из сиблинг-репо** (`hosting: external` и сервисы с образом
+  сервис-репо): форк соответствующего шаблона (`<org>/backend`,
+  `<org>/frontend`, `<org>/site`, …) — дальше его ведёт агент в сиблинге
+  обвязкой того репо по плану здесь (`CLAUDE.md § Оркестрация`); образ
+  пушит `/release` сервис-репо в `REGISTRY_HOST`, тег → `<SVC>_TAG` в
+  `.env` (`make bump SVC=<svc> TAG=…`).
 - **Секреты активных профилей**: оператор дописывает блок `VAR=value`
   в `.env` на VPS по `.env.example` (комментарии там объясняют, как
   сгенерировать каждое значение).
-- **Edge** из `stack § Generates`: egress-IP VPS в crowdsec-whitelist
-  (оператор передаёт корп-оператору out-of-band); сабдомены под LE-DNS.
+- **DNS и ACME** из `stack § Domains` / `§ Generates`: A-записи сабдоменов под LE HTTP-01;
+  `ACME_EMAIL`/`ACME_CASERVER` — в `.env` на VPS.
 
 ## Verify
 
@@ -231,8 +233,8 @@ State — **коммитбл артефакт**, не приватная пам�
   это фиксированная база шаблона.
 - **Не удалять без каскада.** Каждое `git rm` идёт после показа
   каскада + явного подтверждения через `AskUserQuestion`.
-- **Не выполнять cross-repo (форки/seed) самому** — только печатать
-  next-steps (граница продуктового слоя).
+- **Не выполнять cross-repo (форки, заполнение `.env` на VPS) самому** —
+  только печатать next-steps: это действия в чужих репо и на сервере.
 - **Не `docker volume rm`/`down -v` при прунинге** — не нужно и
   deny-blocked в `.claude/settings.json`; удаляем только файлы
   фрагментов.

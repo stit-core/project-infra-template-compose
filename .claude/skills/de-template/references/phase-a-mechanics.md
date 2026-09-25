@@ -35,7 +35,7 @@ A — Phase B (печать cross-repo next-steps).
    ```
    Дефолт записан в .env.example: COMPOSE_PROFILES=<набор>.
    В рантайме на VPS — выставь тот же набор в .env после bootstrap
-   (профили активируются только после seed'а их KV).
+   (профиль включается после заполнения его секции секретов в .env).
    ```
 
 ### Anti-patterns
@@ -134,7 +134,7 @@ Identity (`PROJECT_NAME`/`ENV`/`DOMAIN`), `ACME_*`,
 
 | файл | что меняется | что НЕ трогать |
 |---|---|---|
-| `CLAUDE.md` | шапка/стек под имя проекта; убрать «шаблон stit», «копируется в `<client-org>/infra`», секцию «Что менять при копировании» | Карта где-что, rules, корп-контракт, форвард-only |
+| `CLAUDE.md` | шапка/стек под имя проекта; убрать «шаблон stit», «копируется в `<client-org>/infra`», секцию «Что менять при копировании» | Карта где-что, оркестрация, rules, форвард-only |
 | `README.md` (корневой) | проектная шапка вместо «шаблон проектной инфры»; убрать «форкни»; короткое описание из продуктового `<org>/strategy/.../vision.md § Problem` (cross-repo) | reference-ссылки |
 | `docs/reference/*` | НЕ трогать (общие reference-доки) | всё |
 | `docs/contributing.md` | НЕ трогать | всё |
@@ -159,7 +159,7 @@ Identity (`PROJECT_NAME`/`ENV`/`DOMAIN`), `ACME_*`,
 
 ### Anti-patterns
 
-- Удалить секцию «Стек» / «Команды» / «Корп-контракт» — это рабочий
+- Удалить секцию «Стек» / «Команды» / «Оркестрация» — это рабочий
   справочник, не шаблонный нарратив.
 - Перевести «правила Git» и «Auto-memory» на проектные — они общие.
 - Переписать `docs/reference/*` (это общий справочник архитектуры,
@@ -171,11 +171,9 @@ Identity (`PROJECT_NAME`/`ENV`/`DOMAIN`), `ACME_*`,
 
 1. **Удалить** `docs/getting-started.md` — [META] «как форкнуть
    шаблон»; форку не нужен. `git rm`.
-2. **Сбросить** `.claude/plans/roadmap.md` к пустому fork-start:
-   - оставить шапку (формат, форвард-only);
-   - `## Active` пуст;
-   - `## Backlog` пуст;
-   - удалить любые секции, унаследованные от шаблона.
+2. **Сбросить** `.claude/plans/` к fork-start:
+   - удалить файлы планов `<slug>.md`, унаследованные от шаблона;
+   - `backlog.md` — заголовок, строка-пояснение и `_пусто_`.
 3. **Оставить** `docs/project/{services/*, stack}.md` — это инфра-доки
    проекта (карта + cross-cutting). Продуктовые доки — в `<org>/strategy`.
 4. **Оставить** `docs/project/_templates/` — система наследуется
@@ -186,17 +184,17 @@ Identity (`PROJECT_NAME`/`ENV`/`DOMAIN`), `ACME_*`,
 ### Шаги
 
 1. Через `AskUserQuestion`: «удалить `docs/getting-started.md` и
-   сбросить `.claude/plans/roadmap.md`? Оба относятся к шаблонному
+   сбросить `.claude/plans/`? Оба относятся к шаблонному
    scaffolding'у». Опции «Да» / «Только getting-started» / «Только
-   roadmap» / «Отмена».
+   планы» / «Отмена».
 2. По «Да»:
    - `git rm docs/getting-started.md`;
-   - Edit `.claude/plans/roadmap.md` — обнулить тело.
+   - удалить файлы планов шаблона, `backlog.md` — `_пусто_`.
 3. Записать в state «A.5 done».
 
 ## Phase B — cross-repo next-steps
 
-Печатать в чат. **НЕ выполнять**.
+Печатать в чат, не выполнять: это действия в чужих репо и на сервере.
 
 ### Источники накопления
 
@@ -210,18 +208,17 @@ Identity (`PROJECT_NAME`/`ENV`/`DOMAIN`), `ACME_*`,
    - в карте есть `backend` → tag живёт в `.env` (`BACKEND_TAG`), деплой — `make bump`;
    - в `services/*/Secrets` упоминаются переменные, не заполненные в
      `.env` на VPS → оператор дописывает их по `.env.example`;
-   - в `stack/Edge` упомянут source-IP whitelist → оператор передаёт
-     egress-IP корп-оператору out-of-band;
-   - в `stack/Domains` — сабдомены, нужны A-записи под LE-HTTP-01.
+   - в `stack/Domains` — сабдомены, нужны A-записи под LE-HTTP-01;
+     ACME-значения (`ACME_EMAIL`/`ACME_CASERVER`) — в `.env` на VPS.
 
 ### Формат чеклиста в чат
 
 ```
 ## Cross-repo next-steps (де-темплейт завершён)
 
-### 1. Внешние сервисы
-- [ ] Форкнуть `<org>/backend` из `go-backend-template`,
-      собрать образ `git.stit.tech/<org>/backend:<tag>`.
+### 1. Сервисы из сиблинг-репо
+- [ ] Форкнуть `<org>/backend` из `go-backend-template` — дальше его
+      ведёт агент в `../backend`; образ пушит его `/release`.
 - [ ] Форкнуть `<org>/frontend` (если есть external).
 
 ### 2. Секреты профилей в .env на VPS (оператор дописывает по .env.example)
@@ -230,14 +227,12 @@ Identity (`PROJECT_NAME`/`ENV`/`DOMAIN`), `ACME_*`,
       storage профиля.
 - [ ] `OIDC_*` / `JWT_SECRET` — для backend профиля.
 
-### 3. Edge (оператор передаёт корп-оператору out-of-band)
-- [ ] Egress IP VPS в crowdsec-whitelist (получить IP после
-      /bootstrap-vps).
+### 3. DNS
 - [ ] LE-HTTP-01 A-записи для сабдоменов:
       api.<DOMAIN>, minio.<DOMAIN>, s3.<DOMAIN>.
 
 ### 4. Выставить tag backend в .env
-- [ ] После сборки backend-образа: `make bump SVC=backend TAG=<sha>`
+- [ ] После `/release` backend: `make bump SVC=backend TAG=<vX.Y.Z>`
       (правит `BACKEND_TAG` в `.env` на VPS + force-recreate).
 ```
 
@@ -251,5 +246,6 @@ Identity (`PROJECT_NAME`/`ENV`/`DOMAIN`), `ACME_*`,
 1. `make validate` зелёный.
 2. `make check` зелёный.
 3. Удалить `state/de-template.md` (онбординг закрыт).
-4. Сообщить оператору: онбординг закрыт; следующий шаг —
-   `/bootstrap-vps`.
+4. Сообщить оператору: онбординг закрыт; следующий шаг — VPS среды ещё
+   нет → `/bootstrap-vps`, уже поднят → `make ship` выкатывает
+   развёрнутую инфру.

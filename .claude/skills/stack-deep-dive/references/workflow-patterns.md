@@ -46,16 +46,14 @@ C по секциям. B — реже, для разбора сырья (опи�
 ### Пример раунда (Edge, после Domains)
 
 Корневой `DOMAIN` известен. Public-сервисы из карты: backend под `api.`,
-minio Console под `minio.`. Скилл предлагает четыре вопроса разом:
+minio Console под `minio.`. Скилл предлагает три вопроса разом:
 
 - **crowdsec middleware** — две опции: «`crowdsec@file` на всех public
   роутах (дефолт шаблона)» / «исключения есть» (Other → какие).
-- **source-IP whitelist** — две опции: «нужен — `Generates` next-step:
-  egress-IP корп-оператору out-of-band» / «не нужен (нет CrowdSec central-LAPI)».
-- **rate-limit** — две опции: «дефолт traefik» / «кастомный
+- **rate-limit** — две опции: «дефолт `rate-limit@file`» / «кастомный
   middleware» (Other → подробнее).
-- **acme провайдер** — две опции: «LE prod (acme_caserver=prod)» /
-  «LE staging (тестовый)». Подсказка: «значение пойдёт в `meta` KV».
+- **acme провайдер** — две опции: «LE prod» / «LE staging (тестовый)».
+  Подсказка: «значение — `ACME_CASERVER` в `.env` на VPS».
 
 ## B. Сырьё
 
@@ -78,7 +76,7 @@ oбa под `*.acme.dev`, public только backend и minio Console»).
    ```
    Из материала разнесу:
    - Domains: DOMAIN=acme.dev; api.acme.dev, minio.acme.dev;
-   - Edge: crowdsec@file (дефолт), source-IP — TBD;
+   - Edge: crowdsec@file (дефолт), rate-limit — TBD;
    - Networks: дефолтные proxy/backend-net;
    - Backup: restic репо `s3://restic.acme.dev/<env>`, расписание TBD;
    - Observability: метрик нет (дефолт), логи local-only;
@@ -116,8 +114,8 @@ oбa под `*.acme.dev`, public только backend и minio Console»).
      сервисы public) + `services/*.md § Route` (какие сабдомены упомянуты).
    - **environments** → `.claude/rules/multi-env.md` (один VPS = один ENV).
    - **edge** → `compose/traefik.yml`, `compose/crowdsec.yml`,
-     `configs/crowdsec/acquis.yaml` (живой образец; whitelist egress-IP —
-     corp-side в `corp-infra-template`, не в этом репо).
+     `configs/crowdsec/acquis.yaml`, `configs/traefik/dynamic/middlewares.yml.tpl`
+     (живой образец набора middleware).
    - **networks** → `docker-compose.yml` + `compose/*.yml` (какие сети
      реально есть).
    - **backup** → `compose/backup.yml` (если уже есть),
@@ -125,7 +123,7 @@ oбa под `*.acme.dev`, public только backend и minio Console»).
    - **observability** → метрик нет по дефолту; логи — `docker logs`
      (json-file). Свой стек метрик/логов — сервисы в карте.
    - **generates** → `configs/traefik/dynamic/`, `.env.example`,
-     crowdsec source-IP next-step (corp-side).
+     ACME next-step (`ACME_*` в `.env` на VPS).
 4. Применить `field-checklists.md § <секция>` к строкам. Найти:
    - пустые обязательные поля (placeholder `<...>`);
    - подозрения по anti-patterns (Backup без retention; public-сабдомен
@@ -160,7 +158,7 @@ oбa под `*.acme.dev`, public только backend и minio Console»).
 | anti-pattern из `Что stack НЕ` | две опции: «соответствует anti-pattern» / «нет» (Other) |
 | тест-критерий из `field-checklists` | опции из примеров ✅/❌ |
 | выбор существующего соседа (сабдомен из карты, сеть из compose) | по опции на каждый существующий + «нужен новый» (Other) |
-| структурный выбор (`Backup: есть / N/A`, `source-IP whitelist: нужен / нет`) | две опции |
+| структурный выбор (`Backup: есть / N/A`, `rate-limit: дефолт / кастом`) | две опции |
 
 ### Когда не давать опции, только Other
 

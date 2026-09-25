@@ -1,6 +1,6 @@
 ---
 name: stack-deep-dive
-description: Углублённая проработка cross-cutting инфры VPS в singleton `docs/project/stack.md` (Service map · Domains · Edge · Networks · Backup · Observability · Environments · Generates). Ведёт сессию через структурированные вопросы (AskUserQuestion), фиксирует рабочее состояние в `state/stack.md`, не выдумывает решения сам. Использовать всегда, когда речь о `docs/project/stack.md`, заполнении 8 артефактных секций, проектировании cross-cutting (домены/edge/сети/бэкап/телеметрия), владении картой сервисов (Service map — драйвер COMPOSE_PROFILES), переходе `status draft → stable`, или копании связей с продуктовыми surfaces в соседнем `<org>/strategy` и service-doc'ами. Также — единственная точка входа в `docs/project/stack.md`. Профили `COMPOSE_PROFILES` явным списком НЕ перечисляет — их выводит `/de-template` из `stack § Service map`.
+description: Углублённая проработка cross-cutting инфры VPS в singleton `docs/project/stack.md` (Service map · Domains · Edge · Networks · Backup · Observability · Environments · Generates). Ведёт сессию через структурированные вопросы (AskUserQuestion), фиксирует рабочее состояние в `state/stack.md`, не выдумывает решения сам. Использовать всегда, когда речь о `docs/project/stack.md`, заполнении 8 артефактных секций, проектировании cross-cutting (домены/edge/сети/бэкап/логи и метрики/среды), владении картой сервисов (Service map — драйвер COMPOSE_PROFILES), переходе `status draft → stable`, или копании связей с продуктовыми surfaces в соседнем `<org>/strategy` и service-doc'ами. Единственная точка входа в `docs/project/stack.md`. Профили `COMPOSE_PROFILES` явным списком не перечисляет — их выводит `/de-template` из `stack § Service map`.
 ---
 
 # stack-deep-dive
@@ -9,7 +9,7 @@ description: Углублённая проработка cross-cutting инфр�
 `docs/project/stack.md` до `status: stable`. Где `/service-deep-dive`
 отвечает «как хостится конкретный сервис», этот скилл — «что общее для
 всего стека» **плюс владение картой сервисов**: `Service map` (инвентарь),
-домены и сабдомены, edge (Traefik+CrowdSec), сети, бэкап, телеметрия,
+домены и сабдомены, edge (Traefik+CrowdSec), сети, бэкап, логи и метрики,
 среды, контракт `Generates` для `/de-template`.
 
 `stack.md` — единственный инфра-singleton. **Продуктовый контекст**
@@ -26,8 +26,7 @@ description: Углублённая проработка cross-cutting инфр�
 назначение). **Профили `COMPOSE_PROFILES` явным списком НЕ задаются** —
 их выводит `/de-template` из `stack § Service map` (datastore→postgres/
 storage, backend→backend). `stack § Generates` несёт только cross-cutting:
-traefik dynamic routes, `DOMAIN`, crowdsec source-IP next-step,
-acme-настройки.
+traefik dynamic routes, `DOMAIN`, ACME-настройки.
 
 Использовать как **единственную точку входа** в `docs/project/stack.md`:
 заведение, углубление, переход `draft → stable`.
@@ -73,7 +72,7 @@ stack — singleton, режим B используется реже (типич�
    - **пустая** (только placeholder).
 4. Запустить `make project-check A=docs/project/stack.md` — если
    красный, показать ошибки.
-5. Вывести компактную карту состояния (≤8 строк):
+5. Вывести компактную карту состояния:
 
    ```
    ## Состояние stack.md (status=<…>)
@@ -82,7 +81,7 @@ stack — singleton, режим B используется реже (типич�
    |---|---|---|
    | Service map    | да  | — |
    | Domains        | да  | — |
-   | Edge           | нет | crowdsec source-IP whitelist неопределён |
+   | Edge           | нет | набор middleware на public-роутах не определён |
    | Networks       | да  | — |
    | Backup         | да  | retention TBD |
    | Observability  | да  | — |
@@ -113,12 +112,12 @@ stack — singleton, режим B используется реже (типич�
   Точечные вопросы по дырам/подозрениям; чек-лист `draft → stable`
   после каждой правки секции.
 
-## Интерактив — норма, plain-чат запрещён
+## Интерактив — через `AskUserQuestion`
 
-**Любое взаимодействие с архитектором — через `AskUserQuestion`.** Не
-«выведи таблицу и жди ответа в свободной форме», не «дай развёрнутый
-рассказ и спроси что дальше». Сводки в чат — только как **преамбула**
-перед `AskUserQuestion`-раундом.
+**Любое взаимодействие с архитектором — через `AskUserQuestion`**: решения
+по инфре принимает архитектор, а структурированный выбор фиксирует их
+однозначно. Сводки в чат — только как **преамбула** перед
+`AskUserQuestion`-раундом, коротко и по делу.
 
 Принципы:
 
@@ -126,8 +125,6 @@ stack — singleton, режим B используется реже (типич�
 - Свободная форма — через **Other**, не в чат.
 - «Какую секцию копать?», «Готов к stable?», «Удалить stack.md?» —
   всё `AskUserQuestion`, не chat-prompt.
-- Длинные монологи скилла — anti-pattern. Сводки коротко (≤8 строк) и
-  сразу `AskUserQuestion`.
 
 ## Стиль вопросов
 
@@ -144,8 +141,8 @@ stack — singleton, режим B используется реже (типич�
 - **Свободная форма** (через Other) — для **значения**: корневой
   `DOMAIN`, конкретные сабдомены, `RESTIC_REPOSITORY` URI, retention
   политика, имя сети если кастомное.
-- **Никогда** не подсказывать конкретные домены/имена от себя.
-  Anti-patterns — да. Сами значения — нет.
+- Конкретные домены/имена от себя не подсказывай — это решения проекта,
+  которые знает только архитектор. Anti-patterns — да, сами значения — нет.
 
 ## Память `state/stack.md` — коммитится
 
@@ -164,7 +161,7 @@ State — **коммитбл артефакт**, не приватная пам�
 - Это **shared контекст** команды архитекторов: ревьюится в Pull Request,
   виден всем, не привязан к конкретной сессии Claude.
 - Переживает `/clear` именно за счёт коммита.
-- **Не содержит секретов** — только ссылки на KV-пути и описания
+- **Не содержит секретов** — только имена переменных `.env` и описания
   доменных решений.
 
 См. `references/state-format.md`. Кратко:
@@ -202,11 +199,11 @@ stack согласуются с ним и с service-doc'ами:
   сервисов; кастомные имена сетей (`<project>-proxy`) — здесь.
 - **Топология хостов** (single-host vs split): дефолт — single-host (всё на
   одном VPS). Split (Postgres/MinIO на отдельных хостах, `HOST_ROLE`) спрашивается
-  в `§ Networks`, фиксируется в `state/stack.md § Host layout`; эндпоинты — в KV
-  (`db.host`, `backup.repository`), не в карте. Швы и граница (репликация/HA —
+  в `§ Networks`, фиксируется в `state/stack.md § Host layout`; эндпоинты — в `.env`
+  (`PG_HOST`/`PG_PORT`, `RESTIC_REPOSITORY`), не в карте. Швы и граница (репликация/HA —
   дело потребителя) — `references/multi-host.md`.
 - **Generates** ↔ `/de-template`: traefik dynamic routes выводятся из
-  service-doc, но `DOMAIN`/acme/crowdsec-whitelist — отсюда.
+  service-doc, но `DOMAIN`/ACME — отсюда.
 
 Скилл правит **свою** `Service map`, но **не правит** service-doc'и из
 stack-сессии. Если видит рассинхрон (Route сабдомен не в Domains, или
@@ -234,8 +231,8 @@ stack-сессии. Если видит рассинхрон (Route сабдом
    - `Generates` упоминает реальные пути (`configs/traefik/dynamic/*`,
      `.env.example`).
 4. `Generates` непуст и содержит хотя бы один из:
-   `configs/traefik/dynamic/*`, `DOMAIN` в `.env.example`, crowdsec
-   source-IP next-step, acme meta next-step.
+   `configs/traefik/dynamic/*`, `DOMAIN` в `.env.example`, ACME next-step
+   (`ACME_EMAIL`/`ACME_CASERVER` в `.env` на VPS).
 5. Тест-критерий из `field-checklists.md` явно подтверждён архитектором
    (раунд `AskUserQuestion` ✅/❌).
 6. В `state/stack.md` нет `**blocker**`-вопросов.
@@ -256,10 +253,6 @@ stack-сессии. Если видит рассинхрон (Route сабдом
 - **`Backup` упоминается, но в карте нет datastore-профиля**:
   `**blocker**` — нужно либо `Backup: N/A`, либо завести
   storage-сервис.
-- **crowdsec source-IP whitelist**: egress-IP VPS знает только
-  корп-сторона — записать как cross-repo next-step в state, в
-  `Generates` упомянуть как «next-step: оператор передаёт egress-IP
-  корп-оператору out-of-band».
 
 После заведения stub продолжаем копание.
 
@@ -272,7 +265,7 @@ stack-сессии. Если видит рассинхрон (Route сабдом
    stack.md, поэтому удаление сносит и инвентарь).
 2. Показать каскад: «после удаления stack.md `/de-template` не сможет
    вывести `COMPOSE_PROFILES` (карта сервисов исчезнет), развернуть
-   traefik dynamic routes, crowdsec whitelist, acme — это откат проекта
+   traefik dynamic routes и ACME-настройки — это откат проекта
    к pre-init».
 3. Через `AskUserQuestion` подтвердить: «Это точно? Опции: "Да, откат" /
    "Нет, отмена" / "Сбросить к шаблону (`cp _templates/stack.md`)"».
@@ -281,8 +274,8 @@ stack-сессии. Если видит рассинхрон (Route сабдом
 
 ## Завершение сессии
 
-В конце короткая сводка в чат (≤10 строк) — что изменено, что осталось
-— и сразу `AskUserQuestion` «куда дальше?» с опциями:
+В конце короткая сводка в чат — что изменено, что осталось — и сразу
+`AskUserQuestion` «куда дальше?» с опциями:
 
 - «Копать следующую секцию» (если есть `draft`-секции с дырами);
 - «Перейти к `/de-template`» (если stack `stable` и все service-doc'и
@@ -306,7 +299,7 @@ stack-сессии. Если видит рассинхрон (Route сабдом
   `AskUserQuestion`/state, а не правкой соседнего репо.
 - Не описывать always-on сервисы (traefik/crowdsec/landing) как
   «отдельный сервис» — это фундамент шаблона; в stack описывается
-  их конфигурация (middleware, source-IP), не их «наличие».
+  их конфигурация (middleware, rate-limit), не их «наличие».
 - Не оставлять `Generates` пустым.
 - Не повышать `draft → stable` без явного подтверждения архитектора и
   зелёного `make project-check`.

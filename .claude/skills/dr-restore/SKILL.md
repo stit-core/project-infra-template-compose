@@ -1,6 +1,6 @@
 ---
 name: dr-restore
-description: Disaster recovery проектной инфры — восстановление сервиса/volume/всего хоста из restic-снапшота (проектный Minio). Каждый destructive шаг требует явного OK. Активируй на "/dr-restore", "восстанови из бэкапа", "вернуть данные", "перезалей volume", "host crashed".
+description: Disaster recovery проектной инфры — восстановление postgres, отдельной таблицы или всего хоста из restic-снапшота (`RESTIC_REPOSITORY`). Каждый destructive шаг требует явного OK. Вызывай при потере или порче данных, откате неудачной миграции БД, падении или замене хоста.
 ---
 
 # Skill: dr-restore
@@ -16,7 +16,7 @@ description: Disaster recovery проектной инфры — восстан�
 - "VPS заменили, нужно вернуть данные"
 - "/dr-restore"
 
-## Когда НЕ применять
+## Когда не применять
 
 - Простой restart — `make restart SVC=<x>`.
 - Диагностика — сначала `make logs SVC=<svc>`.
@@ -37,14 +37,14 @@ Retention в `containers/backup/backup-now`: 7 daily / 4 weekly / 3 monthly.
 
 ## Шаги
 
-### 0. Установить контекст (СПРАШИВАЙ юзера)
+### 0. Установить контекст (спроси юзера)
 
 - Что точно сломано / потеряно?
 - На каком хосте восстанавливаем (текущий или новый)?
 - Target snapshot — последний (`latest`) или конкретная дата?
 - Scope — один volume / postgres / весь хост?
 
-Без чёткого ответа — НЕ начинай.
+Без чёткого ответа не начинай: каждый сценарий ниже необратимо перезаписывает данные.
 
 ### 1. Список снапшотов
 
@@ -137,4 +137,4 @@ Local-default `s3:http://minio:9000/backups` отсутствует by design �
 
 - Restore прошёл, healthchecks зелёные → `/smartdev` (вернуться в cockpit) и залогировать инцидент в `docs/incidents/` (шаг 4 выше).
 - Restore не сходится (snapshot не читается, `restic check` падает, репо потерян) → `/triage` с собранным выводом `restic snapshots` / логами; разобрать корневую причину, не замазывать.
-- Тронул corp-поверхность по ходу DR (новый egress-IP под CrowdSec-whitelist, новый сабдомен) → оператор передаёт данные корп-оператору out-of-band до claim «готово».
+- Хост заменён (сценарий C) — у VPS новый IP: сверь внешние системы, завязанные на IP (webhook'и, allowlist'ы), — `docs/reference/runbook.md` → «Полная замена VPS».

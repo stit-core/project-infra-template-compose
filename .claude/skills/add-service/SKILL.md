@@ -1,21 +1,19 @@
 ---
 name: add-service
-description: Добавить новый сервис в проектную инфру (compose-фрагмент с pinned image / healthcheck / networks, опционально секреты через .env и traefik labels). Активируй на "/add-service", "добавь сервис X", "запили <name>", "новый контейнер".
+description: Добавить новый сервис в проектную инфру — compose-фрагмент с pinned image / healthcheck / networks, опционально секреты через .env и traefik labels. Вызывай, когда в стек нужен новый контейнер — сервис из сиблинг-репо (frontend, site, бот), движок (cache, search, очередь) или воркер, в том числе по INFRA-HANDOFF из сервис-репо.
 ---
 
 # Skill: add-service
 
 Чек-лист добавления сервиса в проектный compose-стек. Цель — каждый сервис из коробки имеет healthcheck, корректные networks, секреты через `${VAR}`-интерполяцию из .env (если нужно), traefik labels с WAF (если public).
 
-В отличие от корп-вского `add-service` — здесь нет Authentik OIDC, alerting rules, prom scrape config (это корп-вещи, не проектные).
-
 ## Когда применять
 
 - "Добавь worker / cache / search-index"
-- "Поставь сервис X"
+- Сервис из сиблинг-репо выходит в стек (frontend, site, бот) — в том числе по INFRA-HANDOFF-блоку его `/release`
 - "/add-service"
 
-## Когда НЕ применять
+## Когда не применять
 
 - Изменение существующего сервиса (image bump, env change) — это правка одного файла.
 - Внутренний sidecar к app — добавь в тот же `compose/<svc>.yml`.
@@ -26,6 +24,9 @@ description: Добавить новый сервис в проектную ин
 
 - **Имя** (kebab-case): `worker`, `redis`, `search`.
 - **Image + закреплённая версия**: `redis:7.4-alpine`. Никаких `:latest`.
+  Образ сервис-репо (frontend, site, бот) — как `compose/backend.yml`:
+  `image: ${REGISTRY_HOST:-git.stit.tech}/${PROJECT_NAME}/<svc>:${<SVC>_TAG}`, тег — `# <SVC>_TAG=`
+  в `.env.example`, выкатка — `make bump SVC=<svc> TAG=<tag>` (контракт — `docs/reference/ecosystem.md`).
 - **Сабдомен** (если public): `<sub>.${DOMAIN}`. Проверить: `grep -r 'Host(\`<sub>' compose/`.
 - **Тип доступа**:
   - public с UI/API (требует WAF + rate-limit) → `crowdsec@file,secure-headers@file,rate-limit@file`
@@ -101,10 +102,6 @@ services:
    profiles: [<profile>]
    ```
 
-> **Corp-поверхность.** Секреты живут в `.env` на VPS — корп не участвует.
-> Корп-оператору передаётся out-of-band только новый образ из registry
-> `git.stit.tech` или изменившийся egress-IP под CrowdSec-whitelist.
-
 ### 3. Конфиг сервиса (если нужен)
 
 `configs/<svc>/<config>.yaml`. Если конфиг должен содержать значение из `.env` (не секрет, а bootstrap-параметр) — оформи `.tpl` + `${VAR}`, добавь в `.env.example` и в `scripts/render-configs.sh` (если рендер обрабатывается там).
@@ -150,7 +147,7 @@ services:
 - [ ] Если читает секреты — `${VAR}` в `environment:` + декларация в `.env.example` + оператор дописал значения в `.env` на VPS
 - [ ] Все `${VAR}` есть в `.env.example`
 - [ ] Если новый Postgres — добавлен ещё один `pg_dumpall` блок в `containers/backup/backup-now` (с другим `-h` host'ом и `--stdin-filename`)
-- [ ] Если нужен новый образ из registry / новый egress-IP — оператор передал данные корп-оператору out-of-band **до** claim «готово»
+- [ ] Если образ сервис-репо — `${REGISTRY_HOST:-git.stit.tech}/${PROJECT_NAME}/<svc>:${<SVC>_TAG}` + `# <SVC>_TAG=` в `.env.example`
 - [ ] `make validate` зелёный
 - [ ] (Если bespoke-сигнал вне `docker ps`) — `scripts/tools/smoke.d/90-<svc>.sh` для `== Server ==`
 

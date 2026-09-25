@@ -72,8 +72,8 @@ surfaces) живёт в соседнем `<org>/strategy` и **читается*
 - В `## Текущий этап` записать «3».
 - Если `Service map` содержит `hosting: external` — добавить в
   `## Cross-repo next-steps` строки «форкнуть `<repo>` для `<name>`».
-- Слить cross-repo next-steps из stack-сессии (egress-IP для crowdsec-whitelist
-  оператору корп-инфры out-of-band, acme через meta).
+- Слить cross-repo next-steps из stack-сессии (A-записи сабдоменов,
+  `ACME_EMAIL`/`ACME_CASERVER` в `.env` на VPS).
 
 ---
 
@@ -136,7 +136,7 @@ surfaces) живёт в соседнем `<org>/strategy` и **читается*
    - `.env.example` содержит `COMPOSE_PROFILES=<набор>`;
    - `CLAUDE.md` / `README.md` без «шаблон»-нарратива;
    - `docs/getting-started.md` ([META]) удалён;
-   - `.claude/plans/roadmap.md` сброшен.
+   - в `.claude/plans/` нет планов шаблона, `backlog.md` — `_пусто_`.
 4. Если что-то не сделано — указать оператору вернуться в
    `/de-template` или зафиксировать `**blocker**` в state.
 
@@ -161,9 +161,11 @@ surfaces) живёт в соседнем `<org>/strategy` и **читается*
 ### Что делает
 
 1. Прогнать `make check` — зелёный → готово.
-2. Перечислить накопленные cross-repo next-steps из state.
+2. Перечислить накопленные cross-repo next-steps из state; работу в
+   сиблингах предложить вести общим планом (`/plan`, фаза на репо).
 3. Сообщить оператору: онбординг закрыт.
-4. Подсказать `/bootstrap-vps` (поднять VPS под env).
+4. Подсказать следующий шаг: VPS среды ещё нет → `/bootstrap-vps`; уже
+   поднят → `make ship`.
 5. Через AskUserQuestion: «удалить `state/journey.md`?» (опции «Да» /
    «Оставить — допилить cross-repo next-steps»).
 

@@ -10,23 +10,23 @@
 | Слой | Что держит | Когда грузится |
 |---|---|---|
 | **`CLAUDE.md`** (этот файл) | ядро + роутер | всегда |
-| **`.claude/rules/<topic>.md`** | инварианты по теме | path-scoped — когда matching-файл в контексте |
+| **`.claude/rules/<topic>.md`** | инварианты по теме | path-scoped (`paths:`) — когда matching-файл в контексте |
 | **`.claude/skills/<name>/`** | процедуры (`/smartdev`, `/plan`, `/triage`, …) | при вызове скилла |
-| **`.claude/plans/roadmap.md`** | активные планы | по запросу; переживает `/clear` |
+| **`.claude/plans/`** | активные планы `<slug>.md` (в том числе программы сквозных задач) и `backlog.md` | по запросу; переживает `/clear` |
 | **`docs/`** | reference для людей (`README.md` — обзор) | по ссылке |
 
 За деталью — не дублируй здесь, иди по «Карте: где что» ниже.
 
 ## Точка входа
 
-- **`/smartdev`** — cockpit сессии: за один проход `make status`, поднимает активный план
-  и **сам переключает** в нужный режим (triage / plan / add-service /
-  dr-restore / bootstrap-vps). Запускай в начале / после `/clear`.
-- **Planning-first.** Любое содержательное изменение идёт через план — секцию в едином
-  `.claude/plans/roadmap.md` (skill `/plan`). Прямая правка — только truly-atomic и багфиксы
-  (skill `triage`, RED-first). План переживает `/clear`.
+- **`/smartdev`** — cockpit сессии: за один проход `make status`, поднимает активный план и сам
+  переключает в нужный режим (triage / plan / add-service / dr-restore / bootstrap-vps / задача
+  сиблингу). Запускай в начале сессии и после `/clear`.
+- **Planning-first.** Содержательное изменение идёт через план — файл в `.claude/plans/` (skill
+  `/plan`); сквозная задача — программа с фазами по репо. Прямая правка — только truly-atomic и
+  багфиксы (skill `triage`, RED-first).
 - **Дефолтная петля любой правки — RED→GREEN:** `make validate` / `make doctor` красный →
-  fix → зелёный. Все действия — через `make <verb>` (`make help`); скрипты за make не дёргаем.
+  fix → зелёный.
 
 ## Где это запускается
 
@@ -34,43 +34,40 @@
 стека локально нет: приложения и контейнеры — на удалённом VPS (один VPS = одна среда).
 `make ship` пушит и триггерит remote `deploy.sh` по SSH. Ops на VPS (`ps`/`logs`/`deploy`/
 `restart`) — через `scripts/tools/ssh.sh` (connection из `.env.local`, fallback
-`ansible/inventory.ini`). Локальный SKIP
-authoring-проверок без `.env`/docker — норма, не падение.
+`ansible/inventory.ini`). Локальный SKIP authoring-проверок без `.env`/docker — норма, не падение.
 
 ## Где это в экосистеме
 
-**Роль:** шаблон проектной VPS. Один форк (`<client-org>/infra`) — один проект, один VPS на
-env (dev/staging/prod).
-**Зависит от:** `corp-infra-template` — хостит registry `git.stit.tech` и ведёт
-CrowdSec-whitelist egress-IP проектных VPS.
-**Image-теги:** бампаются **строго через `.env`** (`<SVC>_TAG`, верб `make bump SVC= TAG=`).
-**Обслуживает:** сервис-форки `<client-org>/{backend,frontend,<bot>}` — runtime их образов из
-registry; из коробки в стеке — `compose/backend.yml`, frontend/bot добавляются `/add-service`.
-Deploy нового тега любого сервиса — `make bump SVC=<svc> TAG=<tag>` (тег строго в `.env`).
-**Читает:** `<client-org>/strategy` (форк `business-strategy-template`) — продуктовый контекст (vision,
-surfaces); sibling-checkout рядом с этим репо, read-only. Резолв пути — `docs/reference/ecosystem.md`.
+**Роль:** runtime проекта и его **операционный хаб**. Один форк (`<org>/infra`) — один проект,
+один VPS на среду (dev/staging/prod); отсюда ведутся программы сквозных задач и выкатка тегов, сервис-репо
+лежат рядом sibling-checkout'ами. Карта репо, флоу и контракты — канон `docs/reference/ecosystem.md`.
+**Образы сервисов** — из registry `REGISTRY_HOST` (дефолт `git.stit.tech`); теги — строго в `.env`
+(`<SVC>_TAG`), выкатка — `make bump SVC=<svc> TAG=<tag>`. Из коробки в стеке — `compose/backend.yml`;
+frontend / site / бот добавляются `/add-service`.
+**Читает:** `<org>/strategy` (форк `business-strategy-template`) — продуктовый контекст (vision,
+surfaces), read-only; резолв пути — `docs/reference/ecosystem.md`.
 
-Карта репо и канонические контракты — `corp-infra-template/docs/ecosystem.md`.
+## Оркестрация: флоу проекта
 
-## Оркестрация: агенты по репо
+1. **Сначала strategy.** Бизнес и продукт проектируются в `<org>/strategy` её скиллами
+   (`/entrypoint`, клиент — `/entrypoint-for-business`) до инфры; здесь продукт не авторится.
+2. **Дальше — отсюда.** `/init-project` читает strategy и проектирует инфру. Сквозная задача —
+   программа здесь (`/plan`, фаза на репо) → агенты в сиблингах со своими планами фаз → выкатка здесь.
+3. **Агент в сиблинге работает обвязкой того репо** — сначала его CLAUDE.md, дальше его вербы,
+   скиллы и гейты: контракты сиблинга живут там, поэтому его код отсюда в обход них не правим.
 
-Этот репо — **операционный хаб проекта**: задачи (продуктовые и технические) входят сюда, общий
-план ведётся здесь (`.claude/plans/roadmap.md`), и отсюда агенты расходятся по sibling-checkout'ам
-(`../<name>`, резолв и graceful degradation — `docs/reference/ecosystem.md`):
-
-| Сосед | Что там | Агент там |
+| Сосед | Что там | Итог работы агента |
 |---|---|---|
-| `../strategy` | design SoT: vision/surface, домены, UX/screens, FSD-карта, инфра-периметр | проектирует его скиллами (`/entrypoint` + deep-dives); отсюда — только читаем |
-| `../backend` | Go-сервис (форк `go-backend-template`) | работает его обвязкой (`/smartdev`, `/plan`, `/scaffold`, гейт `make check`); финал — `/release` → образ в registry |
-| `../frontend` | React SPA (форк `spa-frontend-template`) | то же, гейт `pnpm check`; финал — `/release` |
-| `../<bot>` | Telegram-бот (форк `telegram-bot-template`) | то же (`/dialog-deep-dive`, `/state-migration`); финал — `/release` |
+| `../strategy` | design SoT: продукт, домены, UX, FSD-карта, ИТ-периметр | правка дизайна скиллами strategy |
+| `../backend` | Go-сервис | `/release` → образ в registry; здесь `make bump SVC=backend` |
+| `../frontend` | React SPA (кабинет) | `/release` → образ; здесь `make bump SVC=frontend` |
+| `../site` | Astro SSR-сайт | `/release` → образ; здесь `make bump SVC=site` |
+| `../<bot>` | Telegram-бот | `/release` → образ; здесь `make bump SVC=bot` |
+| `../mobile` | KMP-приложение | только задачи: релиз в магазины — его `/release`, деплой отсюда не касается |
 
-Правила ходьбы: агент в сиблинге работает **обвязкой того репо** (его CLAUDE.md / вербы / скиллы /
-гейты) — чужой код в обход их гейтов из infra не правим. Сервис-репо останавливаются на
-image-in-registry; деплой тега — только здесь (`make bump`). Сквозная задача = план здесь (фаза
-на репо) → исполнение агентами в сиблингах → rollout здесь. Прямой заход человека в сервис-репо —
-нормальный режим при ролевом разделении команды. Канон модели —
-`corp-infra-template/docs/ecosystem.md § Операционная модель агентов`.
+Прямой заход человека в сервис-репо — нормальный режим: репо работает своей обвязкой, последствия
+для хаба приходят INFRA-HANDOFF-блоком. Резолв сиблингов (`<NAME>_REPO_PATH` из `.env.local`,
+иначе `../<name>`), что каждый читает из strategy и детали контракта — `docs/reference/ecosystem.md`.
 
 ## Стек
 
@@ -78,15 +75,14 @@ image-in-registry; деплой тега — только здесь (`make bump
 |---|---|---|
 | Edge | Traefik v3 + CrowdSec | `compose/traefik.yml`, `compose/crowdsec.yml` |
 | DB | Postgres 17 | `compose/postgres.yml` |
-| App | Backend (`git.stit.tech/<client-org>/backend`) | `compose/backend.yml` |
+| App | Backend (`${REGISTRY_HOST}/${PROJECT_NAME}/backend`) | `compose/backend.yml` |
 | Storage | Minio (S3 + Console) на `s3.${DOMAIN}` / `minio.${DOMAIN}` | `compose/minio.yml` |
 | Backup | restic + pg_dumpall + crond в alpine, пишет в `$RESTIC_REPOSITORY` | `compose/backup.yml`, `containers/backup/` |
 
-Always-on (traefik / crowdsec / landing) поднимается
-на identity + ACME из `.env`. `postgres` / `storage` (minio + backup) / `backend`
-— opt-in через `COMPOSE_PROFILES`, активируются после заполнения их секций
-секретов в `.env` (единственный источник секретов, живёт только на VPS). Сети:
-`proxy` (наружу), `backend-net` (internal). См. `.claude/rules/multi-env.md` +
+Always-on (traefik / crowdsec / landing) поднимается на identity + ACME из `.env`. `postgres` /
+`storage` (minio + backup) / `backend` — opt-in через `COMPOSE_PROFILES`, активируются после
+заполнения их секций секретов в `.env` (единственный источник секретов, живёт только на VPS).
+Сети: `proxy` (наружу), `backend-net` (internal). См. `.claude/rules/multi-env.md` +
 `docs/reference/architecture.md`.
 
 ## Команды
@@ -99,12 +95,12 @@ Always-on (traefik / crowdsec / landing) поднимается
 | LOOP | `validate` / `doctor` / `check` | syntax+tpl+.env coverage / live preflight / validate+doctor+plan-check+project-check |
 | SHIP | `ship MSG="..."` | commit + check + push + (на main) ssh-deploy. Канон |
 | | `deploy` / `render` | server-side: git pull → render → compose up --wait / envsubst для `*.tpl` |
-| OPS | `ps` / `logs SVC=` / `restart SVC=` / `recreate SVC=` / `build SVC=` | статус / логи / рестарт / пересоздать (env_file pickup) / сборка образа сервиса |
+| OPS | `ps` / `logs SVC=` / `restart SVC=` / `recreate SVC=` / `build SVC=` | статус / логи / рестарт / пересоздать (подхват нового значения `.env` или тега) / сборка образа сервиса |
 | | `bump SVC= TAG=` | бамп image-тега: правит `<SVC>_TAG` в `.env` на VPS + force-recreate. Единственный канон бампа |
 | | `backup` / `restore-pg SNAPSHOT=` | one-shot backup / restore postgres из restic |
 | INTEL | `status` / `search Q= [P=]` | cockpit-сводка / поиск по compose+configs+scripts+docs |
 | PROVISION | `new-env` | bootstrap `.env` на чистом VPS |
-| SETUP | `setup` | поставить git-хуки (commit-msg + pre-commit) |
+| SETUP | `setup` | git-хуки (commit-msg + pre-commit) + PyYAML для frontmatter-проверки |
 | META | `plan-check` / `project-check` | структура планов / инфра-слой `docs/project/` (stack + сервисы) |
 
 Произвольная команда на VPS — `bash scripts/tools/ssh.sh exec '<command>'` (одной строкой в
@@ -117,27 +113,13 @@ Always-on (traefik / crowdsec / landing) поднимается
 |---|---|
 | Архитектура, сети, профили, non-goals | `docs/reference/architecture.md` |
 | Инфра-слой проекта (stack + карта сервисов + service-doc'и) | `docs/project/README.md` (вход для `/init-project` + `/de-template`) |
+| Экосистема: карта репо, флоу, резолв сиблингов, контракт сервис-репо ↔ хаб | `docs/reference/ecosystem.md` |
 | Продуктовый контекст (vision/surfaces) | соседний `<org>/strategy` (форк `business-strategy-template`), читается cross-repo |
 | Per-env `.env`-контракт, multi-env, профили | `.claude/rules/multi-env.md` |
 | Compose-инварианты сервиса | `.claude/rules/compose-and-services.md` |
 | Секреты и `.env` | `.claude/rules/secrets-and-env.md` |
-| Корп-контракт (registry + CrowdSec-whitelist) | секция «Корп-контракт» ниже |
 | Онбординг / путь потребителя | `docs/getting-started.md` |
 | Runbook / инциденты | `docs/reference/runbook.md` |
-| Экосистема репо, контракты | `docs/reference/ecosystem.md` (→ канон `corp-infra-template/docs/ecosystem.md`) |
-
-## Корп-контракт
-
-Корп-сторона даёт проектной VPS только два сервиса:
-
-1. **Registry** `git.stit.tech` — pull образов `git.stit.tech/<p>/backend:<tag>`
-   (push — разработчик backend-форка).
-2. **CrowdSec whitelist** — egress-IP проектной VPS, иначе служебный трафик к
-   корп-сервисам режется 403. egress-IP передаётся оператору корп-инфры
-   out-of-band для внесения в whitelist.
-
-Секреты корп не выдаёт и не хранит: все секреты оператор пишет сам в `.env` на
-VPS по контракту `.env.example`. Подробности — `.claude/rules/multi-env.md`.
 
 ## Стиль
 
@@ -156,7 +138,7 @@ VPS по контракту `.env.example`. Подробности — `.claude/
 ## Git workflow
 
 - **Conventional Commits** — git-хук `commit-msg` блокирует невалидные. Типы: `feat`, `fix`,
-  `refactor`, `docs`, `test`, `chore`, `meta`.
+  `refactor`, `docs`, `test`, `chore`, `meta`, `perf`.
 - Линейная история, push в main напрямую (solo-flow) — или в ветку → PR в Gitea → merge.
 - `make ship MSG="..."` — единственный канон: commit + `make check` (красный → пуш отменён) +
   push + (на main) ssh-deploy. На чистом дереве MSG необязателен.
@@ -166,12 +148,9 @@ VPS по контракту `.env.example`. Подробности — `.claude/
 
 ### Делать всегда
 - Перед claim «готово» — `make check` (validate + doctor + plan-check + project-check); после деплоя — `make ps`.
-- **Изменение — через план** (planning-first; skill `/plan`). Отклонение — осознанное, проговаривается.
-- Изменение требует CrowdSec-whitelist'а egress-IP корп-side (whitelist живёт в
-  `corp-infra-template`, не здесь) — передай egress-IP оператору корп-инфры
-  out-of-band до claim «готово».
 - Любая новая `${VAR}` в compose/configs — в `.env.example` сразу.
-- Bumps версий образов — отдельным коммитом после явного OK.
+- Бамп инфра-образа (литеральная версия в `compose/<svc>.yml`) — отдельным коммитом после явного OK;
+  тег образа сервис-репо — `make bump`.
 
 ### Сначала спросить
 - Traefik static-конфиг (`configs/traefik/traefik.yml.tpl` → рендерится в
@@ -183,39 +162,35 @@ VPS по контракту `.env.example`. Подробности — `.claude/
   блокирует `permissions.deny` в `.claude/settings.json`.
 - Commit `.env*`, rendered-конфигов, `*.pem`, `*.key`. Image-теги `:latest`.
 - Inline-значения секретов в compose/`configs/` — только `${VAR}` из `.env`.
-- Писать в auto-memory — отключено (см. ниже).
 
 ## Что менять при копировании в `<org>/infra`
 
 1. `.env` — `make new-env` (PROJECT_NAME, ENV, DOMAIN, ACME_EMAIL).
 2. `docker-compose.yml` — проверить network names (conflict-free на shared VPS).
-3. `compose/backend.yml` — `image:` под клиентский org, healthcheck path под backend API;
-   project-specific `${VAR}` в `environment:` + декларация в `.env.example`.
+3. `compose/backend.yml` — healthcheck path под backend API; project-specific `${VAR}` в
+   `environment:` + декларация в `.env.example` (образ уже собран из `REGISTRY_HOST` /
+   `PROJECT_NAME` / `BACKEND_TAG`).
 4. `configs/traefik/dynamic/` — клиент-специфичные routers/middlewares (опц.).
 
-Продуктовый слой проекта (vision / surface) — в соседнем `<org>/strategy` (форк
-`business-strategy-template` — репо бизнес-стратегии; продукт в `docs/projects/<slug>/`),
-проектируется его скиллами; здесь инфру под него ведёт `/init-project` (читает
-`<org>/strategy` cross-repo → стек+карта сервисов → service-doc'и → `/de-template`).
-
-Полный путь потребителя — `docs/getting-started.md`.
+Инфру под продукт из `<org>/strategy` ведёт `/init-project` (стек + карта сервисов →
+service-doc'и → `/de-template`). Полный путь потребителя — `docs/getting-started.md`.
 
 ## Auto-memory
 
-В этом проекте автопамять Claude **отключена**. Всё, что должно пережить сессию, фиксируется в
-репо под git — видно команде, ревьюится, воспроизводимо.
+Автопамять Claude в проекте **отключена**: всё, что должно пережить сессию, фиксируется в репо
+под git — видно команде, ревьюится, воспроизводимо.
 
 | Что | Куда |
 |---|---|
 | Постоянные правила/предпочтения для агента | `CLAUDE.md` или `.claude/rules/<topic>.md` |
 | Архитектурные решения / «почему» | `docs/reference/architecture.md` (inline, present-state) |
-| Активные задачи / план работ | `.claude/plans/roadmap.md` (single-file) |
+| Активные задачи / план работ | `.claude/plans/` (`<slug>.md` + `backlog.md`) |
 | Reference на внешние системы | `docs/reference/{architecture,ecosystem,runbook}.md`, `docs/getting-started.md` |
-| Креды и где используются | вне репо (Vaultwarden, оператор-only заметка) |
+| Креды | вне git: `.env` на VPS, `.env.local` на рабочей станции (rule `env-local`) |
 
-Технически: `autoMemoryEnabled: false` + `permissions.deny` на `Write`/`Edit`/`MultiEdit`/
-`NotebookEdit` по `**/.claude/projects/**/memory/**` в `.claude/settings.json`. Если правила
-«забываются» между сессиями — значит недо-зафиксированы в репо; перенеси в `CLAUDE.md` / `.claude/rules/`.
+Технически: `autoMemoryEnabled: false` + `permissions.deny` на `Edit(**/.claude/projects/**/memory/**)`
+в `.claude/settings.json`. Если правила «забываются» между сессиями — значит недо-зафиксированы в
+репо; перенеси в `CLAUDE.md` / `.claude/rules/`.
 
 ## Forward-only
 

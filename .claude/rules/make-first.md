@@ -20,13 +20,13 @@ paths:
 |---|---|---|
 | LOOP | `validate` / `doctor` / `check` | compose syntax+tpl+.env / live preflight / `validate`+`doctor`+`plan-check`+`project-check` |
 | SHIP | `ship MSG="…"` / `deploy` / `render` | commit+check+push+(main)ssh-deploy / server-side / envsubst для `.tpl` |
-| OPS | `ps` / `logs SVC=` / `restart SVC=` / `recreate SVC=` / `build SVC=` | статус / логи / рестарт / пересоздать (env_file/тег pickup) / сборка образа сервиса (на VPS) |
+| OPS | `ps` / `logs SVC=` / `restart SVC=` / `recreate SVC=` / `build SVC=` | статус / логи / рестарт / пересоздать (подхват нового значения `.env` или тега) / сборка образа сервиса (на VPS) |
 | | `bump SVC= TAG=` | бамп image-тега: `<SVC>_TAG` в `.env` на VPS + force-recreate. Теги — строго через `.env` |
 | | `backup` / `restore-pg SNAPSHOT=` | one-shot backup / restore postgres из restic |
 | INTEL | `status` / `search Q= [P=]` | cockpit-сводка (локальный `status.sh` + серверный смок `== Server ==` по SSH при `.env.local`) / поиск по compose+configs+scripts+docs |
 | PROVISION | `new-env` | bootstrap `.env` на чистом VPS |
-| SETUP | `setup` | симлинк git-хуков (commit-msg, pre-commit) в `.git/hooks/` |
-| META | `plan-check` / `project-check` | структура `.claude/plans/roadmap.md` / инфра-слой `docs/project/` (stack + сервисы) |
+| SETUP | `setup` | симлинк git-хуков (commit-msg, pre-commit) в `.git/hooks/` + PyYAML для frontmatter-проверки |
+| META | `plan-check` / `project-check` | формат планов `.claude/plans/` / инфра-слой `docs/project/` (stack + сервисы) |
 
 Канонический gate перед claim «готово» / push — **`make check`** (validate + doctor + plan-check + project-check).
 

@@ -15,8 +15,9 @@ status: draft
 (hosting: here, образ из git.stit.tech/<org>/backend). Какой профиль COMPOSE_PROFILES активирует.>
 
 ## Identity
-<Что это: образ (`git.stit.tech/<org>/<name>:<tag>`, закреплённая версия) или движок
-(postgres 17 / minio). container_name, healthcheck (path/команда), сети (proxy / backend-net).>
+<Что это: образ сервис-репо (`${REGISTRY_HOST:-git.stit.tech}/${PROJECT_NAME}/<name>:${<NAME>_TAG}`,
+тег — в `.env`, выкатка `make bump`) или движок с закреплённой версией (postgres 17 / minio).
+container_name, healthcheck (path/команда), сети (proxy / backend-net).>
 
 ## Secrets
 <Какие `${VAR}` нужны в .env: секция .env.example (postgres: POSTGRES_*;

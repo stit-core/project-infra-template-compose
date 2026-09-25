@@ -5,7 +5,7 @@
 Ничего не меняется, пока оператор явно не выберет split.
 
 **Split** — opt-in: Postgres / MinIO+backup / edge+app разносятся по отдельным
-VPS (несколько серверов на одну среду). **Шаблон даёт ТОЛЬКО швы** (эндпоинты
+VPS (несколько серверов на одну среду). **Шаблон даёт только швы** (эндпоинты
 бэкендов в `.env` + таргетинг compose по ролям). Cross-host сеть, TLS между
 хостами, репликация/HA/failover, S3-репликация — **дело потребителя** (см. § Граница).
 
@@ -17,10 +17,10 @@ VPS (несколько серверов на одну среду). **Шабло
 | Что | Где | single-host дефолт | split |
 |---|---|---|---|
 | Postgres host/port | `.env` `PG_HOST`/`PG_PORT` (опц.) | `postgres` / `5432` | db-хост |
-| restic-репозиторий | `.env` `RESTIC_REPOSITORY` | MinIO на этом VPS | storage-хост / managed S3 |
+| restic-репозиторий | `.env` `RESTIC_REPOSITORY` | внешний S3 (local MinIO — только rehearsal) | storage-хост / внешний S3 |
 
 `PG_DSN` собирается compose-интерполяцией `${PG_HOST:-postgres}:${PG_PORT:-5432}`
-— `.env` без этих переменных даёт дефолт (single-host, байт-в-байт).
+— `.env` без этих переменных даёт single-host дефолт `postgres:5432`.
 
 ## Шов 2: `HOST_ROLE` — таргетинг compose по ролям
 
@@ -36,15 +36,15 @@ VPS (несколько серверов на одну среду). **Шабло
 | `db` | docker-compose + postgres | Postgres |
 | `storage` | docker-compose + minio + backup | MinIO + restic-backup |
 
-`COMPOSE_PROFILES` по-прежнему гейтит postgres/storage/backend — на split-хосте
+`COMPOSE_PROFILES` гейтит postgres/storage/backend и при split — на split-хосте
 ставится профиль его роли (`db` → `COMPOSE_PROFILES=postgres`, `storage` →
-`storage`). Дефолт `HOST_ROLE=all` даёт прежний `-f`-набор — рендер не меняется.
+`storage`). Дефолт `HOST_ROLE=all` поднимает `docker-compose.yml` + все `compose/*.yml`.
 
 ## Шов 3: per-host backup
 
 При split backup (роль `storage`) делает `pg_dumpall` к Postgres на db-хосте
 **по сети** (`PG_HOST` из `.env`). Co-location-проверка `storage ⇒ postgres` в
-`deploy.sh` активна только при `HOST_ROLE=all`; при split она снята (PG на
+`deploy.sh` активна только при `HOST_ROLE=all`; при split её нет (PG на
 другом хосте — норма). Cross-host доступ к PG обеспечивает потребитель.
 
 ## Граница: что шаблон НЕ делает (дело потребителя)

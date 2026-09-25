@@ -25,9 +25,9 @@
 - **Pinned images.** Образы закреплены конкретной версией; `:latest` ловит
   `make validate`.
 - **Multi-env физически.** Один шаблон, N VPS, у каждого свой `ENV` и свой `.env`.
-- **Без вендор-лока.** Control-plane может быть managed (stit) или self-hosted —
-  меняется только хост registry в `.env`, не зашит. Не вшивай
-  зависимость от одного провайдера там, где это мешает self-host.
+- **Хосты — параметры.** Registry образов — `REGISTRY_HOST` в `.env` (дефолт
+  `git.stit.tech`), git-хост выводится из `project_repo_url` inventory. Не вшивай
+  конкретный хост или провайдера туда, где он должен приходить параметром.
 - **Forward-only документация.** Текст описывает текущее состояние, без «было/стало» —
   история живёт в `git log`.
 
@@ -37,9 +37,8 @@
   поведение.
 - **PR** — форкни репозиторий, заведи ветку, открой pull request с понятным описанием
   «зачем». Держи PR сфокусированным; не подмешивай несвязанные правки.
-- Тронул corp-поверхность (compose-профили, `.env.example`,
-  `ansible/`) — опиши это в PR отдельно (в проекте изменения, требующие действия
-  корп-стороны, передаются оператору корп-инфры out-of-band).
+- Тронул контракт форков (compose-профили, `.env.example`, `ansible/`) — опиши это в PR
+  отдельно: операторам форков понадобится дописать `.env` или перепрогнать ansible.
 
 ## Перед PR
 
@@ -55,7 +54,7 @@ make validate    # compose syntax + yamllint + .tpl + .env coverage
 - Каждый сервис имеет `restart`, `healthcheck`, `container_name`, явный `networks`.
   Public сервис — в `proxy` сети + traefik labels с `crowdsec@file` middleware.
 - **Conventional Commits** (хук `commit-msg`): `<type>(<scope>)?: <subject>`,
-  subject ≤72. Типы: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `meta`.
+  subject ≤72. Типы: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `meta`, `perf`.
   Пример: `feat(postgres): add read-replica service`.
 
 ## Что меняется осторожно

@@ -10,7 +10,7 @@ paths:
 
 ## Топология
 
-Корневой `docker-compose.yml` — только определения сетей и общих volume-ов (если есть). Сервисы — отдельные файлы в `compose/<service>.yml`. Склеиваются `Makefile` через `COMPOSE_ARGS := -f docker-compose.yml $(addprefix -f ,$(wildcard compose/*.yml))`.
+Корневой `docker-compose.yml` — только определения сетей и общих volume-ов (если есть). Сервисы — отдельные файлы в `compose/<service>.yml`. Склеиваются `Makefile` через `COMPOSE_ARGS := --env-file .env -f docker-compose.yml $(addprefix -f ,$(wildcard compose/*.yml))`.
 
 **Правило:** один сервис (или тесная группа: app + sidecar) = один файл. Не сваливай несвязанные сервисы.
 
@@ -109,11 +109,11 @@ Backup-контейнер (`containers/backup/`) бэкапит **только**
 
 ## После любой правки compose
 
-`make validate` (compose syntax + yamllint + .tpl + .env coverage). На сервере — `make deploy` → `git pull → render-configs → compose up -d --wait --wait-timeout 120`.
+`make validate` (compose syntax + yamllint + .tpl + .env coverage). На сервере — `make deploy` → `git pull → render-configs → compose up -d --wait --wait-timeout 180`.
 
 ## Bump образа
 
-**Никогда не меняй image-тег без явного OK.**
+Image-тег меняется только с явного OK юзера: бамп — это выкатка новой версии в среду.
 
 - **Инфра-образы** (traefik/postgres/minio/...) закреплены литеральной версией в `compose/<svc>.yml`. Bump = отдельный коммит `chore(<svc>): bump <name> to <version>` с release-notes в теле.
-- **Бампаемые app-образы** (backend и любые будущие) параметризуются `${<SVC>_TAG}` — тег живёт **строго в `.env`** на VPS. Bump = `make bump SVC=<svc> TAG=<tag>` (правит `.env` + force-recreate; compose сам пуллит отсутствующий образ). Rollback — тот же верб со старым тегом.
+- **Образы сервис-репо** (backend, frontend, site, бот) тянутся как `${REGISTRY_HOST:-git.stit.tech}/${PROJECT_NAME}/<svc>:${<SVC>_TAG}` — тег живёт **строго в `.env`** на VPS. Bump = `make bump SVC=<svc> TAG=<tag>` (правит `.env` + force-recreate; compose сам пуллит отсутствующий образ). Rollback — тот же верб со старым тегом. Контракт с сервис-репо — `docs/reference/ecosystem.md`.

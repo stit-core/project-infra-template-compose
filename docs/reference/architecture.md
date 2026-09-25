@@ -33,8 +33,8 @@ Single-VPS docker-compose стек одного проекта (дефолт). �
 
 | Network | Тип | Кто в ней |
 |---|---|---|
-| `proxy` | bridge, external | Traefik (edge), backend (для входящего HTTPS), backup (исходящий к внешнему S3) |
-| `backend-net` | bridge, **internal** | postgres, backend |
+| `proxy` | bridge (наружу через traefik) | Traefik (edge), CrowdSec, landing, backend (входящий HTTPS), minio (S3 + Console), backup (исходящий к внешнему S3) |
+| `backend-net` | bridge, **internal** | postgres, backend, minio, minio-init, backup |
 
 Постгрес НЕ в `proxy` — он недоступен извне. Backend стучится в постгрес по hostname `postgres` через `backend-net`.
 
@@ -45,20 +45,22 @@ Single-VPS docker-compose стек одного проекта (дефолт). �
 | `postgres-data` | PG datadir | да — `pg_dumpall` из `containers/backup` |
 | `traefik-acme` | LE cert storage | нет (восстанавливается через ACME) |
 | `crowdsec-data` / `-config` | bouncer state, ban-lists | опционально (mostly self-rebuilds) |
-| `minio-data` | S3-объекты (uploads + backups) | да (restic в bucket `backups`) |
+| `minio-data` | S3-объекты (uploads; в rehearsal — ещё restic-bucket `backups`) | нет (см. ниже) |
 
 Секреты в volume'ах не живут: сервисы получают их через `environment:` (интерполяция из `.env`), rendered-конфиги (`configs/traefik/traefik.yml`) пересобираются render-configs.sh на каждом deploy.
 
-## Контракт с корпом
+## Внешние зависимости
 
-| Корп-сервис | Что | Адрес |
+| Что | Где | Задаётся |
 |---|---|---|
-| Gitea | Source + container registry | `https://git.stit.tech` |
-| CrowdSec whitelist | egress-IP проектной VPS в корп-whitelist | corp-side |
+| Git-хостинг + container registry | Gitea `git.stit.tech` | `REGISTRY_HOST` в `.env` (дефолт `git.stit.tech`); git-хост — из `project_repo_url` ansible-inventory |
+| Restic-репозиторий бэкапа | внешний S3-совместимый endpoint | `RESTIC_REPOSITORY` + `BACKUP_AWS_*` в `.env` |
+
+Образы сервис-репо compose тянет как `${REGISTRY_HOST:-git.stit.tech}/${PROJECT_NAME}/<svc>:${<SVC>_TAG}`; выкатка тега — `make bump SVC= TAG=`.
 
 Backup может писать в любой restic-совместимый endpoint (`RESTIC_REPOSITORY` в `.env`). Local-default отсутствует by design — на single-VPS он не даёт DR, host failure уносит и репо. Рекомендация: external managed S3 / bare-IP S3 на другом хосте. App-uploads bucket (`minio-data`) — **не** покрыт backup'ом; если нужен — настрой `mc mirror` job в external storage отдельно.
 
-Один VPS = одна среда. Подробно — `.claude/rules/multi-env.md`. Общая карта контрактов между репо экосистемы — `corp-infra-template/docs/ecosystem.md`.
+Один VPS = одна среда. Подробно — `.claude/rules/multi-env.md`. Карта репо экосистемы, флоу и контракт с сервис-репо — `docs/reference/ecosystem.md`.
 
 ## Поток секретов
 
@@ -75,6 +77,7 @@ laptop оператора                          VPS
    │                                        │
    │  make ship MSG="..."                    │
    │  ├─ git add -A && git commit -m "..."   │
+   │  ├─ make check (красный → стоп)         │
    │  ├─ git push origin main                │
    │  └─ ssh root@vps 'cd /opt/<p>-infra && bash scripts/deploy.sh'
    ↓                                        ↓
@@ -85,15 +88,14 @@ laptop оператора                          VPS
                                          (пересоздаёт сервисы с изменённым environment сам)
 ```
 
-Никаких runner'ов, push-trigger'ов, gitea-CI. Backend-images собирает разработчик локально (`docker buildx build … && docker push git.stit.tech/<client-org>/backend:<tag>`), затем `make bump SVC=backend TAG=<tag>` — правит `BACKEND_TAG` в `.env` на VPS и force-recreate'ит backend. Image-теги живут строго в `.env` (конвенция `<SVC>_TAG`).
+Никаких runner'ов, push-trigger'ов, gitea-CI. Образы сервисов собирает и пушит в registry сервис-репо своим `/release`, затем здесь `make bump SVC=<svc> TAG=<tag>` — правит `<SVC>_TAG` в `.env` на VPS и force-recreate'ит сервис. Image-теги живут строго в `.env` (конвенция `<SVC>_TAG`).
 
 ## Cockpit-сводка и серверный смок
 
 `make status` — единая сводка для агента (skill `smartdev`), оркестратор из двух источников:
 
 - **Локально** (`scripts/tools/status.sh`, pure-local — без docker и SSH): git-состояние,
-  `== Critical ==` (upstream/deploy-drift), `== Infra-touch ==` (тронутая corp-поверхность),
-  активный план из `roadmap.md`.
+  `== Critical ==` (upstream/deploy-drift), активные планы из `.claude/plans/` (`validate-plan.sh --summary`).
 - **Серверный смок** (`== Server ==`): host-витали (load / RAM / swap / disk / OOM) + здоровье
   контейнеров (unhealthy / exited / restart-loop, автодискавери из `docker ps`). Бежит **на хосте** —
   `scripts/tools/smoke-run.sh` гоняет drop-in `scripts/tools/smoke.d/*.sh` по порядку

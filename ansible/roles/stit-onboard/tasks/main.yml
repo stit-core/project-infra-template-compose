@@ -28,8 +28,7 @@
       {{ pubkey.stdout }}
       ──────────────────────────────────────────────────────────────────────────────
 
-# Хост git-registry выводится из project_repo_url (managed git.stit.tech или
-# self-hosted git.<org>); override — git_host в inventory.
+# Хост git выводится из project_repo_url; override — git_host в inventory.
 - name: Resolve git host for deploy key
   ansible.builtin.set_fact:
     git_host: "{{ git_host | default(project_repo_url | regex_replace('^(?:ssh://)?[^@]+@([^:/]+).*$', '\\1'), true) }}"

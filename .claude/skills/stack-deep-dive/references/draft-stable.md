@@ -37,7 +37,7 @@
 | public-сервисы из карты | `Domains` | каждый `Route: <sub>` имеет соответствующий пункт в `Domains` ИЛИ open-question в state |
 | имена сетей | `Networks` | соответствуют тому, что есть в `compose/` (или явный rename-план в `Generates`) |
 | `Backup: N/A` ↔ карта | `Backup` | в карте нет `datastore` И нет volume'ов под бэкап |
-| `Generates` пути | `Generates` | реалистичны (`configs/traefik/dynamic/*`, `.env.example`, crowdsec source-IP next-step corp-side) |
+| `Generates` пути | `Generates` | реалистичны (`configs/traefik/dynamic/*`, `.env.example`, ACME next-step) |
 | `ACME_EMAIL`/`ACME_CASERVER` | `Domains` / `Generates` | значения отмечены как next-step: оператор заполняет `.env` на VPS по `.env.example` |
 
 ### 4. `Generates` содержит хотя бы один реальный артефакт
@@ -47,7 +47,6 @@
 
 - `configs/traefik/dynamic/*` (динамические роуты),
 - `DOMAIN` в `.env.example` (либо проектный default),
-- crowdsec source-IP next-step (egress-IP корп-оператору out-of-band),
 - acme next-step (`ACME_EMAIL`/`ACME_CASERVER` в `.env` на VPS).
 
 Если ни одного — `Generates` бесполезен, `/de-template` не из чего
@@ -95,8 +94,8 @@
    повышаем?» с опциями «Да, повысить» / «Нет, ещё не уверен» (через
    Other — что именно смущает).
 6. При «Да» — Edit'ом поменять `status: draft → stable`.
-7. После повышения — ещё раз `make project-check` (теперь проверит
-   non-empty bodies строго).
+7. После повышения — ещё раз `make project-check` (при `status: stable`
+   валидатор строго проверяет непустые секции).
 
 ## Что НЕ делать
 

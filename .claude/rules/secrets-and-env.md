@@ -24,7 +24,7 @@ envsubst'ом (`scripts/render-configs.sh`).
 | ACME | `ACME_EMAIL`, `ACME_CASERVER` | `scripts/new-env.sh` / оператор |
 | Local-managed | `CROWDSEC_BOUNCER_API_KEY`, `COMPOSE_PROFILES`, `HOST_ROLE` | auto-register / оператор |
 | Image-теги | `BACKEND_TAG` (конвенция `<SVC>_TAG`) | оператор (`make bump SVC= TAG=`) |
-| Registry | `REGISTRY_HOST` (managed-дефолт в коде; self-hosted переопределяет) | оператор (self-hosted) |
+| Registry | `REGISTRY_HOST` (дефолт `git.stit.tech` в compose) | оператор, если registry другой |
 | Секреты профилей | `POSTGRES_*`, `OIDC_*`, `JWT_SECRET`, `MINIO_*`, `APP_S3_*`, `BACKUP_S3_*`, `RESTIC_*`, `BACKUP_AWS_*` | оператор (по `.env.example`) |
 
 ## Multi-env
@@ -38,7 +38,7 @@ envsubst'ом (`scripts/render-configs.sh`).
 | Файл | В репо? | Зачем |
 |---|---|---|
 | `.env.example` | да | Полный контракт переменных: активные — заполняются на bootstrap, профильные — закомментированы с комментарием как сгенерировать |
-| `.env` | **нет** (gitignored, permissions.deny) | Реальные значения на VPS |
+| `.env` | **нет** (gitignored) | Реальные значения на VPS |
 | `configs/<svc>/*.tpl` | да | envsubst-шаблоны с .env-vars (`traefik.yml.tpl` с `${ACME_EMAIL}`, `middlewares.yml.tpl` с `${CROWDSEC_BOUNCER_API_KEY}`) |
 | rendered `configs/<svc>/<file>` | **нет** (gitignored) | Выход render-configs.sh, пересобирается каждый deploy |
 
@@ -46,7 +46,8 @@ envsubst'ом (`scripts/render-configs.sh`).
 
 ### .env / .env.example
 
-- `.env*` НИКОГДА не коммитятся (gitignore + `permissions.deny`).
+- `.env*` не коммитятся: `.gitignore` их покрывает, а `make ship` делает `git add -A` — проверяй
+  `git status` перед коммитом, если заводил файл с нестандартным именем.
 - `.env.example` — контракт: каждый `${VAR}` из compose/configs присутствует
   там (активный или закомментированный `# VAR=`) с комментарием откуда взять /
   как сгенерировать (`openssl rand -hex 32` для паролей). `make validate`
@@ -110,11 +111,11 @@ identity + ACME из `.env`, других секретов не требует.
 - Rendered-файлов из `.tpl` (gitignored: `configs/traefik/traefik.yml`,
   `configs/traefik/dynamic/middlewares.yml`)
 
-Hook `permissions.deny` страхует, но привычка проверять — золото.
+`.gitignore` страхует от типовых имён; `git diff --cached` ловит остальное.
 
 ## Чек перед коммитом
 
 - В `.env.example` нет реальных значений (только placeholder / пусто)?
 - Любой новый `${VAR}` в compose/configs — добавлен в `.env.example`
   (активный или закомментированный) с комментарием как сгенерировать?
-- `scripts/tools/validate.sh` зелёный (он ловит missing vars в `.env.example`)?
+- `make validate` зелёный (он ловит missing vars в `.env.example`)?

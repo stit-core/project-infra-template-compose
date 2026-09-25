@@ -1,26 +1,22 @@
 ---
 name: smartdev
-description: Ведущий cockpit проектной инфры (<client-org>/infra шаблон). Не «сводка и стоп» — за один проход собирает состояние (make status), поднимает контекст (активный план + память) и САМ переключает в нужный режим (init-project / triage / plan / add-service / dr-restore / bootstrap-vps), ведя RED→GREEN по дефолту. Запускай в начале сессии, после /clear, когда непонятно с чего начать, или когда «вроде сломалось». Активируй на "/smartdev", "что у нас?", "статус", "с чего начать?", "введи в курс дела".
+description: Ведущий cockpit проектной инфры (<org>/infra — операционный хаб проекта). За один проход собирает состояние (make status), поднимает контекст (активный план, инициализирован ли проект, есть ли соседний <org>/strategy) и сам переключает в нужный режим — init-project / triage / plan / add-service / dr-restore / bootstrap-vps или задача агенту в сиблинг-репо, — ведя RED→GREEN по дефолту. Запускай в начале сессии, после /clear, когда непонятно, с чего начать или в каком репо живёт задача, когда спрашивают о состоянии репо или стека, и когда «вроде сломалось».
 ---
 
 # Skill: smartdev
 
-Каноничный entry-point. Не «показать сводку и замолчать», а **вести**: за один
-проход собрать состояние, поднять контекст и **самому переключить** в правильный
-режим. Дефолтная петля для любой правки — RED→GREEN (`validate`/`doctor` красный
-→ fix → зелёный), не «опиши и спроси».
+Каноничный entry-point. Задача — не показать сводку и замолчать, а **вести**: за один проход
+собрать состояние, поднять контекст и самому переключить в правильный режим. Дефолтная петля для
+любой правки — RED→GREEN (`validate`/`doctor` красный → fix → зелёный), не «опиши и спроси».
 
 ## Когда применять
 
-- Начало сессии: "/smartdev", "что у нас", "с чего начать"
-- После /clear или возврата к репо после паузы
-- Юзер сформулировал задачу, но непонятно насколько она большая
-- Что-то «вроде сломалось» и нужна orientation
+- Начало сессии, возврат к репо после паузы или `/clear`.
+- Юзер сформулировал задачу, но непонятно, насколько она большая и в каком репо живёт.
+- Что-то «вроде сломалось» и нужна ориентация.
 
-## Когда НЕ применять
-
-- Юзер уже дал чёткую узкую задачу — иди прямо в работу (RED→GREEN)
-- Уже идёт активная сессия с известным контекстом — не повторяй briefing
+Юзер уже дал чёткую узкую задачу — иди прямо в работу (RED→GREEN). Идёт активная сессия с
+известным контекстом — briefing не повторяй.
 
 ## 1. Собрать состояние
 
@@ -28,42 +24,39 @@ description: Ведущий cockpit проектной инфры (<client-org>/
 make status
 ```
 
-Парси секции (они детерминированы — на них держится чейнинг):
-- `== Critical ==` — `ATTENTION:`-строки **git/deploy-drift** (upstream behind) или `none`. Это
-  pure-local (`status.sh`): docker тут НЕ дёргается.
-- `== Server ==` — **серверный смок VPS** (host-витали load/RAM/swap/disk/OOM + здоровье
+Секции детерминированы — на них держится чейнинг:
+- `== Critical ==` — `ATTENTION:`-строки git/deploy-drift (upstream behind) или `none`. Это
+  pure-local (`status.sh`): docker тут не дёргается.
+- `== Server ==` — серверный смок VPS (host-витали load/RAM/swap/disk/OOM + здоровье
   контейнеров unhealthy/exited/restart-loop). Собирает таргет `make status` через смок
   (`smoke-run.sh` на VPS / `ssh.sh smoke` с workstation). Свои `ATTENTION:`-строки — чейнить как
-  Critical (→ triage). `SKIP` — нет `.env.local` (connection не задан) или VPS недоступен; это норма,
-  не падение.
-- `== Infra-touch ==` — список corp-классов или `none`
-- `== Plan ==` — активные планы из roadmap или `none`
-- `== Branch ==` / `== Working tree ==` / `== Compose ==` / `== Recent commits ==` — фон
+  Critical (→ triage). `SKIP` — нет `.env.local` (connection не задан) или VPS недоступен; это
+  норма, не падение.
+- `== Plan ==` — активные планы (статус, прогресс, следующий шаг) и число пунктов бэклога, или `none`.
+- `== Branch ==` / `== Working tree ==` / `== Compose ==` / `== Recent commits ==` — фон.
 
-`make status` смокает VPS на **входе сессии** (`.env`-sentinel: на VPS — `smoke-run.sh` локально;
-с workstation — `ssh.sh smoke`; connection из `.env.local`). Mid-session не пере-смокай на каждый
-микро-вопрос — точечно `make ps` / `make logs SVC=<svc>` / `bash scripts/tools/ssh.sh exec '…'`
-(тот же ssh-split; exec-канон — rule `make-first`).
-Split и `.env.local` — rules `make-first`/`env-local`. `make doctor` без `.env` локально → SKIP, норма.
+Смок VPS — на входе сессии. Дальше точечно: `make ps` / `make logs SVC=<svc>` /
+`bash scripts/tools/ssh.sh exec '…'` (exec-канон и `.env.local` — rules `make-first`/`env-local`).
+`make doctor` без `.env` локально → SKIP, норма.
 
 ## 2. Поднять контекст
 
-- `== Plan ==` ≠ none → прочитай активную `### `-секцию в `.claude/plans/roadmap.md`: последний
-  чекпоинт, незакрытые атомы, `**Corp impact.**`. Сверься с `git log` с момента чекпоинта.
+- `== Plan ==` ≠ none → прочитай активный план `.claude/plans/<slug>.md` целиком, начиная с «Где мы
+  сейчас»; у программы — ещё статусы фаз. Сверься с `git log` с момента последней правки плана.
 - **Инициализирован ли проект** — свежий форк шаблона ещё не развёрнут под свой продукт:
   ```bash
   git remote get-url origin           # ещё …project-infra-template-compose… ?
   test -f docs/project/stack.md && grep -q '^status: stable' docs/project/stack.md
   ```
   Origin ещё template ИЛИ нет `stack.md` со `status: stable` → проект не инициализирован (см. чейн).
-- **Продуктовый контекст** живёт в соседнем `<org>/strategy` (`business-strategy-template`,
-  sibling-checkout; резолв пути — `docs/reference/ecosystem.md`, дефолт `../strategy`). При старте
-  глянь, есть ли он и что в `docs/projects/<slug>/{vision,surface}.md` — это scope для инфры.
-  Нет sibling-репо → не падай, отметь next-step «склонируй `<org>/strategy`».
+- **Продуктовый контекст** живёт в соседнем `<org>/strategy` (резолв пути —
+  `docs/reference/ecosystem.md`, дефолт `../strategy`). Глянь, есть ли он и что в
+  `docs/projects/<slug>/{vision,surface}.md` — это scope для инфры. Соседа нет → не падай, отметь
+  next-step «склонируй `<org>/strategy` рядом».
 - Автопамять в проекте отключена (`CLAUDE.md § Auto-memory`) — весь переживающий
-  сессию контекст в репо: roadmap, state-файлы скиллов, docs.
+  сессию контекст в репо: планы, state-файлы скиллов, docs.
 
-## 3. Чейнить (НЕ описывать)
+## 3. Чейнить
 
 За один проход переключись в режим. Сверху вниз — первый сработавший выигрывает:
 
@@ -71,20 +64,19 @@ Split и `.env.local` — rules `make-first`/`env-local`. `make doctor` без `
 |---|---|
 | `== Critical ==` ≠ none (upstream behind-drift) | → skill `triage` |
 | `== Server ==` ATTENTION (host-pressure: disk/RAM/load/OOM, или unhealthy/exited/restart на VPS) | → skill `triage` |
-| Багфикс / «сломалось» / «не поднимается» / трейс | → skill `triage` (НЕ `plan`) |
+| Багфикс / «сломалось» / «не поднимается» / трейс | → skill `triage` (не `plan`) |
 | Проект не инициализирован (origin ещё template ИЛИ нет stable `docs/project/stack.md`) | → skill `init-project` (первым делом) |
-| `== Infra-touch ==` ≠ none (новый egress-IP под CrowdSec / новый образ из registry) | оператор передаёт данные оператору корп-инфры out-of-band до claim «готово» |
-| `== Plan ==` активный `in-progress` | продолжи со следующего открытого атома |
-| Задача целиком про сервис-репо (фича бэка / фронта / бота) | → сиблинг `../<svc>`: работай его обвязкой (`CLAUDE.md § Оркестрация`); rollout тега — вернись сюда, `make bump` |
-| Задача сквозная (несколько репо) | план здесь (фаза на репо) → агенты в сиблингах → rollout здесь |
+| `== Plan ==` активный `in-progress` | продолжи со следующего открытого шага («Где мы сейчас») |
+| Задача целиком про один сиблинг: фича бэка / фронта / сайта / бота, задача мобильному приложению, правка дизайна продукта | → агент в `../<repo>` работает его обвязкой (`CLAUDE.md § Оркестрация`); выкатка тега — вернись сюда, `make bump` (у mobile и strategy выкатки отсюда нет) |
+| Задача сквозная (несколько репо) | → skill `plan`: фаза на репо → агенты в сиблингах → выкатка здесь |
 | Задача = новый сервис в стек | → skill `add-service` |
 | Задача = restore / потеря данных / host crashed | → skill `dr-restore` |
 | Задача = новый VPS / клиент / первый запуск | → skill `bootstrap-vps` |
-| Задача крупная (>5 шагов / security-sensitive / >2 сервиса / env-контракт) | → skill `plan` |
-| Задача мелкая (<5 шагов, без неочевидностей) | делай сразу, RED→GREEN |
+| Задача содержательная (не truly-atomic: топология, env-контракт, security-sensitive, несколько файлов) | → skill `plan` (planning-first) |
+| Задача truly-atomic (опечатка, один очевидный файл, одна `${VAR}`) | делай сразу, RED→GREEN |
 | Задачи нет, working tree чистый, план none | спроси юзера: какую задачу решаем |
 
-Security-sensitive (план + явный OK обязательны до правки): `.env.example`-контракт,
+Security-sensitive (план + явный OK до правки): `.env.example`-контракт,
 `configs/traefik/traefik.yml.tpl` (static-конфиг Traefik рендерится из него в
 `configs/traefik/traefik.yml`; правка → рестарт Traefik = downtime),
 `containers/backup/` + `compose/backup.yml` (риск потери restore-points).
@@ -95,9 +87,8 @@ Security-sensitive (план + явный OK обязательны до пра�
 
 1. Правишь.
 2. `make validate` (синтаксис/tpl/.env-coverage) — зелёный.
-3. `make doctor` если задело live-поверхность (.env/rendered configs) — зелёный или осознанный WARN.
-4. `== Infra-touch ==` стал ≠ none (новый egress-IP / образ из registry) → оператор передаёт данные оператору корп-инфры out-of-band ДО claim «готово».
-5. Коммит (Conventional Commits). Деплой — `make ship MSG="..."` (см. ниже), только когда юзер этого хочет.
+3. `make doctor`, если задело live-поверхность (.env/rendered configs) — зелёный или осознанный WARN.
+4. Коммит (Conventional Commits). Деплой — `make ship MSG="..."` (см. ниже), только когда юзер этого хочет.
 
 ## Deploy-флоу (канон)
 
@@ -136,21 +127,20 @@ git-репо. Следующий `make ship`/`make deploy` сделает `git p
 оператор упомянул правку на хосте — флажь `⚠ on-server drift, нужен backport`
 (в `triage`). Исключение — gitignored (`.env`, rendered-конфиги) правятся на VPS легально.
 
-Debug на VPS: `ssh root@<vps> 'cd /opt/<p>-infra && make deploy'` (пошаговый stdout
-вместо `--wait`-таймаутов через SSH).
+Debug на VPS: `bash scripts/tools/ssh.sh exec 'make deploy'` (пошаговый stdout вместо
+`--wait`-таймаутов `make ship`).
 
-## Что cockpit НЕ делает
+## Что cockpit не делает
 
-- Не делает развёрнутый диагноз сам — чейнит в `triage` (там TDD-петля разбора).
-- Не молчит про тронутую corp-поверхность (egress-IP / образ из registry) — напоминает про out-of-band handoff корп-оператору до claim «готово».
-- Не запускает `make ship`/`deploy`/`backup` без явной воли юзера.
-- Не делает `git pull`/`fetch` без явной просьбы.
-- Не перепланирует чужой in-progress план — продолжает его.
+- Развёрнутый диагноз сам не ставит — чейнит в `triage` (там петля разбора).
+- `make ship`/`deploy`/`backup` без явной воли юзера не запускает.
+- `git pull`/`fetch` без явной просьбы не делает.
+- Чужой in-progress план не перепланирует — продолжает его.
 
 ## Anti-patterns
 
-- Дамп всего `make status` в чат. Сводка — 4-6 строк, дальше — действие.
-- Пере-смок VPS (`make status` / `ssh.sh smoke`) на каждый микро-вопрос: смок — session-start, дальше точечно `make ps`/`make logs`.
-- Briefing на 100 строк и остановка «жду команды» вместо чейна.
+- Дамп всего `make status` в чат: сводка — только то, что влияет на выбор режима, дальше — действие.
+- Пере-смок VPS (`make status` / `ssh.sh smoke`) на каждый микро-вопрос: смок — на входе сессии, дальше точечно `make ps`/`make logs`.
+- Длинный briefing и остановка «жду команды» вместо чейна.
 - Прыжок в `add-service` минуя оценку — если задача = один Edit, делай Edit (RED→GREEN).
-- Багфикс через `plan`. Баг → всегда `triage`.
+- Багфикс через `plan`: баг → `triage`.

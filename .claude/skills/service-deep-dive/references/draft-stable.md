@@ -37,7 +37,7 @@
 | Набор переменных в `Secrets` | секции `.env.example` (`postgres`/`storage`/`backend`) или имена `${VAR}` | переменные задекларированы в `.env.example` и читаются `environment:`-интерполяцией consumer-сервиса ИЛИ явный stub-next-step «оператор дописывает в `.env` по `.env.example`» |
 | `<sub>.${DOMAIN}` в `Route` | публичный сервис | сабдомен упомянут в `stack.md § Domains` ИЛИ явный stub «допилить stack» |
 | `COMPOSE_PROFILES`-профиль в `Hosting` | имя профиля | соответствует таблице маппинга `subtype → профиль` (см. `docs/project/README.md`) |
-| `Generates` имена parts/templates | имена | реалистичны для kind (`configs/<svc>/<file>.tpl`, `compose/<name>.yml`) |
+| `Generates` имена файлов | имена | реалистичны для kind (`configs/<svc>/<file>.tpl`, `compose/<name>.yml`) |
 
 `stable` может ссылаться на `draft`-соседа (например, `backend.stable`
 упоминает `db.draft`) — это допустимо; валидатор подсветит, но не
@@ -86,8 +86,8 @@ stable не относится — может быть. Секция `## Что 
    повышаем?» с опциями «Да, повысить» / «Нет, ещё не уверен» (через
    Other — что именно смущает).
 6. При «Да» — Edit'ом поменять `status: draft → stable`.
-7. После повышения — ещё раз `make project-check` (теперь проверит
-   non-empty bodies строго).
+7. После повышения — ещё раз `make project-check` (при `status: stable`
+   валидатор строго проверяет непустые секции).
 
 ## Что НЕ делать
 

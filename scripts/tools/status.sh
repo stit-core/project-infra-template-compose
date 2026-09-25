@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 # Локальная сводка состояния репо для cockpit-skill smartdev — pure-local:
-# git / roadmap / fragments, БЕЗ docker и БЕЗ SSH. Секции парсятся smartdev'ом
+# git / планы / fragments, БЕЗ docker и БЕЗ SSH. Секции парсятся smartdev'ом
 # детерминированно для чейнинга:
 #   == Critical ==     ATTENTION: <…> (git/deploy-drift) → чейн в triage (none = чисто)
-#   == Infra-touch ==  список corp-классов → передать оператору корп-инфры (none = чисто)
-#   == Plan ==         активный план из roadmap → продолжить атомы
+#   == Plan ==         активные планы (validate-plan.sh --summary) → продолжить шаг
 # Серверный смок (host-витали + здоровье контейнеров) — НЕ здесь: его собирает
 # таргет `make status` секцией == Server == (smoke-run.sh на VPS / ssh.sh smoke
 # с workstation). Сам всегда exit 0 (информационный); сигналы — в тексте секций.
@@ -49,45 +48,8 @@ fi
 [ "$crit" -eq 0 ] && echo "none"
 
 echo
-echo "== Infra-touch =="
-# Working tree задел corp-поверхность? → передать оператору корп-инфры out-of-band.
-paths=$(git status --porcelain 2>/dev/null | cut -c4-)
-declare -a hits=()
-grep -qE '^compose/.*\.ya?ml'                 <<<"$paths" && hits+=("compose-topology/profiles")
-grep -qE '(^|[ >])\.env\.example'             <<<"$paths" && hits+=("env-contract")
-grep -qE 'configs/crowdsec/whitelists\.yaml'  <<<"$paths" && hits+=("crowdsec-whitelist")
-grep -qE '^ansible/'                          <<<"$paths" && hits+=("ansible-bootstrap")
-if [ ${#hits[@]} -eq 0 ]; then
-  echo "none"
-else
-  printf '%s\n' "${hits[*]}"
-  echo "(тронута corp-поверхность — заполни **Corp impact.** в плане и передай оператору корп-инфры)"
-fi
-
-echo
 echo "== Plan =="
-# Единый roadmap: Current focus + по секции ## Active — slug, статус, следующий открытый атом.
-# Метадата-строки якорятся к ^** (проза атомов с `**Статус:**` иначе ломает парс).
-roadmap=.claude/plans/roadmap.md
-if [ -f "$roadmap" ]; then
-  foc=$(grep -m1 '^\*\*Current focus:\*\*' "$roadmap" | sed -E 's/\*\*Current focus:\*\*[[:space:]]*//')
-  [ -n "$foc" ] && echo "  focus: $foc"
-  awk '
-    function flush(){ if(slug!="") printf "  %s: %s | next: %s\n", slug, st, (nx==""?"—":nx) }
-    /^## Active/ { inact=1; next }
-    /^## /       { flush(); inact=0; slug=""; next }
-    !inact       { next }
-    /^### /      { flush(); slug=$0; sub(/^### /,"",slug); sub(/ .*/,"",slug); st="?"; nx=""; next }
-    slug=="" { next }
-    /^\*\*Создан:\*\*/ { if ($0 ~ /\*\*Статус:\*\*/){ s=$0; sub(/.*\*\*Статус:\*\*[[:space:]]*/,"",s); sub(/[[:space:]].*$/,"",s); st=s } }
-    /^\*\*Статус:\*\*/ { s=$0; sub(/^\*\*Статус:\*\*[[:space:]]*/,"",s); sub(/[[:space:]].*$/,"",s); st=s }
-    /^- \[ \] \*\*A[0-9]/ && nx=="" { n=$0; sub(/^- \[ \] \*\*/,"",n); sub(/:.*/,"",n); nx=n }
-    END { flush() }
-  ' "$roadmap"
-  grep -q '^### ' "$roadmap" || echo "  none (нет активных планов)"
-else
-  echo "none (roadmap отсутствует)"
-fi
+bash scripts/tools/validate-plan.sh --summary
 
 echo
 echo "== Compose =="

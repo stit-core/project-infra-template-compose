@@ -21,7 +21,7 @@ runtime-секреты приложения и **не** серверный `.env
 - SSH-**ключ** лежит на машине (`~/.ssh/…`); в файле — только **куда** ходить (host/port/user).
   **Host берётся из `.env.local`, ничего не хардкодим** в скриптах.
 - Живёт в корне, в `.gitignore` (покрыт `.env.*` + `*.local`). Committed только `.env.local.example`
-  (плейсхолдеры + откуда брать). В авто-backup'ы не уезжает — копия у оператора (Vaultwarden).
+  (плейсхолдеры + откуда брать). В авто-backup'ы не уезжает — копию держит оператор.
 - **Формат:** dotenv, `KEY=value` на строку. Парсится `grep`'ом, **не** `source`'ом — без
   многострочных значений, `$`-подстановок, inline-команд.
 
@@ -37,8 +37,9 @@ runtime-секреты приложения и **не** серверный `.env
   `.env.local` и использует значение внутри bash-процесса — в stdout/transcript оно не попадает.
 - ❌ **`Read`/`cat`/echo ради значения креда — необратимая утечка** в transcript: придётся
   ротировать. Нужен токен — зови tool, не вытаскивай значение в чат.
-- ❌ Эхоить deploy-key, registry-PAT, токены при онбординге/bootstrap (skill
-  `bootstrap-vps`): подтверждай факт, не печатай значение.
+- ❌ Эхоить приватный deploy-key, registry-PAT, токены при онбординге/bootstrap (skill
+  `bootstrap-vps`): подтверждай факт, не печатай значение. Pubkey deploy-key — публичный, его
+  регистрируют в Gitea.
 - ❌ Коммитить `.env.local` (gitignore страхует, но `git add -A` цепляет — проверяй `git status`).
 - ❌ Класть сюда долгоживущие runtime-секреты приложения (их место — серверный `.env`) — и не дублировать сюда серверный `.env` целиком.
 
@@ -49,5 +50,5 @@ runtime-секреты приложения и **не** серверный `.env
 | `SSH_HOST` / `SSH_PORT` / `SSH_USER` | `scripts/tools/ssh.sh` (ops-вербы, exec-канал произвольных команд, серверный смок `make status`) | куда ходить; ключ — на машине |
 | `HOST` | `ssh.sh` (override `user@ip`) | разовая сессия на другой хост |
 | `PROJECT_NAME` | `ssh.sh` (`REMOTE_DIR=/opt/<p>-infra`) | имя проекта на VPS |
-| `<NAME>_REPO_PATH` (`STRATEGY_`/`BACKEND_`/`FRONTEND_`/…) | скиллы (init-project/stack-deep-dive/de-template/smartdev) + оркестрация по сиблингам (`CLAUDE.md § Оркестрация`) | путь к sibling-репо `<org>/<name>`; дефолт `../<name>`; **не секрет** (путь, читается grep'ом) |
+| `<NAME>_REPO_PATH` (`STRATEGY_`/`BACKEND_`/`FRONTEND_`/`SITE_`/`MOBILE_`/…) | скиллы (init-project/stack-deep-dive/de-template/smartdev) + оркестрация по сиблингам (`CLAUDE.md § Оркестрация`) | путь к sibling-репо `<org>/<name>`; дефолт `../<name>` (резолв — `docs/reference/ecosystem.md`); **не секрет** (путь, читается grep'ом) |
 | `<TOKEN>` | по мере необходимости | токены, присланные оператором (registry/API/…) |

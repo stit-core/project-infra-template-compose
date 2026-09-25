@@ -97,7 +97,7 @@ restore-pg: ## restore postgres из restic: make restore-pg SNAPSHOT=latest
 	else bash scripts/tools/ssh.sh exec make restore-pg SNAPSHOT=$(SNAPSHOT); fi
 
 ##@ INTEL
-# Оркестратор cockpit-сводки: локальный status.sh (git/roadmap/fragments, pure-local)
+# Оркестратор cockpit-сводки: локальный status.sh (git/планы/fragments, pure-local)
 # + секция == Server == (серверный смок). Server по тому же .env-sentinel, что OPS:
 # есть .env (на VPS) → smoke-run.sh локально; нет → ssh.sh smoke на VPS (недоступен
 # → SKIP). status.sh docker/SSH не трогает — композит здесь. Финальный OK печатает таргет.
@@ -122,7 +122,7 @@ setup: ## git-хуки (commit-msg, pre-commit) + dev-deps (PyYAML для frontm
 	bash scripts/setup.sh
 
 ##@ META
-plan-check: ## Валидатор структуры единого плана .claude/plans/roadmap.md (A=<file> override)
+plan-check: ## Формат планов .claude/plans/ (A=<файл> — один файл, A=--summary — сводка)
 	@bash scripts/tools/validate-plan.sh $(A)
 
 project-check: ## Валидатор инфра-слоя docs/project/ (stack + service-doc'и; A=<path> override)

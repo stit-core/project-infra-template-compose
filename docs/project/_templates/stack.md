@@ -27,11 +27,11 @@ cross-repo.
 
 ## Domains
 <Корневой `DOMAIN` и сабдомены: какие сервисы публичны и под какими именами
-(`api.${DOMAIN}`, `s3.${DOMAIN}`, `minio.${DOMAIN}`). LE-сертификаты (acme_email/caserver из meta).>
+(`api.${DOMAIN}`, `s3.${DOMAIN}`, `minio.${DOMAIN}`). LE-сертификаты (`ACME_EMAIL`/`ACME_CASERVER` — в `.env` на VPS).>
 
 ## Edge
-<Traefik v3 + CrowdSec: какие middleware на public-роутах, нужен ли source-IP whitelist
-(egress IP этого VPS — corp-side, см. crowdsec-whitelist). Rate-limit / особые роутеры.>
+<Traefik v3 + CrowdSec: какие middleware на public-роутах (`crowdsec@file`, `secure-headers@file`,
+`rate-limit@file` или кастомные). Rate-limit / особые роутеры.>
 
 ## Networks
 <Сети docker: `proxy` (наружу через traefik), `backend-net` (internal). Кастомные имена для
@@ -54,6 +54,5 @@ crond, retention. `N/A` если storage-профиль не включён.>
 - COMPOSE_PROFILES — выводится из Service map выше (subtype + hosting)
 - configs/traefik/dynamic/* — клиент-специфичные routers/middlewares
 - DOMAIN в .env.example
-- crowdsec source-IP next-step (egress IP передать оператору корп-инфры для whitelist)
-- acme_email/caserver — meta KV next-step
+- ACME next-step: ACME_EMAIL/ACME_CASERVER в .env на VPS
 - для external-строк карты: cross-repo next-step (форкни <repo>)>
