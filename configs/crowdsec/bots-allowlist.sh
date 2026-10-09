@@ -90,6 +90,9 @@ get() { # <адрес> <файл>
     exec timeout "$FETCH_SEC" wget -q -S -T 15 -U 'Mozilla/5.0 (compatible; edge-bots-allowlist)' -O "$2" "$1" ) 2> "$2.hdr" &
   wait $! 2>/dev/null
 }
+# Сертификат источника сверяет помощник ssl_client: без него wget busybox идёт по https,
+# не проверяя сертификат.
+command -v ssl_client >/dev/null || { say "в образе нет ssl_client: сертификат источника не проверить — allowlist не меняется"; exit 1; }
 
 version=$(sed -n '1s/^# crawlers\.yaml sha256:\([0-9a-f]\{12\}\)[0-9a-f]\{52\}$/\1/p' "$SRC" 2>/dev/null)
 [ -n "$version" ] || { say "нет списка источников или его первая строка — не версия реестра: $SRC (make bots-sources)"; exit 1; }
