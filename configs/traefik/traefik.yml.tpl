@@ -31,6 +31,11 @@ providers:
     endpoint: "unix:///var/run/docker.sock"
     exposedByDefault: false
     network: proxy
+    # Контейнер без здоровья — неудачная выкатка, unhealthy — оставляет свои роутеры с
+    # пустым сервисом: его адреса отвечают 5xx (503; первые секунды, до пробы сервиса, —
+    # 500), а не роутером ниже приоритетом — заглушка отдала бы на корне свою страницу с
+    # кодом 200.
+    allowEmptyServices: true
   file:
     directory: /etc/traefik/dynamic
     watch: true
@@ -56,9 +61,19 @@ experimental:
       version: "v1.4.4"
 
 log:
+  # Не тише INFO: по строке «Plugins loaded» make deploy сверяет загрузку плагина bouncer.
   level: INFO
 
+# Журнал доступа — файл в каталоге хоста (compose/traefik.yml): его читают CrowdSec
+# (configs/crowdsec/acquis.yaml) и отчёт «бот × статус». Пишется каждый ответ: сценарии
+# обхода CrowdSec считают и 2xx. User-Agent — иначе ботов в журнале не видно;
+# X-Request-Id сшивает запись со строкой лога сервиса. Ротация — расписание стека
+# (configs/crowdsec/crontab).
 accessLog:
+  filePath: /var/log/traefik/access.log
   format: json
-  filters:
-    statusCodes: ["400-599"]
+  fields:
+    headers:
+      names:
+        User-Agent: keep
+        X-Request-Id: keep
