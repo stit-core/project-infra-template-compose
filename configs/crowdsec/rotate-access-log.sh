@@ -24,12 +24,15 @@ flock -n 9 || exit 0
 [ -f "$log" ] || exit 0
 [ "$(stat -c %s "$log")" -ge "$min" ] || exit 0
 
+# Копия — раньше сдвига прежних: когда она не удалась (нет места), целы и активный файл, и
+# накопленные копии.
+cp "$log" "$log.new" || { rm -f "$log.new"; echo "rotate-access-log: копия не удалась — журнал и копии не тронуты"; exit 1; }
+: > "$log"
 i=$keep
 while [ "$i" -gt 1 ]; do
   if [ -f "$log.$((i - 1)).gz" ]; then mv -f "$log.$((i - 1)).gz" "$log.$i.gz"; fi
   i=$((i - 1))
 done
-cp "$log" "$log.1"
-: > "$log"
+mv -f "$log.new" "$log.1"
 gzip -f "$log.1"
 echo "rotate-access-log: access.log.1.gz — $(stat -c %s "$log.1.gz") байт"
