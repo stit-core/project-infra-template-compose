@@ -7,8 +7,9 @@
 #   FAIL: <чек>   — есть hard-фейл, exit 1
 #
 # FAIL только на том, что точно ломает стек И actionable здесь (compose
-# config invalid, .env без identity, замок не-прод среды, который basicAuth
-# не разберёт, Docker Engine старше 25 при профиле site). DNS — WARN (traefik сам ретрайнет ACME, см. preflight-dns.sh).
+# config invalid, .env без identity, строка .env не той формы, замок не-прод
+# среды, с которым не войти, Docker Engine старше 25 при профиле site).
+# DNS — WARN (traefik сам ретрайнет ACME, см. preflight-dns.sh).
 # Поэтому на чистом лаптоп-чекауте (нет .env/docker) doctor = OK (всё SKIP) —
 # make check остаётся зелёным.
 #
@@ -37,6 +38,13 @@ st() {
 }
 
 echo "== doctor =="
+
+# .env preflight считается раньше проверок, которые читают .env шеллом и compose: на
+# строке не той формы они сами печатают её кусок — хеш, пароль. Такие проверки при
+# отказе preflight пропускаются.
+env_rc=0; env_cap=""
+if [ -f .env ]; then env_cap=$(bash scripts/preflight-env.sh 2>&1); env_rc=$?; fi
+env_skip=".env не читается — см. .env preflight"
 
 # 1. Docker Engine — ключу healthcheck.start_interval (compose/site.yml) нужен Engine ≥ 25:
 #    на старом движке такой контейнер не создаётся, а плагин compose тех лет не
@@ -73,6 +81,8 @@ if ! command -v docker >/dev/null 2>&1; then
   st "compose config" SKIP "docker недоступен"
 elif [ ! -f .env ]; then
   st "compose config" SKIP "нет .env"
+elif [ "$env_rc" -ne 0 ]; then
+  st "compose config" SKIP "$env_skip"
 else
   args=(-f docker-compose.yml)
   for f in compose/*.yml; do [ -f "$f" ] && args+=(-f "$f"); done
@@ -88,6 +98,8 @@ fi
 # 3. .env identity — без неё интерполяция compose и ACME-рендер не работают
 if [ ! -f .env ]; then
   st ".env identity" SKIP "нет .env (pre-bootstrap)"
+elif [ "$env_rc" -ne 0 ]; then
+  st ".env identity" SKIP "$env_skip"
 else
   # shellcheck disable=SC1091
   miss=$(. ./.env; for k in PROJECT_NAME ENV DOMAIN ACME_EMAIL; do
@@ -99,17 +111,16 @@ else
   fi
 fi
 
-# 4. .env preflight — замок не-прод среды и пара её контуров; тот же скрипт
-#    останавливает make render и make deploy
+# 4. .env preflight — форма строк, замок не-прод среды и пара её контуров; тот же
+#    скрипт останавливает make render, make deploy и ops-вербы
 if [ ! -f .env ]; then
   st ".env preflight" SKIP "нет .env"
 else
-  cap=$(bash scripts/preflight-env.sh 2>&1); rc=$?
-  note=$(printf '%s\n' "$cap" | sed -n 's/^ENV-[A-Z]*: //p' | head -n 1)
-  if [ "$rc" -ne 0 ]; then
-    st ".env preflight" FAIL "${note:-scripts/preflight-env.sh: код $rc}" "$cap"
+  note=$(printf '%s\n' "$env_cap" | sed -n 's/^ENV-[A-Z]*: //p' | head -n 1)
+  if [ "$env_rc" -ne 0 ]; then
+    st ".env preflight" FAIL "${note:-scripts/preflight-env.sh: код $env_rc}" "$env_cap"
   elif [ -n "$note" ]; then
-    st ".env preflight" WARN "$note" "$cap"
+    st ".env preflight" WARN "$note" "$env_cap"
   else
     st ".env preflight" PASS
   fi
@@ -127,6 +138,8 @@ fi
 # 6. DNS preflight (LE HTTP-01) — advisory, self-skip без .env
 if [ ! -f .env ]; then
   st "dns" SKIP "нет .env"
+elif [ "$env_rc" -ne 0 ]; then
+  st "dns" SKIP "$env_skip"
 else
   cap=$(bash scripts/preflight-dns.sh 2>&1 || true)
   if echo "$cap" | grep -q 'DNS-WARN'; then

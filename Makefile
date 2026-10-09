@@ -1,4 +1,4 @@
-.PHONY: help validate doctor check ship deploy render ps logs restart recreate build bump backup restore-pg status search new-env setup plan-check project-check
+.PHONY: help validate doctor check ship deploy render env-form ps logs restart recreate build bump backup restore-pg status search new-env setup plan-check project-check
 
 SHELL := /usr/bin/env bash
 
@@ -50,6 +50,13 @@ render: ## envsubst для configs/**/*.tpl из .env
 # Ops-вербы выполняются НА VPS. Sentinel — наличие `.env` (живёт только на сервере):
 # есть .env → локальный docker; нет → проксируем через scripts/tools/ssh.sh на VPS.
 # Connection для ssh.sh — из .env.local (см. .claude/rules/{make-first,env-local}.md).
+#
+# Форма .env проверяется раньше, чем его прочтут compose и шелл скрипта: на строке не той
+# формы они сами печатают её кусок — хеш замка, пароль. Без .env проверять нечего.
+ps logs restart recreate build bump restore-pg: env-form
+env-form:
+	@bash scripts/preflight-env.sh form
+
 ps: ## статус сервисов (на VPS; с workstation — через ssh)
 	@if [ -f .env ]; then docker compose $(COMPOSE_ARGS) ps; \
 	else bash scripts/tools/ssh.sh exec make ps; fi

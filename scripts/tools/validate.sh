@@ -27,11 +27,20 @@ rec() {
   fi
 }
 
+# Форма .env — раньше, чем его прочтут compose и шелл: на строке не той формы они сами
+# печатают её кусок — хеш, пароль.
+env_err=""
+if [ -f .env ] && ! env_cap=$(bash scripts/preflight-env.sh form 2>&1); then
+  env_err=$(printf '%s\n' "$env_cap" | sed -n 's/^ENV-ERR: //p' | head -n 1)
+fi
+
 # 1. compose syntax
 if ! command -v docker >/dev/null; then
   rec "compose syntax" SKIP "docker не установлен" "docker не установлен — пропускаем"
 elif [ ! -f .env ]; then
   rec "compose syntax" SKIP "нет .env" ".env отсутствует — для подстановок нужен реальный .env"
+elif [ -n "$env_err" ]; then
+  rec "compose syntax" FAIL "$env_err" "$env_cap"
 else
   args=(-f docker-compose.yml)
   for f in compose/*.yml; do [ -f "$f" ] && args+=(-f "$f"); done
@@ -62,7 +71,8 @@ tpls=(configs/**/*.tpl)
 if [ ${#tpls[@]} -eq 0 ]; then
   rec ".tpl render" SKIP "нет .tpl" ".tpl-файлов нет"
 else
-  set -a; [ -f .env ] && . ./.env; set +a
+  # shellcheck disable=SC1091
+  set -a; [ -f .env ] && [ -z "$env_err" ] && . ./.env; set +a
   bad=(); lines=""
   for tpl in "${tpls[@]}"; do
     if envsubst < "$tpl" >/dev/null 2>&1; then
