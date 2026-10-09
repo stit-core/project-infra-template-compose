@@ -44,17 +44,15 @@ blocked-by: —
   `ROLE_FILES[edge]` и в DNS-preflight сайта нет; смок — `10-host`, `20-containers`; проза: корень — заглушка, `site`
   добавляет `/add-service`, `<org>/site` читает `fsd/<surface>/`. `compose syntax` без `.env` — SKIP.
 - **Факты, снятые при планировании** (пробы на образах машины, без проброса портов; контейнеры проб убраны):
-  - Traefik `v3.6.16`: действующий `middlewares.yml.tpl` с `sslRedirect` загружается (опция мёртвая, не фатальная);
-    middleware и четыре роутера § 1.1–1.3 разбираются; лимит частоты отвечает 429; `User-Agent: keep` даёт ключ
-    `request_User-Agent`; ответ 401 от `basicAuth` несёт `X-Robots-Tag`, только когда `staging-noindex` стоит в
-    цепочке перед `staging-auth`.
+  - Traefik `v3.6.16`: четыре роутера § 1.1 разбираются; `User-Agent: keep` даёт ключ `request_User-Agent`; на HEAD
+    `compress` не работает — сжатие проверяется на GET.
   - CrowdSec `v1.7.7` (Alpine 3.21, entrypoint `/bin/bash /docker_start.sh`): в образе есть `crond`, `wget`, `yq`,
     `flock`, нет `curl` и `jq`; `cscli allowlists` — `create`, `add` (сети, срок `-e`, комментарий `-d`), `remove`,
     `inspect`, `check`, правится только на LAPI; постоверфлоу ставит `POSTOVERFLOWS`. Парсер `traefik-logs` берёт
     `ClientHost`, `DownstreamStatus`, `RequestPath`, `RequestHost`, `request_User-Agent`; `http-crawl-non_statics` —
     40 разных не-статических путей при утечке 0,5 с, статус не смотрит; `http-bad-user-agent` — два запроса за
     минуту, в его списке `CCBot`; частные адреса (сеть docker) до сценариев не доходят (`crowdsecurity/whitelists`).
-  - Плагин bouncer `v1.4.4`: `remediationStatusCode` (умолчание 403); режим `live` держит вердикт в кеше до 60 с.
+  - Плагин bouncer `v1.4.4`, режим `live`: вердикт — и «чист», и «бан» — живёт в кеше до 60 с.
   - Compose: обязательная переменная (`${VAR:?…}`) у сервиса с выключенным профилем роняет `docker compose config`
     всего стека — ключи сайта остаются с умолчаниями.
   - Реестр: печать § 1.5 — 25 строк; 20 с `ip_list_url` (18 разных адресов, `claude.com/crawling/bots.json` — общий
@@ -102,9 +100,9 @@ blocked-by: —
   includeSubDomains`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`,
   `Permissions-Policy: camera=(), microphone=(), geolocation=()`; от приложения — `Content-Security-Policy` с
   `frame-ancestors 'none'`; `X-Frame-Options` и `X-XSS-Protection` не ставит никто; HTML сжат. Состав общий — те же
-  заголовки edge у ответа заглушки. Проверка: на стенде `scurl -I -H 'Accept-Encoding: br' https://p7.test/` → пять
-  заголовков и `content-encoding: br`, двух лишних нет; `scurl -o /dev/null -D - -X POST https://p7.test/` (отвечает
-  заглушка) → четыре заголовка edge
+  заголовки edge у ответа заглушки. Проверка: на стенде `scurl -o /dev/null -D - -H 'Accept-Encoding: br'
+  https://p7.test/` → пять заголовков и `content-encoding: br`, двух лишних нет; `scurl -o /dev/null -D - -X POST
+  https://p7.test/` (отвечает заглушка) → четыре заголовка edge
 - [ ] **AC4** — Избыточный трафик получает 429, а не 403: серия POST на `/api/contact` упирается в лимит формы, и
   заявка сверх лимита до процесса не доходит; тело формы больше 64 КиБ без `Content-Length` — 413 от edge; отказ WAF
   (решение CrowdSec о бане) — тоже 429; у лимитов нет `sourceCriterion`, в цепочке формы нет `retry` и `compress`.
@@ -169,13 +167,18 @@ blocked-by: —
     HEAD `R` `1c49139`. Свежий стенд `d8458e3`: первый `make deploy` — код 0, три сервиса healthy, `compose syntax
     PASS`; `make bump SVC=site` — `no such service`, код 2; источников acquisition — 0; у заглушки `x-xss-protection:
     1; mode=block`, `Permissions-Policy` нет; после `down` контейнеров `p7-` нет; `make plan-check` — OK
-- [ ] **S2** — Middleware edge — по § 1.3: `secure-headers` в составе списка (без XSS-фильтра и `sslRedirect`, с
+- [x] **S2** — Middleware edge — по § 1.3: `secure-headers` в составе списка (без XSS-фильтра и `sslRedirect`, с
   `Permissions-Policy`), `compress`, `www-to-apex`, `form-rate-limit`, `form-body-limit`, `retry`, `deny-all`, контур
   staging (`staging-noindex` перед `staging-auth`; файл замка рендерится из `.env` и не попадает в git), отказ WAF —
   429
   - Проверка: на стенде `make deploy` → лог Traefik без ошибок конфигурации; `scurl -I https://p7.test/` (заглушка)
     → четыре заголовка edge, `X-XSS-Protection` нет; решение `cscli decisions add` на адрес клиента → 429;
     `make validate` → OK · Закрывает: AC3, AC4, AC5 · Зависит от: S1
+  - Сделано: `middlewares.yml.tpl` — состав § 1.3, `staging.htpasswd.tpl`, `.gitignore`, `STAGING_BASIC_AUTH_USERS` в
+    `.env.example`, таблица правила `traefik-routing`. Стенд (`M/p7/s2-check.{sh,log}`): деплой рестартует Traefik,
+    ошибок конфигурации 0; у заглушки 4 из 4 заголовков edge, лишних 0; решение на адрес клиента → 429, после
+    `decisions delete` → 200; проба каждого middleware на роутерах стенда — `br` и `gzip`, 301 на apex, 403, 413,
+    пять ответов и 429, 401 с `X-Robots-Tag`; файл замка равен строке `htpasswd`, в `git status` его нет
 - [ ] **S3** — Сервис `site` в стеке и выкатка: `compose/site.yml` по § 1.1 (профиль `site`; роутеры `site`,
   `site-form`, `site-image`, `site-www`; healthcheck контейнера и сервиса Traefik), секция `profile site` в
   `.env.example` и подсказки `make new-env`, `site` в роли `edge`, `www` в DNS-preflight, `make bump` ждёт healthy
@@ -243,6 +246,12 @@ blocked-by: —
   нет». Защита не слабее: запрос так же не доходит до сервиса.
 - Порядок контура staging — `staging-noindex`, затем `staging-auth`: иначе ответ 401 уходит без `X-Robots-Tag`
   (факт Traefik `v3.6.16`). Значение переменной — `,staging-noindex@file,staging-auth@file`.
+- Смена пароля замка staging — `make deploy` и `make restart SVC=traefik`: `usersFile` Traefik читает при сборке
+  цепочки, а перерендер одного файла замка конфигурацию не меняет (стенд: старый пароль жив до рестарта). Строка — в
+  `.env.example`; в правило `secrets-and-env` — S9. Формат хеша — bcrypt как самый стойкий: `$apr1$…` envsubst не
+  портит (подставленное значение он не разбирает), ловушка значения одна — кавычки в `.env` (Р15 покрытия).
+- Отказ тела формы сверх лимита Traefik пишет в свой лог уровнем `ERR` (`vulcand/oxy/buffer`) — это ответ 413
+  клиенту, а не ошибка конфигурации: проверка «лог без ошибок» (AC11) такие строки не считает.
 - Политику сайта задание allowlist читает с `robots.txt` сервиса напрямую (`site:3000`), не через публичный адрес:
   на не-прод тот отвечает 401, на стенде домена нет. Нет сервиса `site` или ответа — allowlist не меняется.
 - Список источников — файл хаба из печати контракта, а не копия реестра: пересборка — команда хаба, вызывающая
@@ -279,6 +288,6 @@ blocked-by: —
   `.gitignore`; `deploy.sh` глотает отказ `git pull --ff-only`.
 
 ## Где мы сейчас
-Этап A: S1 закрыт — план в репо, хуки стоят, стенд `M/p7/stand.sh` поднимается с нуля за полминуты, исходная картина
-на `d8458e3` — в `M/p7/baseline.log`. Следующий шаг — S2: middleware edge по § 1.3 в `middlewares.yml.tpl`, файл замка
-staging, отказ WAF с кодом 429; проверка — на стенде с рабочим деревом (`sync`, `make deploy`).
+Этап A: S1 и S2 закрыты — edge несёт состав middleware § 1.3, отказ WAF — 429, контур staging собран и проверен на
+роутерах пробы стенда. Следующий шаг — S3: `compose/site.yml` с четырьмя роутерами, секция `profile site`, роль
+`edge`, `www` в DNS-preflight, `make bump` ждёт healthy; им подтверждаются AC1 и, на сайте, AC3–AC5.

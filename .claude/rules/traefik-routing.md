@@ -27,9 +27,15 @@ paths:
 
 | Chain | Назначение | Кто |
 |---|---|---|
-| `crowdsec@file` | WAF / IP-ban | **Все** публичные роуты |
-| `secure-headers@file` | HSTS, nosniff, XSS-filter, referrer-policy | Публичные HTTP-роуты сервисов (backend, landing) — label'ом роутера |
+| `crowdsec@file` | WAF / IP-ban; отказ — 429, как у лимита частоты | **Все** публичные роуты |
+| `secure-headers@file` | HSTS, nosniff, `Referrer-Policy`, `Permissions-Policy` (камера, микрофон и геолокация закрыты); состав общий для всех публичных роутов | Публичные HTTP-роуты сервисов (backend, landing) — label'ом роутера |
 | `rate-limit@file` | Rate limit | Любой публичный POST/API |
+| `compress@file` | Сжатие `br` / `gzip` | Роуты, отдающие HTML |
+| `form-rate-limit@file`, `form-body-limit@file` | Лимит частоты и тела публичной формы | Роут публичного POST формы |
+| `retry@file` | Повтор запроса при гонке пересоздания сервиса | Только идемпотентные роуты (GET / HEAD) |
+| `www-to-apex@file` | `www.${DOMAIN}` → `${DOMAIN}` одним 301 | Роут `www` |
+| `deny-all@file` | 403 на edge, до сервиса | Путь без внешнего доступа |
+| `staging-noindex@file`, `staging-auth@file` | Не-прод контур: `X-Robots-Tag` и basicAuth — парой и в этом порядке | Роуты не-прод среды |
 
 **Правило:**
 - Любой публичный сервис → минимум `crowdsec@file`.

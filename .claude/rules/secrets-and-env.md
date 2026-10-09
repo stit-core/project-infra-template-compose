@@ -109,7 +109,7 @@ identity + ACME из `.env`, других секретов не требует.
 - Inline-секретов в `compose/*.yml` (значения вида `password: actual_secret` —
   должно быть `${VAR}` с декларацией в `.env.example`)
 - Rendered-файлов из `.tpl` (gitignored: `configs/traefik/traefik.yml`,
-  `configs/traefik/dynamic/middlewares.yml`)
+  `configs/traefik/dynamic/middlewares.yml`, `configs/traefik/dynamic/staging.htpasswd`)
 
 `.gitignore` страхует от типовых имён; `git diff --cached` ловит остальное.
 
