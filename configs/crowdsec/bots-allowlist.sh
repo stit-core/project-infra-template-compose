@@ -14,11 +14,12 @@
 # allowlist с таким именем, которого нет среди нужных, удаляется.
 #
 # Ответ вендора — недоверенные данные. Из него берутся только строковые значения ключей
-# ipv4Prefix, ipv6Prefix, ip_prefix и ipv6_prefix, записанные адресом или сетью; сеть шире
-# /16 (IPv4) или /32 (IPv6) отвергается — чужой ответ не открывает edge. Ничего из ответа
-# не исполняется: значения проходят фильтр знаков и уходят в файл для cscli.
+# ipv4Prefix, ipv6Prefix, ip_prefix и ipv6_prefix, записанные адресом или сетью; ничего
+# из ответа не исполняется. Список принимается целиком или не принимается вовсе: в нём
+# только публичные адреса, а число сетей и их суммарный охват — в пределах MAX_* ниже.
+# Тот, кто отвечает за вендора, вносит в allowlist свои сети — в этих пределах, не шире.
 #
-# Источник не ответил или не дал ни одной сети — прежний allowlist бота остаётся. Записи
+# Источник не ответил или его список не принят — прежний allowlist бота остаётся. Записи
 # живут 21 день: сети источника, который перестал отвечать совсем, уходят сами. Сервис
 # site не ответил — allowlist не меняется вовсе.
 #
@@ -31,9 +32,13 @@ ROBOTS=http://site:3000/robots.txt
 PREFIX=bot-
 TTL=504h
 REFRESH=518400
-V4_MIN=16
-V6_MIN=32
 MAX_BYTES=2097152
+# Пределы списка одного вендора. У списков реестра — до 1292 сетей, 36 496 адресов IPv4
+# (самая широкая сеть — /17) и 256 сетей /64 IPv6 (одна /56). Число сетей — с запасом
+# втрое, охват IPv4 — всемеро (четыре сети /16), охват IPv6 — одна сеть /48.
+MAX_NETS=4096
+MAX_V4=262144
+MAX_V6=65536
 mode=${1:-all}
 
 say() { echo "bots-allowlist: $*"; }
@@ -106,39 +111,63 @@ while read -r url; do
 done < "$tmp/urls"
 wait
 
-# Сети из ответа: только значения известных ключей, только адрес или сеть, не шире порога.
-networks() { # <файл ответа> <файл сетей> <файл отвергнутых>
+# Сети из ответа: значения известных ключей в форме адреса или сети. Причина, по которой
+# список не принят, — в файле причины.
+networks() { # <файл ответа> <файл сетей> <файл причины>
+  : > "$2"; : > "$3"
   [ -s "$1" ] || return 1
   grep -oE '"(ipv4Prefix|ipv6Prefix|ip_prefix|ipv6_prefix)"[[:space:]]*:[[:space:]]*"[0-9A-Fa-f:./]{2,49}"' "$1" |
     sed -E 's/.*"([^"]*)"$/\1/' |
-    awk -v v4="$V4_MIN" -v v6="$V6_MIN" -v wide="$3" '
+    awk -v max="$MAX_NETS" -v max4="$MAX_V4" -v max6="$MAX_V6" -v why="$3" '
+      function num(a,   o) { split(a, o, "."); return ((o[1] * 256 + o[2]) * 256 + o[3]) * 256 + o[4] }
+      BEGIN {
+        # Не адреса клиентов из сети: «эта сеть», частные, CGNAT, loopback, link-local,
+        # multicast и резерв. Сети для документации (192.0.2.0/24, 198.51.100.0/24,
+        # 203.0.113.0/24, 2001:db8::/32) проходят: трафика из сети с них нет, а
+        # проверять задание больше не на чем.
+        nr = split("0.0.0.0/8 10.0.0.0/8 100.64.0.0/10 127.0.0.0/8 169.254.0.0/16 172.16.0.0/12 192.168.0.0/16 224.0.0.0/3", r, " ")
+        for (i = 1; i <= nr; i++) { split(r[i], q, "/"); ra[i] = num(q[1]); rl[i] = q[2] + 0 } }
       { n = split($0, p, "/"); if (n > 2 || (n == 2 && p[2] !~ /^[0-9]+$/)) next
-        addr = p[1]
+        addr = tolower(p[1]); spec = 0
         if (addr ~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/) {
-          split(addr, o, "."); ok = 1
-          for (i = 1; i <= 4; i++) if (length(o[i]) > 3 || o[i] + 0 > 255) ok = 0
-          len = (n == 2) ? p[2] + 0 : 32
-          if (!ok || len > 32) next
-          if (len < v4) { print $0 >> wide; next }
-          print addr "/" len
-        } else if (addr ~ /^[0-9A-Fa-f:]+$/ && addr ~ /:/) {
+          split(addr, o, "."); len = (n == 2) ? p[2] + 0 : 32
+          for (i = 1; i <= 4; i++) if (o[i] !~ /^(0|[1-9][0-9]?[0-9]?)$/ || o[i] + 0 > 255) next
+          if (len > 32) next
+          net = addr "/" len; if (net in seen) next
+          a = num(addr)
+          # Сеть задевает особую, когда у них совпадают первые min(длин) бит.
+          for (i = 1; i <= nr && !spec; i++) { m = (len < rl[i]) ? len : rl[i]; d = 2 ^ (32 - m); spec = (int(a / d) == int(ra[i] / d)) }
+          n4++; c4 += 2 ^ (32 - len); if (n4 == 1 || len < l4) { l4 = len; w4 = net }
+        } else if (addr ~ /^[0-9a-f:]+$/ && addr ~ /:/) {
           len = (n == 2) ? p[2] + 0 : 128
           if (len > 128) next
-          if (len < v6) { print $0 >> wide; next }
-          print tolower(addr) "/" len
-        } }' | sort -u > "$2"
+          net = addr "/" len; if (net in seen) next
+          # Адрес клиента IPv6 — глобальный, 2000::/3; охват считается сетями /64.
+          spec = (addr !~ /^[23][0-9a-f][0-9a-f][0-9a-f]:/ || len < 3)
+          n6++; c6 += (len < 64) ? 2 ^ (64 - len) : 1; if (n6 == 1 || len < l6) { l6 = len; w6 = net }
+        } else next
+        seen[net] = 1; out[++k] = net
+        if (spec && ++nspec <= 5) specs = specs " " net }
+      END {
+        if (nspec) msg = sprintf("сети не из публичных адресов (%d):%s", nspec, specs)
+        else if (n4 > max) msg = sprintf("сетей IPv4 — %d, предел — %d", n4, max)
+        else if (n6 > max) msg = sprintf("сетей IPv6 — %d, предел — %d", n6, max)
+        else if (c4 > max4) msg = sprintf("охват IPv4 — %.0f адресов, предел — %d; самая широкая сеть — %s", c4, max4, w4)
+        else if (c6 > max6) msg = sprintf("охват IPv6 — %.0f сетей /64, предел — %d; самая широкая сеть — %s", c6, max6, w6)
+        if (msg != "") { print msg > why; exit }
+        for (i = 1; i <= k; i++) print out[i] }' | sort -u > "$2"
   [ -s "$2" ]
 }
 
 updated=0; failed=0
 while read -r token url; do
   i=$(awk -v u="$url" '$2 == u { print $1 }' "$tmp/index"); name=$PREFIX$token
-  : > "$tmp/wide"
-  if ! networks "$tmp/r$i" "$tmp/nets" "$tmp/wide"; then
-    say "WARN $token: источник не ответил или не дал ни одной сети ($url) — прежний allowlist оставлен"
+  if ! networks "$tmp/r$i" "$tmp/nets" "$tmp/why"; then
+    if [ -s "$tmp/why" ]; then why="список не принят — $(cat "$tmp/why")"
+    else why="источник не ответил или не дал ни одной сети"; fi
+    say "WARN $token: $why ($url) — прежний allowlist оставлен"
     failed=$((failed + 1)); continue
   fi
-  [ ! -s "$tmp/wide" ] || { say "WARN $token: сети шире порога отвергнуты — $(tr '\n' ' ' < "$tmp/wide")($url)"; failed=$((failed + 1)); }
   { echo "value,expiration,comment"; sed "s/\$/,$TTL,/" "$tmp/nets"; } > "$tmp/nets.csv"
   cscli allowlists delete "$name" >/dev/null 2>&1
   if cscli allowlists create "$name" -d "$url" >/dev/null 2>&1 && cscli allowlists import "$name" -i "$tmp/nets.csv" >/dev/null 2>&1; then
