@@ -36,7 +36,7 @@ paths:
 - `mem_limit` для прожорливых.
 - `read_only: true` + `tmpfs: ["/tmp"]` для всего что не пишет в `/data`.
 - `depends_on` с `condition: service_healthy`.
-- `healthcheck.start_interval` — частая проба на старте (Traefik строит роутеры контейнера после первой удачной). Ключу нужен Docker Engine ≥ 25: на старом движке compose не создаёт контейнер, а плагин compose старше v2.20 не разбирает сам файл — тогда падает любой верб. Версию называет `make doctor` (`docker engine`).
+- `healthcheck.start_interval` — частая проба на старте (Traefik строит роутеры контейнера после первой удачной). Ключу нужен Docker Engine ≥ 25: на старом движке compose не создаёт контейнер, а плагин compose до v2.20.2 не разбирает сам файл — тогда падает любой верб. Версию называет `make doctor` (`docker engine`).
 
 ## Секреты сервиса
 

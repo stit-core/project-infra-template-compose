@@ -130,7 +130,7 @@ Backup, который ни разу не тестировался, не раб�
 
 ## Docker Engine старше 25
 
-**Симптом:** `make deploy` / `make bump SVC=site` не создаёт контейнер `site` — compose отвергает `healthcheck.start_interval` (`compose/site.yml`); с плагином compose старше v2.20 не разбирается сам файл, и падает любой верб, даже без профиля `site`.
+**Симптом:** `make deploy` / `make bump SVC=site` не создаёт контейнер `site` — compose отвергает `healthcheck.start_interval` (`compose/site.yml`); плагин compose до v2.20.2 не разбирает сам файл, и падает любой верб, даже без профиля `site`.
 
 `make doctor` называет версию строкой `docker engine`: FAIL при профиле `site`, иначе WARN. Роль `ansible/roles/docker` ставит свежий движок на новый VPS и не обновляет уже установленный — на действующем VPS:
 
