@@ -20,7 +20,8 @@
 # только публичные адреса, а число сетей и их суммарный охват — в пределах MAX_* ниже.
 # Тот, кто отвечает за вендора, вносит в allowlist свои сети — в этих пределах, не шире.
 # Редирект источника принимается только по https: его назначает сам вендор в ответе,
-# подлинность которого держит TLS, — список по http в allowlist не попадает.
+# подлинность которого держит TLS, — список по http в allowlist не попадает. Список,
+# взятый с другого хоста, итоговая строка называет: адрес в реестре сайта пора сменить.
 #
 # Источник не ответил, не уложился в срок или его список не принят — прежний allowlist
 # бота остаётся. Записи живут 21 день: сети источника, который перестал отвечать совсем,
@@ -142,15 +143,20 @@ done < "$tmp/want"
 # адрес, до которого нет маршрута, держит попытку до таймаута. Редиректу wget следует сам:
 # запрос по адресу не по https уходит, ответ не принимается, повтора нет.
 cut -d' ' -f2 "$tmp/todo" | sort -u > "$tmp/urls"
-fetch() { # <адрес> <файл>; причина отказа, если она не «нет ответа», — в <файл>.why
-  n=0
+fetch() { # <адрес> <файл>; причина отказа, если она не «нет ответа», — в <файл>.why,
+          # хост, на который увёл редирект, — в <файл>.via
+  host=${1#https://}; host=${host%%/*}; n=0
   while [ "$n" -lt 4 ]; do
     get "$1" "$2"; rc=$?
     sed -n 's/^ *[Ll][Oo][Cc][Aa][Tt][Ii][Oo][Nn]: *//p' "$2.hdr" | tr -d '\r' > "$2.loc"
+    : > "$2.via"
     while read -r to; do
-      case "$to" in https://*|/*) ;; *)
-        echo "редирект на $(printf '%s' "$to" | tr -cd 'A-Za-z0-9._~:/?#@!&=+%-' | cut -c1-120) — принимается только https" > "$2.why"
-        : > "$2"; return 1 ;;
+      case "$to" in
+        "https://$host/"*|/*) ;;
+        https://*) printf '%s' "$to" | cut -d/ -f3 | tr -cd 'A-Za-z0-9.:-' | cut -c1-80 > "$2.via" ;;
+        *)
+          echo "редирект на $(printf '%s' "$to" | tr -cd 'A-Za-z0-9._~:/?#@!&=+%-' | cut -c1-120) — принимается только https" > "$2.why"
+          : > "$2"; return 1 ;;
       esac
     done < "$2.loc"
     [ "$rc" -eq 0 ] && [ -s "$2" ] && return 0
@@ -213,7 +219,7 @@ networks() { # <файл ответа> <файл сетей> <файл прич�
   [ -s "$2" ]
 }
 
-updated=0; failed=0
+updated=0; failed=0; via=
 while read -r token url; do
   i=$(awk -v u="$url" '$2 == u { print $1 }' "$tmp/index"); name=$PREFIX$token
   if ! networks "$tmp/r$i" "$tmp/nets" "$tmp/why"; then
@@ -227,6 +233,7 @@ while read -r token url; do
   cscli allowlists delete "$name" >/dev/null 2>&1
   if cscli allowlists create "$name" -d "$url" >/dev/null 2>&1 && cscli allowlists import "$name" -i "$tmp/nets.csv" >/dev/null 2>&1; then
     updated=$((updated + 1))
+    [ ! -s "$tmp/r$i.via" ] || via="$via $token → $(cat "$tmp/r$i.via");"
   else
     say "WARN $token: cscli allowlists не принял сети ($(wc -l < "$tmp/nets"))"; failed=$((failed + 1))
   fi
@@ -234,5 +241,6 @@ done < "$tmp/todo"
 
 [ "$odd" -eq 0 ] || { say "WARN строк не той формы в $SRC: $odd — пропущены (make bots-sources)"; failed=$((failed + 1)); }
 total=$(cscli allowlists list -o raw 2>/dev/null | awk -F, -v p="$PREFIX" 'NR > 1 && index($1, p) == 1 { n++; s += $6 } END { print n + 0 " allowlist, " s + 0 " сетей" }')
+[ -z "$via" ] || say "список взят по редиректу на другой хост:${via%;}"
 say "реестр $version — к allowlist ботов: $(wc -l < "$tmp/want"), закрыто robots.txt: $closed, обновлено: $updated, снято: $removed; итого $total"
 [ "$failed" -eq 0 ] || exit 2
