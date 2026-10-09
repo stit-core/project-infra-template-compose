@@ -77,15 +77,27 @@ build: ## пересобрать образ сервиса с build-context (н�
 # (UPPER_SNAKE). Верб правит .env на VPS и пересоздаёт сервис —
 # compose сам подтянет отсутствующий образ (pull policy=missing) — и ждёт
 # healthy: образ, который не поднялся за 90 с, — отказ верба, а не «успех».
-bump: ## бамп image-тега через .env (<SVC>_TAG) + recreate, ждёт healthy: make bump SVC=backend TAG=v1.2.3
+# Отказ не оставляет среду на несостоявшемся теге: прежний тег возвращается
+# в .env (иначе на нём падает следующий make deploy), и сервис поднимается на нём.
+bump: ## бамп image-тега через .env (<SVC>_TAG) + recreate, ждёт healthy; отказ — возврат на прежний тег: make bump SVC=backend TAG=v1.2.3
 	@if [ -z "$(SVC)" ] || [ -z "$(TAG)" ]; then echo 'usage: make bump SVC=<name> TAG=<tag>'; exit 2; fi
 	@if [ -f .env ]; then \
 		var=$$(echo "$(SVC)" | tr '[:lower:]-' '[:upper:]_')_TAG; \
+		old=$$(sed -n "s|^$$var=||p" .env | tail -n 1); \
 		if grep -q "^$$var=" .env; then sed -i "s|^$$var=.*|$$var=$(TAG)|" .env; \
 		elif grep -q "^# $$var=" .env; then sed -i "s|^# $$var=.*|$$var=$(TAG)|" .env; \
 		else printf '%s=%s\n' "$$var" "$(TAG)" >> .env; fi; \
 		echo "→ $$var=$(TAG) (.env)"; \
-		docker compose $(COMPOSE_ARGS) up -d --no-deps --force-recreate --wait --wait-timeout 90 $(SVC); \
+		up="docker compose $(COMPOSE_ARGS) up -d --no-deps --wait --wait-timeout 90"; \
+		$$up --force-recreate $(SVC) && exit 0; \
+		if [ -n "$$old" ] && [ "$$old" != "$(TAG)" ]; then \
+			sed -i "s|^$$var=.*|$$var=$$old|" .env; \
+			echo "✗ $(SVC):$(TAG) не поднялся — $$var=$$old возвращён в .env, сервис поднимается на нём" >&2; \
+			$$up $(SVC) || echo "✗ $(SVC):$$old тоже не поднялся — make ps, make logs SVC=$(SVC)" >&2; \
+		else \
+			echo "✗ $(SVC):$(TAG) не поднялся; прежнего тега нет — $$var=$(TAG) остался в .env" >&2; \
+		fi; \
+		exit 1; \
 	else bash scripts/tools/ssh.sh exec make bump SVC=$(SVC) TAG=$(TAG); fi
 
 backup: ## one-shot backup (на VPS; с workstation — через ssh)

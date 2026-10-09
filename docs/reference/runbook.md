@@ -84,7 +84,7 @@ Backend rollback (image tag):
 make bump SVC=backend TAG=v0.1.0   # с workstation (проксируется на VPS) или на VPS
 ```
 
-`BACKEND_TAG` живёт строго в `.env` на VPS (конвенция `<SVC>_TAG`). `make bump` правит его и делает force-recreate — rollback это тот же bump на старый тег.
+`BACKEND_TAG` живёт строго в `.env` на VPS (конвенция `<SVC>_TAG`). `make bump` правит его и делает force-recreate — rollback это тот же bump на старый тег. Неудавшийся bump откатывается сам: образ не найден или не стал healthy за 90 с — верб возвращает прежний тег в `.env`, поднимает сервис на нём и выходит с ошибкой; у первого тега сервиса прежнего нет — он остаётся в `.env`.
 
 Infra rollback (compose/configs):
 
