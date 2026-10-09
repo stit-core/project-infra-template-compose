@@ -21,6 +21,9 @@ fallback `ansible/inventory.ini`).
 ## Pre-requisites
 
 - Куплены VPS (Debian 12 / Ubuntu 24.04, 2–4 GB RAM, 40+ GB disk) — по одному на env.
+- На VPS — Docker Engine ≥ 25 с плагином compose: новый VPS получает свежий движок на шаге 2; на VPS,
+  поднятом раньше, версию называет `make doctor` (строка `docker engine`), обновление —
+  `docs/reference/runbook.md § Docker Engine старше 25`.
 - Для каждого env опубликован домен с A-записью на IP соответствующего VPS (LE HTTP-01).
   Convention — `<env>.<domain>` или `<env>-<domain>`, но это вне шаблона.
 - Аккаунт в Gitea (`git.stit.tech`) с доступом к `<org>` и PAT для registry.

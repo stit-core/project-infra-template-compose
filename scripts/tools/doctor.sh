@@ -8,7 +8,7 @@
 #
 # FAIL только на том, что точно ломает стек И actionable здесь (compose
 # config invalid, .env без identity, замок не-прод среды, который basicAuth
-# не разберёт). DNS — WARN (traefik сам ретрайнет ACME, см. preflight-dns.sh).
+# не разберёт, Docker Engine старше 25 при профиле site). DNS — WARN (traefik сам ретрайнет ACME, см. preflight-dns.sh).
 # Поэтому на чистом лаптоп-чекауте (нет .env/docker) doctor = OK (всё SKIP) —
 # make check остаётся зелёным.
 #
@@ -37,6 +37,36 @@ st() {
 }
 
 echo "== doctor =="
+
+# 0. Docker Engine — ключу healthcheck.start_interval (compose/site.yml) нужен Engine ≥ 25:
+#    на старом движке такой контейнер не создаётся, а плагин compose тех лет не
+#    разбирает сам файл — тогда красный и compose config ниже.
+if ! command -v docker >/dev/null 2>&1; then
+  st "docker engine" SKIP "docker недоступен"
+elif [ ! -f .env ]; then
+  st "docker engine" SKIP "нет .env"
+else
+  ver=$(docker version --format '{{.Server.Version}}' 2>/dev/null)
+  need=$(grep -lE '^[^#]*start_interval:' compose/*.yml 2>/dev/null | paste -sd' ' -)
+  case "${ver%%.*}" in
+    ''|*[!0-9]*) st "docker engine" SKIP "${ver:+версия не разобрана: }${ver:-docker daemon недоступен}" ;;
+    *)
+      if [ "${ver%%.*}" -ge 25 ] || [ -z "$need" ]; then
+        st "docker engine" PASS "$ver"
+      else
+        # FAIL — сервис с этим ключом уже включён: всегда поднят или его профиль активен
+        # (имя профиля — имя файла); иначе WARN: деплой сломает включение профиля.
+        sev=WARN
+        profiles=",$(sed -nE 's/^COMPOSE_PROFILES=//p' .env | tail -n 1 | tr -d "\"'"),"
+        for f in $need; do
+          p=$(basename "$f" .yml)
+          grep -qE '^[[:space:]]*profiles:' "$f" || sev=FAIL
+          case "$profiles" in *",$p,"*) sev=FAIL ;; esac
+        done
+        st "docker engine" "$sev" "$ver — $need: healthcheck.start_interval требует Engine ≥ 25; обновление — docs/reference/runbook.md"
+      fi ;;
+  esac
+fi
 
 # 1. compose config — синтаксис при реальном .env
 if ! command -v docker >/dev/null 2>&1; then

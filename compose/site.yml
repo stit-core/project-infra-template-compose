@@ -44,6 +44,7 @@ services:
       start_period: 15s
       # Роутеры контейнера в состоянии starting Traefik не строит: при пересоздании
       # запросы уходят мимо сайта до первой удачной пробы — на старте она частая.
+      # Ключу нужен Docker Engine ≥ 25: версию называет make doctor.
       start_interval: 1s
     labels:
       traefik.enable: "true"

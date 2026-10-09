@@ -253,6 +253,8 @@ blocked-by: —
   конфигурации — проверка «лог без ошибок» (AC11) такие строки не считает.
 - Healthcheck `site` — с `start_interval: 1s`: роутеры контейнера в состоянии `starting` docker-провайдер Traefik не
   строит, и при пересоздании ~5 с отвечала заглушка (стало ~2 с — ниже держит `providersThrottleDuration`; Р18).
+  Ключу нужен Docker Engine ≥ 25 (N7): версию называет `make doctor` (FAIL при включённом сервисе с ключом, иначе
+  WARN), что будет на старом движке и как обновить — runbook, `getting-started`, правило `compose-and-services`.
 - Первый разворот: профиль `site` в `.env`, затем `make bump` (ставит `SITE_TAG`); профиль без тега роняет
   `make deploy` (`invalid reference format`), `bump` без профиля поднимает сервис мимо `make deploy` (Р19).
 - Политику сайта задание allowlist читает с `robots.txt` сервиса (`site:3000`), не через публичный адрес: на не-прод
