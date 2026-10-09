@@ -19,7 +19,7 @@ help: ## сгруппированный список команд
 		/^[a-zA-Z0-9_-]+:.*## / {printf "  \033[36m%-13s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 ##@ LOOP
-validate: ## Compose syntax + yamllint + .tpl + .env coverage (FORMAT=detailed)
+validate: ## Compose syntax + yamllint + .tpl + .env coverage + умолчания edge (FORMAT=detailed)
 	@bash scripts/tools/validate.sh $(if $(filter detailed,$(FORMAT)),--format=detailed)
 
 doctor: ## Live fail-fast preflight: compose/render/dns/env (A= --full)

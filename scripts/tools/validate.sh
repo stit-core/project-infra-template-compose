@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Pre-deploy gate: compose syntax + yamllint + .tpl render + .env.example
-# coverage + frontmatter (skills/rules). Concise-by-default (строка на проверку
-# + каноничный хвост):
+# coverage + frontmatter (skills/rules) + умолчания безопасности edge.
+# Concise-by-default (строка на проверку + каноничный хвост):
 #   OK              — все проверки прошли/skip
 #   FAIL: <чеки>    — список упавших, exit 1
 # --format=detailed — полный per-item разбор (как раньше).
@@ -145,6 +145,58 @@ else
   else
     rec "frontmatter" FAIL "$(printf '%s' "$bad" | paste -sd';' -)" "$bad"
   fi
+fi
+
+# 6. Умолчания безопасности edge — по тексту compose/ и configs/, без docker и .env:
+#    то, что снаружи выглядит рабочим стеком, а запрос пускает мимо edge.
+edge_bad=()
+# Роутеры из labels (map- и list-форма): у каждого есть цепочка, она начинается с
+# crowdsec@file, а правило называет хост — catch-all отдаёт сервис чужому Host.
+while IFS= read -r line; do
+  [ -n "$line" ] && edge_bad+=("$line")
+done < <(awk '
+  /^[ \t]*#/ { next }
+  match($0, /traefik\.http\.routers\.[A-Za-z0-9_-]+\.(rule|middlewares)["\047]?[:=]/) {
+    key = substr($0, RSTART, RLENGTH); val = substr($0, RSTART + RLENGTH)
+    n = split(key, part, "."); name = part[4]; field = part[5]; sub(/["\047]?[:=]$/, "", field)
+    gsub(/^[ \t"\047]+|[ \t"\047]+$/, "", val)
+    id = FILENAME ": роутер " name
+    seen[id] = 1
+    if (field == "rule") rule[id] = val; else chain[id] = val
+  }
+  END {
+    for (id in seen) {
+      if (!(id in chain)) print id " — без цепочки middlewares"
+      else if (chain[id] !~ /^crowdsec@file(,|\$|$)/) print id " — цепочка начинается не с crowdsec@file"
+      if ((id in rule) && rule[id] !~ /Host(Regexp)?\(/) print id " — правило не называет Host"
+    }
+  }' compose/*.yml | sort)
+for f in compose/*.yml; do
+  # Порт сервиса с Traefik-роутером — вход мимо edge: без crowdsec, лимитов и Host-роутинга.
+  if grep -qE '^[^#]*traefik\.enable' "$f" && grep -qE '^[[:space:]]*ports:' "$f"; then
+    edge_bad+=("$f: сервис с Traefik-роутером публикует порт (ports:)")
+  fi
+  if [ "$f" != compose/traefik.yml ] && grep -qE '^[^#]*docker\.sock' "$f"; then
+    edge_bad+=("$f: docker-сокет — только у traefik")
+  fi
+done
+# sanitizePath — умолчание Traefik (включён): правила на путь сопоставляются с приведённым
+# путём, и выключенный он открывает запрет /_image записью //_image.
+while IFS= read -r line; do
+  [ -n "$line" ] && edge_bad+=("${line%%:*}: sanitizePath — умолчание Traefik не трогаем")
+done < <(grep -rilE 'sanitizePath' compose configs docker-compose.yml 2>/dev/null | sort)
+# Отрендеренный сосед .tpl несёт значения .env (ключ bouncer, хеш замка): вне .gitignore
+# его закоммитит `git add -A` из make ship.
+if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  while IFS= read -r tpl; do
+    git check-ignore -q "${tpl%.tpl}" || edge_bad+=("${tpl%.tpl}: отрендеренный файл не под .gitignore")
+  done < <(find configs -type f -name '*.tpl' | sort)
+fi
+if [ ${#edge_bad[@]} -eq 0 ]; then
+  rec "edge defaults" PASS "" "OK — crowdsec@file на каждом роутере, Host в правилах, порты и docker-сокет — только у traefik, sanitizePath не тронут, отрендеренные конфиги под .gitignore"
+else
+  detail=$(printf '%s\n' "${edge_bad[@]}")
+  rec "edge defaults" FAIL "$(printf '%s' "$detail" | paste -sd';' - | sed 's/;/; /g')" "$detail"
 fi
 
 [ "$DETAILED" = "0" ] && echo

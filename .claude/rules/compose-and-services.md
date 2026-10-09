@@ -73,7 +73,7 @@ networks:
   - backend-net      # internal-traffic к postgres/minio/etc
 ```
 
-Backend в шаблоне идёт через traefik (labels), не через `ports:` — там это не блокер. Когда DNS не поднят и сервис временно торчит портом — обязательно proxy.
+Это про сервисы без Traefik-роутера (например, Postgres на db-хосте при split). Сервис с роутером порт не публикует: опубликованный порт — вход мимо edge, без `crowdsec@file`, лимитов и Host-роутинга; `make validate` такой compose отвергает.
 
 ## environment фиксируется при container CREATE, не start
 

@@ -135,9 +135,9 @@ blocked-by: —
   grep-список § 5 файла покрытия → «должно быть» найдено, «не должно быть» пусто; чтение валидатором по § 1.6 покрытия
 - [ ] **AC11** — Гейт зелёный, умолчания безопасности edge на месте: `sanitizePath` не выключен, `crowdsec@file` — на
   каждом публичном роутере, docker-сокет — только у `traefik`, catch-all роутеров и опубликованных портов сервисов
-  нет, dashboard закрыт. Проверка: `make check` на чистом дереве → `✓ check clean`; на стенде `make validate` →
-  `compose syntax PASS`; лог Traefik после деплоя — без ошибок, кроме ACME стенда; `grep -rn sanitizePath compose
-  configs` → пусто; `grep -l docker.sock compose/*.yml` → только `compose/traefik.yml`
+  нет, dashboard закрыт. Проверка: `make check` на чистом дереве → `✓ check clean`, с поломкой умолчания — красный;
+  на стенде `make validate` → `compose syntax PASS`; лог Traefik после деплоя — без ошибок, кроме ACME стенда;
+  `grep -rn sanitizePath compose configs` → пусто; `grep -l docker.sock compose/*.yml` → только `compose/traefik.yml`
 
 ## Шаги
 ### Этап A — стенд, edge, сервис
@@ -233,6 +233,12 @@ blocked-by: —
   он же предупреждает о `noindex` без замка (Р15, Р17, Р21).
 - `make bump` при отказе возвращает прежний тег в `.env` и поднимает сервис на нём, код ≠ 0 (N2): тег без образа
   оставлял `.env`, на котором падает `make deploy`, битый образ — заглушку с 200 на корне. Первый тег остаётся.
+- Умолчания edge держит `make validate` (проверка `edge defaults`, по тексту — без docker и `.env`; N5): цепочка
+  каждого роутера начинается с `crowdsec@file`, правило называет `Host`, сервис с роутером не публикует порт,
+  docker-сокет — только у `traefik`, `sanitizePath` не упомянут, сосед каждого `.tpl` — под `.gitignore`. Пробой, а
+  не статикой — S7: `make accept` — записи `Host` (выше), код отказа WAF 429 решением на свой адрес (на VPS это шлюз
+  сети docker), лишние заголовки и порядок цепочки `staging`; смок — «контейнер healthy, а на `/` отвечает не сайт» и
+  не-прод без замка. Ожидание healthy в `bump` и возврат тега держит гейт этапа (`s3-inner.sh bump`).
 - Журнал — файл в каталоге хоста `/var/log/traefik`, не docker-источник: `acquis.yaml` и монтирование `/var/log` у
   `crowdsec` рассчитаны на этот путь; docker-сокет второму контейнеру — права тому, кто разбирает чужой ввод.
 - Расписание (ротация журнала, обновление allowlist) живёт в стеке, как cron бэкапа, а не на хосте: правка доезжает
@@ -268,8 +274,9 @@ blocked-by: —
   VPS: `make deploy` рестартует Traefik (static-конфиг) — секунды простоя; с полным журналом сценарии обхода
   CrowdSec начинают работать — свой аудит с рабочей станции может получить 429 (runbook).
 - Бэклог `I` (не тема фазы): `make validate` без `.env` не разбирает compose и не ловит `:latest`, хотя проза это
-  обещает; источник `auth.log` у CrowdSec пуст на Debian 12 без rsyslog; `configs/landing/index.html` не в
-  `.gitignore`; `deploy.sh` глотает отказ `git pull --ff-only`; `make new-env` не пишет `HOST_ROLE` — WARN `doctor`.
+  обещает; источник `auth.log` у CrowdSec пуст на Debian 12 без rsyslog; `deploy.sh` глотает отказ
+  `git pull --ff-only`; `make new-env` не пишет `HOST_ROLE` — WARN `doctor`; роутеры file-провайдера (`dynamic/*.yml`)
+  проверка `edge defaults` не читает; API Traefik из контейнера (правило `traefik-routing`) отвечает 404.
 
 ## Где мы сейчас
 Этап A (S1–S3) возвращён независимым валидатором: FAIL, блокирующее B1 — роутер `site-www` отдавал сайт мимо

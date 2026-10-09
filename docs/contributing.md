@@ -90,6 +90,6 @@ Triage / DR / bootstrap делаем скиллами, не прозой в CLAU
 | Subagent ушёл надолго | `tools` в frontmatter — урезать до read-only |
 | CLAUDE.md игнорируется | длина / конфликт инструкций между секциями |
 | Коммит reject'нут | `scripts/git-hooks/commit-msg` — type ∈ {feat,fix,refactor,docs,test,chore,meta,perf} |
-| `make validate` падает | compose-синтаксис / `:latest` / `${VAR}` не в `.env.example` / `.tpl` не рендерится |
+| `make validate` падает | compose-синтаксис / `:latest` / `${VAR}` не в `.env.example` / `.tpl` не рендерится / нарушено умолчание edge (`edge defaults` называет файл и роутер) |
 | `make doctor` падает | live-поверхность: `.env`/rendered-конфиги (локально без `.env` многое SKIP — норма) |
 | `make plan-check` падает | формат плана или бэклога в `.claude/plans/` — см. skill `plan` |
