@@ -19,6 +19,8 @@
 # из ответа не исполняется. Список принимается целиком или не принимается вовсе: в нём
 # только публичные адреса, а число сетей и их суммарный охват — в пределах MAX_* ниже.
 # Тот, кто отвечает за вендора, вносит в allowlist свои сети — в этих пределах, не шире.
+# Редирект источника принимается только по https: его назначает сам вендор в ответе,
+# подлинность которого держит TLS, — список по http в allowlist не попадает.
 #
 # Источник не ответил, не уложился в срок или его список не принят — прежний allowlist
 # бота остаётся. Записи живут 21 день: сети источника, который перестал отвечать совсем,
@@ -81,10 +83,11 @@ fi
 [ -d "$tmp" ] || { say "рабочего каталога нет: $tmp"; exit 1; }
 
 # Одна загрузка: ответ целиком, не больше MAX_BYTES (ulimit обрывает запись) и не дольше
-# FETCH_SEC. Фоном и с wait: о загрузке, снятой по сроку, шелл иначе печатает «Terminated».
+# FETCH_SEC; заголовки ответа — в <файл>.hdr. Фоном и с wait: о загрузке, снятой по сроку,
+# шелл иначе печатает «Terminated».
 get() { # <адрес> <файл>
   ( trap '' XFSZ; ulimit -f $((MAX_BYTES / 512))
-    exec timeout "$FETCH_SEC" wget -q -T 15 -U 'Mozilla/5.0 (compatible; edge-bots-allowlist)' -O "$2" "$1" ) 2>/dev/null &
+    exec timeout "$FETCH_SEC" wget -q -S -T 15 -U 'Mozilla/5.0 (compatible; edge-bots-allowlist)' -O "$2" "$1" ) 2> "$2.hdr" &
   wait $! 2>/dev/null
 }
 
@@ -107,7 +110,7 @@ awk '{ sub(/#.*/, ""); gsub(/\r/, ""); line = tolower($0) }
 : > "$tmp/want"; closed=0
 while read -r purpose token url rdns; do
   [ "$url" != "—" ] || continue
-  if grep -qxF "$(printf '%s' "$token" | tr 'A-Z' 'a-z')" "$tmp/closed"; then closed=$((closed + 1)); continue; fi
+  if grep -qxF -e "$(printf '%s' "$token" | tr 'A-Z' 'a-z')" "$tmp/closed"; then closed=$((closed + 1)); continue; fi
   echo "$token $url" >> "$tmp/want"
 done < "$tmp/bots"
 
@@ -133,12 +136,21 @@ done < "$tmp/want"
 
 # Ответы вендоров — параллельно, каждый адрес один раз. До четырёх попыток, и после
 # попытки, снятой по сроку: соединение с вендором рвётся и на исправном источнике, а
-# адрес, до которого нет маршрута, держит попытку до таймаута.
+# адрес, до которого нет маршрута, держит попытку до таймаута. Редиректу wget следует сам:
+# запрос по адресу не по https уходит, ответ не принимается, повтора нет.
 cut -d' ' -f2 "$tmp/todo" | sort -u > "$tmp/urls"
-fetch() { # <адрес> <файл>
+fetch() { # <адрес> <файл>; причина отказа, если она не «нет ответа», — в <файл>.why
   n=0
   while [ "$n" -lt 4 ]; do
-    get "$1" "$2" && [ -s "$2" ] && return 0
+    get "$1" "$2"; rc=$?
+    sed -n 's/^ *[Ll][Oo][Cc][Aa][Tt][Ii][Oo][Nn]: *//p' "$2.hdr" | tr -d '\r' > "$2.loc"
+    while read -r to; do
+      case "$to" in https://*|/*) ;; *)
+        echo "редирект на $(printf '%s' "$to" | tr -cd 'A-Za-z0-9._~:/?#@!&=+%-' | cut -c1-120) — принимается только https" > "$2.why"
+        : > "$2"; return 1 ;;
+      esac
+    done < "$2.loc"
+    [ "$rc" -eq 0 ] && [ -s "$2" ] && return 0
     : > "$2"; n=$((n + 1)); sleep 1
   done
   return 1
@@ -202,7 +214,8 @@ updated=0; failed=0
 while read -r token url; do
   i=$(awk -v u="$url" '$2 == u { print $1 }' "$tmp/index"); name=$PREFIX$token
   if ! networks "$tmp/r$i" "$tmp/nets" "$tmp/why"; then
-    if [ -s "$tmp/why" ]; then why="список не принят — $(cat "$tmp/why")"
+    if [ -s "$tmp/r$i.why" ]; then why="список не принят — $(cat "$tmp/r$i.why")"
+    elif [ -s "$tmp/why" ]; then why="список не принят — $(cat "$tmp/why")"
     else why="источник не ответил или не дал ни одной сети"; fi
     say "WARN $token: $why ($url) — прежний allowlist оставлен"
     failed=$((failed + 1)); continue

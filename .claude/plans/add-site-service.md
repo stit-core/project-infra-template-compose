@@ -14,19 +14,18 @@ blocked-by: —
 проходит на стенде шаблона с настоящим образом сайта.
 
 ## Контекст
-- **Пути.** `I` = `/home/mm/git/stit-core/project-infra-template-compose` (ветка `main`, одна пишущая рука); `R` =
-  `/home/mm/git/stit-core/ssr-frontend-template` (только чтение; образ сайта — из worktree `M/wt-p7-site` на HEAD
-  `R`); `M` = `/home/mm/git/stit-core/stit-ssr-audit`: прогоны — `M/p7/`, пробы и приёмка — в своих
-  `git -C I worktree add --detach M/wt-p7-<имя>`.
+- **Пути.** `I` =
+  `/home/mm/git/stit-core/project-infra-template-compose` (ветка `main`, одна пишущая рука); `R` = `/home/mm/git/stit-core/ssr-frontend-template`
+  (только чтение; образ сайта — из worktree `M/wt-p7-site` на HEAD `R`); `M` =
+  `/home/mm/git/stit-core/stit-ssr-audit`: прогоны — `M/p7/`, пробы — в worktree `M/wt-p7-<имя>`.
 - **Метод** — `R/.claude/plans/audit-program.md` (решения владельца R16–R18, R01): этап → исполнитель → независимый
   валидатор → фиксы → перепроверка; шаг — коммит, план — тем же коммитом. `make ship` в фазе не используется (он
   пушит и деплоит): коммит — `git commit` с трейлером `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`,
   push — после закрытия фазы. Static-конфиг Traefik — отдельным коммитом (`CLAUDE.md`, «сначала спросить»).
-- **Контракт** — `R/docs/reference/infra-handoff.md` § 1.1–1.7 (на `c1192e7` § 1.1–1.3 повторяют `I` на `e5de963`),
-  `observability.md § Боты в access-log`, строка `AI-BOTS` скилла `/release`, реестр `src/shared/seo/crawlers.yaml`
-  (sha256 `1ca0e662f76d…`, политика HEAD — `allow-all`) и его печать `pnpm bots:sources`.
-- **Покрытие** — `M/plans/add-site-service.coverage.md`: контракт (§ 1), находки (§ 2), расхождения с контрактом
-  (§ 3), набор поломок (§ 4), grep-список прозы (§ 5), факты проб (§ 7). Находки — `M/reports/`.
+- **Контракт** — `R/docs/reference/infra-handoff.md` § 1.1–1.7, `observability.md § Боты в access-log`, строка
+  `AI-BOTS` скилла `/release`, реестр `src/shared/seo/crawlers.yaml` (sha256 `1ca0e662f76d…`, политика HEAD —
+  `allow-all`) и его печать `pnpm bots:sources`. **Покрытие** — `M/plans/add-site-service.coverage.md`: контракт (§
+  1), находки (§ 2), расхождения с контрактом (§ 3), набор поломок (§ 4), grep-список прозы (§ 5), факты проб (§ 7).
 - **Стенд** — одноразовый «VPS в контейнере», `M/p7/stand.sh` (команды — в шапке): `p7-vps` (`docker:dind`, без
   проброса портов) с клоном `I` в `/opt/p7-infra`, registry `127.0.0.1:5000` и `.env` от `make new-env`
   (`DOMAIN=p7.test`); `sync` везёт рабочее дерево как на VPS — через `git pull` из `make deploy`. «На стенде `X`» =
@@ -158,8 +157,7 @@ blocked-by: —
     `X-Request-Id` ответа `/net-takogo` — в записи журнала и в `make logs SVC=site`; запуск ротации → активный файл
     сброшен, следующая запись — в нём · Закрывает: AC6 · Зависит от: S3
   - Сделано: журнал — файл каталога хоста, ротация — crond рядом с CrowdSec (`configs/crowdsec/`),
-    `allowEmptyServices`, сверка `Plugins loaded` в `deploy.sh`. Стенд (`M/p7/stage-b/s4-check-{1,2}.log`): журнал и
-    ротация, неудачная выкатка — 5xx от edge, сбой загрузки плагина — отказ и самолечение; 33 проверки, ✗ 0
+    `allowEmptyServices`. Стенд (`M/p7/stage-b/s4-check-{1,2}.log`): журнал и ротация, неудачная выкатка — 5xx от edge
 - [x] **S5** — CrowdSec читает журнал и бережёт поисковиков: источник acquisition непуст с первого деплоя чистого
   стенда; постоверфлоу `rdns` и `seo-bots-whitelist` установлены; сценарии обхода срабатывают на постороннем адресе
   - Проверка: свежий стенд → `make deploy` → `cscli metrics show acquisition` — строк источника журнала > 0;
@@ -264,13 +262,16 @@ blocked-by: —
   зависшая загрузка и её помощник `ssl_client` (он переживает `wget`, пока источник держит соединение) замка не держат
   и не копятся. Замок занят дольше срока задания — не «уже идёт — пропуск» с кодом 0, а WARN и код 2 у верба и шага
   деплоя и `ATTENTION` в смоке (`smoke.d/30-edge.sh` — режим `state` задания; остальное состояние edge — S7).
+- Редирект источника принимается только по `https` — и на другой хост: его назначает сам вендор в ответе, подлинность
+  которого держит TLS (у Perplexity адрес списка отвечает редиректом на `www.perplexity.ai`: запрет чужого хоста
+  оставил бы двух его ботов без allowlist). Список по `http` и другим схемам не принимается; `wget` образа редиректу
+  следует сам — запрос уходит (GET, без повторов), ответ отбрасывается.
 - `make deploy` обновляет только недостающие и не обновлявшиеся шесть дней списки, все — `make allowlist` и
   расписание. Политика меняется с образом: после `make bump` — `make allowlist` (канон строки `AI-BOTS` — S8).
 - `deploy.sh`, обновлённый тем же `git pull`, продолжает новой версией (`exec`): иначе bash дочитывает прежнюю, и
   новая логика деплоя — сверка плагина, allowlist — опаздывает на один деплой.
 - Заглушка `landing` остаётся always-on и держит выпуск сертификата корня до первого деплоя сайта; при сайте на корне
-  её прунит `/de-template`. Профиль памяти — 512 МБ и `--max-old-space-size=384`; локальная rDNS-страховка не
-  делается — суффиксы Яндекса несёт `seo-bots-whitelist` (предложения и опция контракта).
+  её прунит `/de-template`. Профиль памяти — 512 МБ и `--max-old-space-size=384` (предложения контракта).
 - Правка static-конфига Traefik и контракта `.env.example` — граница «сначала спросить» обвязки `I`; основание —
   строка фазы P7 программы, принятой владельцем, и § 1.4 контракта. Имя сервиса `site` — умолчание шаблона и поле
   `infra-svc` форка; канон «кто что читает из strategy» пишется по контракту strategy 0.2.0 (R01).
