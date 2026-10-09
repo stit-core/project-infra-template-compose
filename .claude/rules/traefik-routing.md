@@ -36,7 +36,7 @@ paths:
 | `retry@file` | Повтор запроса при гонке пересоздания сервиса | Только идемпотентные роуты (GET / HEAD) |
 | `www-to-apex@file` | Любой адрес роутера → `https://${DOMAIN}/<путь>` одним 301; хост regexp не называет — его выбрал роутер | Роут `www`, сервис — `noop@internal` |
 | `deny-all@file` | 403 на edge, до сервиса | Путь без внешнего доступа |
-| `staging-noindex@file`, `staging-auth@file` | Не-прод контур: `X-Robots-Tag` и basicAuth — парой и в этом порядке | Роуты не-прод среды |
+| `staging@file` | Не-прод контур одной цепочкой: `staging-noindex` (`X-Robots-Tag`), затем `staging-auth` (basicAuth) — состав и порядок заданы в шаблоне | Роуты сайта — хвостом цепочки, пока задан `STAGING_BASIC_AUTH_USERS` |
 
 **Правило:**
 - Любой публичный сервис → минимум `crowdsec@file`.

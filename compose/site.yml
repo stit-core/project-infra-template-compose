@@ -56,8 +56,9 @@ services:
       traefik.http.routers.site.entrypoints: websecure
       traefik.http.routers.site.tls: "true"
       traefik.http.routers.site.tls.certresolver: letsencrypt
-      # SITE_EDGE_EXTRA_MW — контур не-прод среды (.env.example § profile site).
-      traefik.http.routers.site.middlewares: crowdsec@file,rate-limit@file,secure-headers@file,compress@file,retry@file${SITE_EDGE_EXTRA_MW:-}
+      # Хвост цепочки — контур не-прод среды, и включает его сам пароль: пока задан
+      # STAGING_BASIC_AUTH_USERS, роутеры site и site-form закрыты цепочкой staging@file.
+      traefik.http.routers.site.middlewares: crowdsec@file,rate-limit@file,secure-headers@file,compress@file,retry@file${STAGING_BASIC_AUTH_USERS:+,staging@file}
 
       # Публичный POST формы: свой лимит частоты и тела; без retry (повтор — вторая
       # заявка) и без compress.
@@ -66,7 +67,7 @@ services:
       traefik.http.routers.site-form.entrypoints: websecure
       traefik.http.routers.site-form.tls: "true"
       traefik.http.routers.site-form.tls.certresolver: letsencrypt
-      traefik.http.routers.site-form.middlewares: crowdsec@file,form-rate-limit@file,form-body-limit@file,secure-headers@file${SITE_EDGE_EXTRA_MW:-}
+      traefik.http.routers.site-form.middlewares: crowdsec@file,form-rate-limit@file,form-body-limit@file,secure-headers@file${STAGING_BASIC_AUTH_USERS:+,staging@file}
       traefik.http.routers.site-form.service: site
 
       # /_image — endpoint изображений Astro: картинки готовит сборка, и запрос на

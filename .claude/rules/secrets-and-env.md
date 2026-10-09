@@ -81,7 +81,10 @@ make deploy           # compose пересоздаст сервисы с изм�
 
 Смена `ACME_*` — рестарт traefik руками (`make restart SVC=traefik`): traefik
 читает static config только на старте, а контент bind-mount'а compose не
-отслеживает.
+отслеживает. Замок не-прод среды (`STAGING_BASIC_AUTH_USERS`) рендерится в
+dynamic-конфиг: `make deploy` включает его, меняет пароль и снимает без рестарта
+traefik. Значение — одна строка `'user:hash'` в одинарных кавычках; другую форму
+`make deploy`, `make render` и `make doctor` отвергают (`scripts/preflight-env.sh`).
 
 ### Profile-based opt-in
 
@@ -95,7 +98,7 @@ identity + ACME из `.env`, других секретов не требует.
 | `postgres` | postgres | `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` |
 | `storage` | minio, minio-init, backup | `MINIO_*`, `APP_S3_*`, `BACKUP_S3_*`, `RESTIC_*`, `BACKUP_AWS_*` (+ обязательно `postgres` профиль) |
 | `backend` | backend | `OIDC_*`, `JWT_SECRET` (+ секция postgres) + `BACKEND_TAG` |
-| `site` | site | `SITE_TAG`, `ROBOTS_POLICY`, канал формы (`SITE_FORM_*`, `SITE_SMTP_URL`); на не-прод — `SITE_EDGE_EXTRA_MW`, `STAGING_BASIC_AUTH_USERS` |
+| `site` | site | `SITE_TAG`, `ROBOTS_POLICY`, канал формы (`SITE_FORM_*`, `SITE_SMTP_URL`); на не-прод — `ROBOTS_POLICY=noindex` и замок `STAGING_BASIC_AUTH_USERS` |
 
 Значения оператор берёт из `.env.example` (комментарии объясняют, как
 сгенерировать каждое), генерирует пароли (`openssl rand`) и дописывает в
@@ -110,7 +113,7 @@ identity + ACME из `.env`, других секретов не требует.
 - Inline-секретов в `compose/*.yml` (значения вида `password: actual_secret` —
   должно быть `${VAR}` с декларацией в `.env.example`)
 - Rendered-файлов из `.tpl` (gitignored: `configs/traefik/traefik.yml`,
-  `configs/traefik/dynamic/middlewares.yml`, `configs/traefik/dynamic/staging.htpasswd`)
+  `configs/traefik/dynamic/middlewares.yml` — в нём ключ bouncer и хеш замка не-прод среды)
 
 `.gitignore` страхует от типовых имён; `git diff --cached` ловит остальное.
 

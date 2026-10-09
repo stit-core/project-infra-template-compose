@@ -72,8 +72,13 @@ http:
       ipAllowList:
         sourceRange: ["127.0.0.1/32"]
 
-    # Не-прод контур — парой и в этом порядке: staging-noindex перед staging-auth, иначе
-    # ответ 401 уходит без X-Robots-Tag.
+    # Не-прод контур — одна цепочка: состав и порядок заданы здесь, а не значением .env.
+    # staging-noindex стоит перед staging-auth, иначе ответ 401 уходит без X-Robots-Tag.
+    # Роутеры сайта получают цепочку, пока задан STAGING_BASIC_AUTH_USERS (compose/site.yml).
+    staging:
+      chain:
+        middlewares: [staging-noindex, staging-auth]
+
     staging-noindex:
       headers:
         customResponseHeaders:
@@ -81,6 +86,9 @@ http:
 
     staging-auth:
       basicAuth:
-        # Файл рендерится из STAGING_BASIC_AUTH_USERS (.env) рядом с этим.
-        usersFile: /etc/traefik/dynamic/staging.htpasswd
+        # users, а не usersFile: смена пароля меняет этот файл, и Traefik применяет её сам,
+        # а отдельный файл пользователей он перечитывает только с рестартом. Форму значения
+        # держит scripts/preflight-env.sh.
+        users:
+          - '${STAGING_BASIC_AUTH_USERS}'
         realm: "staging"

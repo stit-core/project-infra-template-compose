@@ -10,6 +10,10 @@ if [ ! -f .env ]; then
   exit 1
 fi
 
+# Значение, которое сломает конфиг edge, не рендерится: отказ здесь — это и отказ
+# make deploy до compose up.
+bash scripts/preflight-env.sh
+
 set -a
 # shellcheck disable=SC1091
 . ./.env
@@ -20,9 +24,9 @@ set +a
 export ACME_CASERVER="${ACME_CASERVER:-https://acme-v02.api.letsencrypt.org/directory}"
 
 # Неизменённый файл не перезаписывается, изменённый пишется одним вызовом: за
-# каталогом dynamic следит Traefik, и файл, прочитанный посреди записи, на
-# секунды оставляет роутеры без middleware. Запись — поверх (inode тот же):
-# bind-mount одного файла подмены не видит.
+# каталогом dynamic следит Traefik, и с файлом, прочитанным посреди записи,
+# роутеры не собираются — секунды 404 на всём edge. Запись — поверх (inode
+# тот же): bind-mount одного файла подмены не видит.
 while IFS= read -r tpl; do
   out="${tpl%.tpl}"
   new=$(envsubst < "$tpl")

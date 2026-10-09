@@ -7,9 +7,10 @@
 #   FAIL: <чек>   — есть hard-фейл, exit 1
 #
 # FAIL только на том, что точно ломает стек И actionable здесь (compose
-# config invalid, .env без identity). DNS — WARN (traefik сам ретрайнет
-# ACME, см. preflight-dns.sh). Поэтому на чистом лаптоп-чекауте
-# (нет .env/docker) doctor = OK (всё SKIP) — make check остаётся зелёным.
+# config invalid, .env без identity, замок не-прод среды, который basicAuth
+# не разберёт). DNS — WARN (traefik сам ретрайнет ACME, см. preflight-dns.sh).
+# Поэтому на чистом лаптоп-чекауте (нет .env/docker) doctor = OK (всё SKIP) —
+# make check остаётся зелёным.
 #
 # Arg: --full — печатать захваченный stderr WARN/FAIL-проверок.
 #
@@ -68,7 +69,23 @@ else
   fi
 fi
 
-# 3. configs отрендерены (render-configs.sh: envsubst *.tpl)
+# 3. .env preflight — замок не-прод среды и пара её контуров; тот же скрипт
+#    останавливает make render и make deploy
+if [ ! -f .env ]; then
+  st ".env preflight" SKIP "нет .env"
+else
+  cap=$(bash scripts/preflight-env.sh 2>&1); rc=$?
+  note=$(printf '%s\n' "$cap" | sed -n 's/^ENV-[A-Z]*: //p' | head -n 1)
+  if [ "$rc" -ne 0 ]; then
+    st ".env preflight" FAIL "${note:-scripts/preflight-env.sh: код $rc}" "$cap"
+  elif [ -n "$note" ]; then
+    st ".env preflight" WARN "$note" "$cap"
+  else
+    st ".env preflight" PASS
+  fi
+fi
+
+# 4. configs отрендерены (render-configs.sh: envsubst *.tpl)
 if [ ! -f .env ]; then
   st "configs render" SKIP "нет .env"
 elif [ -s configs/traefik/traefik.yml ]; then
@@ -77,7 +94,7 @@ else
   st "configs render" WARN "configs/traefik/traefik.yml пуст/нет — make render/deploy"
 fi
 
-# 4. DNS preflight (LE HTTP-01) — advisory, self-skip без .env
+# 5. DNS preflight (LE HTTP-01) — advisory, self-skip без .env
 if [ ! -f .env ]; then
   st "dns" SKIP "нет .env"
 else
@@ -89,7 +106,7 @@ else
   fi
 fi
 
-# 5. .env покрывает обязательные ключи .env.example
+# 6. .env покрывает обязательные ключи .env.example
 if [ ! -f .env ] || [ ! -f .env.example ]; then
   st ".env coverage" SKIP "нет .env / .env.example"
 else

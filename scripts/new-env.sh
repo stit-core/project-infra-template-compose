@@ -66,7 +66,7 @@ ACME_CASERVER=https://acme-v02.api.letsencrypt.org/directory
 #   backend   — OIDC_* + JWT_SECRET (+ секция postgres) + BACKEND_TAG ниже
 #   site      — ROBOTS_POLICY (index — прод, noindex — не-прод) + канал формы
 #               SITE_FORM_* / SITE_SMTP_URL + SITE_TAG ниже; на не-прод ещё
-#               SITE_EDGE_EXTRA_MW + STAGING_BASIC_AUTH_USERS
+#               замок STAGING_BASIC_AUTH_USERS
 # COMPOSE_PROFILES=
 
 # Image-тег backend; раскомментировать вместе с профилем backend.
