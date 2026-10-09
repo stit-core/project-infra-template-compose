@@ -1,9 +1,10 @@
 #!/bin/sh
 # Allowlist ботов в CrowdSec — задание расписания edge (configs/crowdsec/crontab), шаг
 # make deploy и верб make allowlist.
-#   bots-allowlist.sh [all|missing]
+#   bots-allowlist.sh [all|missing|state]
 # all (умолчание) обновляет allowlist каждого бота; missing — только отсутствующие и те,
-# что не обновлялись дольше шести дней: деплой не ходит к вендорам без нужды.
+# что не обновлялись дольше шести дней: деплой не ходит к вендорам без нужды; state —
+# идёт ли задание сейчас, ничего не меняя (смок).
 #
 # Кого сайт пускает, того edge не банит. Источники — ai-bots.sources рядом (печать реестра
 # ботов сайта, make bots-sources): строка «назначение токен ip_list_url rdns». Бот с
@@ -19,12 +20,12 @@
 # только публичные адреса, а число сетей и их суммарный охват — в пределах MAX_* ниже.
 # Тот, кто отвечает за вендора, вносит в allowlist свои сети — в этих пределах, не шире.
 #
-# Источник не ответил или его список не принят — прежний allowlist бота остаётся. Записи
-# живут 21 день: сети источника, который перестал отвечать совсем, уходят сами. Сервис
-# site не ответил — allowlist не меняется вовсе.
+# Источник не ответил, не уложился в срок или его список не принят — прежний allowlist
+# бота остаётся. Записи живут 21 день: сети источника, который перестал отвечать совсем,
+# уходят сами. Сервис site не ответил — allowlist не меняется вовсе.
 #
-# Код: 0 — сделано; 1 — запуск не состоялся (нет сайта, списка источников); 2 — часть
-# allowlist не обновлена (строки WARN).
+# Код: 0 — сделано или задание уже идёт; 1 — запуск не состоялся (нет сайта, списка
+# источников); 2 — часть allowlist не обновлена (строки WARN).
 set -u
 
 SRC=/opt/edge/ai-bots.sources
@@ -32,6 +33,7 @@ ROBOTS=http://site:3000/robots.txt
 PREFIX=bot-
 TTL=504h
 REFRESH=518400
+LOCK=/tmp/bots-allowlist.lock
 MAX_BYTES=2097152
 # Пределы списка одного вендора. У списков реестра — до 1292 сетей, 36 496 адресов IPv4
 # (самая широкая сеть — /17) и 256 сетей /64 IPv6 (одна /56). Число сетей — с запасом
@@ -39,15 +41,52 @@ MAX_BYTES=2097152
 MAX_NETS=4096
 MAX_V4=262144
 MAX_V6=65536
+# Сроки в секундах: одна попытка загрузки и задание целиком.
+FETCH_SEC=30
+JOB_SEC=600
 mode=${1:-all}
+tmp=${2:-}
 
 say() { echo "bots-allowlist: $*"; }
-case "$mode" in all|missing) ;; *) say "режим? all|missing"; exit 1 ;; esac
+case "$mode" in all|missing|state) ;; *) say "режим? all|missing|state"; exit 1 ;; esac
 
-exec 9> /tmp/bots-allowlist.lock
-flock -n 9 || { say "уже идёт — пропуск"; exit 0; }
-tmp=$(mktemp -d) || exit 1
-trap 'rm -f "$tmp"/*; rmdir "$tmp"' EXIT
+# Одно задание за раз, и у него срок. Замок держит этот процесс, работу ведёт дочерний
+# (тот же файл со вторым аргументом — рабочим каталогом) — без дескриптора замка и своей
+# группой процессов: зависшая загрузка, её помощник ssl_client (через него wget ведёт TLS,
+# и он переживает wget, пока источник держит соединение) и cscli замка не держат, а с
+# концом задания снимаются всей группой.
+if [ -z "$tmp" ]; then
+  exec 9>> "$LOCK"
+  # Повтор через секунду: на миг замок берёт и проверка state.
+  if ! flock -n 9 && { sleep 1; ! flock -n 9; }; then
+    age=$(( $(date +%s) - $(stat -c %Y "$LOCK") ))
+    if [ "$age" -gt $((JOB_SEC + 60)) ]; then
+      say "WARN задание идёт $age с — дольше своего срока ($JOB_SEC с), allowlist не обновляется: make restart SVC=crowdsec (docs/reference/runbook.md)"
+      exit 2
+    fi
+    if [ "$mode" = state ]; then say "задание идёт ($age с)"; else say "уже идёт ($age с) — пропуск"; fi
+    exit 0
+  fi
+  [ "$mode" != state ] || { say "задание не идёт"; exit 0; }
+  touch "$LOCK"
+  tmp=$(mktemp -d) || exit 1
+  setsid timeout "$JOB_SEC" sh "$0" "$mode" "$tmp" 9>&- &
+  job=$!
+  trap 'kill -- "-$job" 2>/dev/null; rm -f "$tmp"/*; rmdir "$tmp"' EXIT
+  trap 'exit 143' HUP INT TERM
+  wait "$job" 2>/dev/null; rc=$?
+  [ "$rc" -le 2 ] || { say "WARN задание прервано (код $rc; срок — $JOB_SEC с) — allowlist обновлён не полностью"; rc=2; }
+  exit "$rc"
+fi
+[ -d "$tmp" ] || { say "рабочего каталога нет: $tmp"; exit 1; }
+
+# Одна загрузка: ответ целиком, не больше MAX_BYTES (ulimit обрывает запись) и не дольше
+# FETCH_SEC. Фоном и с wait: о загрузке, снятой по сроку, шелл иначе печатает «Terminated».
+get() { # <адрес> <файл>
+  ( trap '' XFSZ; ulimit -f $((MAX_BYTES / 512))
+    exec timeout "$FETCH_SEC" wget -q -T 15 -U 'Mozilla/5.0 (compatible; edge-bots-allowlist)' -O "$2" "$1" ) 2>/dev/null &
+  wait $! 2>/dev/null
+}
 
 version=$(sed -n '1s/^# crawlers\.yaml sha256:\([0-9a-f]\{12\}\)[0-9a-f]\{52\}$/\1/p' "$SRC" 2>/dev/null)
 [ -n "$version" ] || { say "нет списка источников или его первая строка — не версия реестра: $SRC (make bots-sources)"; exit 1; }
@@ -56,7 +95,7 @@ grep -E '^(search|user_fetch|training) [A-Za-z0-9._-]+ (https://[A-Za-z0-9._~:/?
 odd=$(grep -cvE '^(#|$)' "$SRC"); odd=$((odd - $(wc -l < "$tmp/bots")))
 
 # Политика сайта — robots.txt сервиса, а не публичный адрес: на не-прод тот за замком.
-wget -q -T 10 -O "$tmp/robots" "$ROBOTS" 2>/dev/null && grep -qi '^user-agent[[:space:]]*:' "$tmp/robots" ||
+get "$ROBOTS" "$tmp/robots" && grep -qi '^user-agent[[:space:]]*:' "$tmp/robots" ||
   { say "сервис site не отвечает ($ROBOTS) — allowlist не меняется"; exit 1; }
 # Токены именных групп с полным запретом (группа `*` — не про ботов из списка).
 awk '{ sub(/#.*/, ""); gsub(/\r/, ""); line = tolower($0) }
@@ -92,15 +131,17 @@ while read -r token url; do
   if [ "$mode" = all ] || [ -z "$age" ] || [ "$age" -gt "$REFRESH" ]; then echo "$token $url" >> "$tmp/todo"; fi
 done < "$tmp/want"
 
-# Ответы вендоров — параллельно, каждый адрес один раз. Ответ целиком и не больше
-# MAX_BYTES (ulimit обрывает запись); до четырёх попыток — соединение с вендором рвётся и
-# на исправном источнике.
+# Ответы вендоров — параллельно, каждый адрес один раз. Повтор, до четырёх попыток, — только
+# после быстрого отказа: соединение с вендором рвётся и на исправном источнике, а тот, кто
+# молчит или тянет до срока, промолчит снова.
 cut -d' ' -f2 "$tmp/todo" | sort -u > "$tmp/urls"
 fetch() { # <адрес> <файл>
   n=0
   while [ "$n" -lt 4 ]; do
-    ( ulimit -f $((MAX_BYTES / 512)); exec wget -q -T 15 -U 'Mozilla/5.0 (compatible; edge-bots-allowlist)' -O "$2" "$1" ) 2>/dev/null && [ -s "$2" ] && return 0
-    : > "$2"; n=$((n + 1)); sleep 1
+    t0=$(date +%s)
+    get "$1" "$2" && [ -s "$2" ] && return 0
+    : > "$2"; [ $(( $(date +%s) - t0 )) -lt 10 ] || return 1
+    n=$((n + 1)); sleep 1
   done
   return 1
 }
