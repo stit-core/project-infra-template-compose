@@ -44,7 +44,7 @@ paths:
 - Роутер, который только редиректит, → `service: noop@internal`. Правило `Host()` принимает и `Host` с портом, заглавными или точкой в конце; запрос, на котором regexp редиректа не сработал, middleware передаёт дальше — в сервис роутера, мимо цепочек основного роутера.
 - Внутренние сервисы — без traefik labels вообще.
 
-Умолчания безопасности edge держит `make validate` (проверка `edge defaults`, по тексту — без docker и `.env`): у каждого роутера в labels есть цепочка, и она начинается с `crowdsec@file`; правило называет `Host`; сервис с включённым Traefik-роутером не публикует порт; docker-сокет — только у сервиса `traefik`; `sanitizePath` не задан (умолчание Traefik — включён: по приведённому пути сопоставляются правила на путь); отрендеренный сосед каждого `.tpl` — под `.gitignore`. Проверка читает текст labels, а не итог `compose config`: роутеры file-провайдера (`configs/traefik/dynamic/`) она не видит — пределы перечислены в её шапке (`scripts/tools/validate.sh`).
+Умолчания безопасности edge держит `make validate` (проверка `edge defaults`, по тексту — без docker и `.env`): у каждого роутера в labels есть цепочка, и она начинается с `crowdsec@file`; правило называет `Host`; сервис с включённым Traefik-роутером не публикует порт и не сидит в сети хоста (`network_mode: host`); docker-сокет — только у сервиса `traefik`, а его порты — только 80 и 443; API и dashboard Traefik закрыты (`api.insecure`, роутер на `api@internal`); `sanitizePath` не задан (умолчание Traefik — включён: по приведённому пути сопоставляются правила на путь); журнал доступа не берёт все заголовки запроса (`headers.defaultMode: keep` — это `Authorization` и `Cookie` в файле); отрендеренный сосед каждого `.tpl` — под `.gitignore`. Проверка читает текст labels, а не итог `compose config`: роутеры file-провайдера (`configs/traefik/dynamic/`) она не видит — пределы перечислены в её шапке (`scripts/tools/validate.sh`). Рядом — проверка `stack scripts`: синтаксис шелл-скриптов `configs/`, `containers/`, `scripts/` и форма расписаний (`crontab`): ошибку в задании расписания деплой не видит.
 
 Forward-auth в стеке нет — IDP на проектной стороне нет. Служебный UI (например, MinIO Console) закрыт `crowdsec@file` + `rate-limit@file`; сузить доступ — IP-allowlist'ом или отключением роутера.
 
@@ -54,7 +54,7 @@ Forward-auth в стеке нет — IDP на проектной стороне
 
 ## Dashboard Traefik
 
-Dashboard не expose'им — на проектной стороне он не нужен (single-tenant): в static-конфиге `api.insecure: false`, роутера на dashboard нет. Если для отладки нужен — точечно через `docker exec traefik wget ... /api/...`.
+Dashboard не expose'им — на проектной стороне он не нужен (single-tenant): в static-конфиге `api.insecure: false`, роутера на dashboard нет, порт 8080 не опубликован — держит `make validate`. Если для отладки нужен — точечно через `docker exec traefik wget ... /api/...`.
 
 ## Журнал доступа
 

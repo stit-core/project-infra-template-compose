@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Pre-deploy gate: compose syntax + yamllint + .tpl render + .env.example
-# coverage + frontmatter (skills/rules) + умолчания безопасности edge.
+# coverage + frontmatter (skills/rules) + умолчания безопасности edge + синтаксис
+# шелл-скриптов стека и форма расписаний.
 # Concise-by-default (строка на проверку + каноничный хвост):
 #   OK              — все проверки прошли/skip
 #   FAIL: <чеки>    — список упавших, exit 1
@@ -164,25 +165,37 @@ fi
 #        (configs/traefik/dynamic/) и labels из extends, якорей и override-файлов — нет;
 #      - `${VAR}` не раскрывает: цепочка начинается с crowdsec@file буквально;
 #      - порт любого назначения у сервиса с включённым роутером — отказ
-#        (правило compose-and-services), порт сервиса без роутера — нет;
+#        (правило compose-and-services), порт сервиса без роутера — нет; порт traefik —
+#        только строкой "80:80" или "443:443", запись другой формы — отказ;
+#      - catch-all правилом HostRegexp и docker-сокет, смонтированный не каталогом
+#        /var/run или /run и не файлом docker.sock, не видит;
 #      - поведение edge (заголовки, лимиты, редиректы, порядок цепочек) не видит.
 edge_bad=()
 # Один проход по сервисам. Роутеры из labels (map- и list-форма, значение в одну строку
 # или с продолжением): у каждого есть цепочка, она начинается с crowdsec@file, а правило
 # называет хост — catch-all отдаёт сервис чужому Host. Сервис с включённым роутером не
-# публикует порт: это вход мимо edge — без crowdsec, лимитов и Host-роутинга.
-# docker-сокет — только у сервиса traefik.
+# публикует порт и не сидит в сети хоста: это вход мимо edge — без crowdsec, лимитов и
+# Host-роутинга. docker-сокет — только у сервиса traefik, а его порты — только 80 и 443:
+# на 8080 у Traefik ping и API.
 while IFS= read -r line; do
   [ -n "$line" ] && edge_bad+=("$line")
 done < <(awk '
   function ltrim(s) { sub(/^[ \t]+/, "", s); return s }
-  FNR == 1 { insvc = 0; si = -1; svc = ""; pend = "" }
+  FNR == 1 { insvc = 0; si = -1; svc = ""; pend = ""; inports = 0 }
   /^[ \t]*(#|$)/ { next }
   {
     match($0, /^[ \t]*/); i = RLENGTH
     if (pend != "") {
       if (i > pi) { val[pend] = val[pend] " " ltrim($0); next }
       pend = ""
+    }
+    if (inports) {
+      if (i > porti) {
+        port = ltrim($0); sub(/[ \t]+#.*$/, "", port); sub(/^-[ \t]*/, "", port); gsub(/["\047]/, "", port)
+        if (svc == "traefik" && port != "80:80" && port != "443:443") extra[FILENAME SUBSEP svc] = extra[FILENAME SUBSEP svc] " " port
+        next
+      }
+      inports = 0
     }
     if (i == 0) { insvc = ($0 ~ /^services:/); si = -1; svc = ""; next }
     if (!insvc) next
@@ -192,8 +205,9 @@ done < <(awk '
       file[FILENAME SUBSEP svc] = FILENAME; name[FILENAME SUBSEP svc] = svc; next
     }
     id = FILENAME SUBSEP svc
-    if ($0 ~ /^[ \t]+ports:/) ports[id] = 1
-    if ($0 ~ /docker\.sock/) sock[id] = 1
+    if ($0 ~ /^[ \t]+ports:/) { ports[id] = 1; inports = 1; porti = i }
+    if ($0 ~ /docker\.sock/ || $0 ~ /^[ \t]*-[ \t]*["\047]?\/(var\/)?run\/?:/) sock[id] = 1
+    if ($0 ~ /^[ \t]+network_mode:[ \t]*["\047]?host/) hostnet[id] = 1
     if ($0 ~ /traefik\.enable["\047]?[:=][ \t]*["\047]?true/) on[id] = 1
     if (match($0, /traefik\.http\.routers\.[A-Za-z0-9_-]+\.(rule|middlewares)["\047]?[:=]/)) {
       key = substr($0, RSTART, RLENGTH); rest = substr($0, RSTART + RLENGTH)
@@ -215,7 +229,9 @@ done < <(awk '
     }
     for (id in file) {
       if ((id in on) && (id in ports)) print file[id] ": сервис с Traefik-роутером публикует порт (ports:) — " name[id]
+      if ((id in hostnet) && ((id in on) || name[id] == "traefik")) print file[id] ": network_mode: host — сервис слушает на хосте мимо edge — " name[id]
       if ((id in sock) && name[id] != "traefik") print file[id] ": docker-сокет — только у traefik — " name[id]
+      if (id in extra) print file[id] ": traefik публикует порт сверх 80 и 443 —" extra[id]
     }
   }' docker-compose.yml compose/*.yml | sort)
 # sanitizePath — умолчание Traefik (включён): правила на путь сопоставляются с приведённым
@@ -223,6 +239,21 @@ done < <(awk '
 while IFS= read -r line; do
   [ -n "$line" ] && edge_bad+=("$line: sanitizePath — умолчание Traefik не трогаем")
 done < <(grep -rilE '^[^#]*sanitizePath' compose configs docker-compose.yml 2>/dev/null | sort)
+# API и dashboard Traefik закрыты: api.insecure открывает их на 8080 без пароля, роутер на
+# api@internal — наружу; API отдаёт dynamic-конфиг с ключом bouncer и хешем замка.
+while IFS= read -r line; do
+  [ -n "$line" ] && edge_bad+=("$line: API и dashboard Traefik наружу не открываем (api.insecure, api@internal)")
+done < <(grep -rlE '^[^#]*(insecure:[[:space:]]*["'"'"']?true|--api\.insecure([[:space:]"'"'"']|=true|$)|api@internal)' compose configs docker-compose.yml 2>/dev/null | sort)
+# Журнал доступа берёт из заголовков запроса только названные: с defaultMode: keep в него
+# уходят Authorization и Cookie.
+while IFS= read -r line; do
+  [ -n "$line" ] && edge_bad+=("$line: журнал доступа с headers.defaultMode: keep пишет Authorization и Cookie")
+done < <(awk '
+  /^[ \t]*(#|$)/ { next }
+  { match($0, /^[ \t]*/); i = RLENGTH }
+  inhdr && i <= hi { inhdr = 0 }
+  /^[ \t]*headers:[ \t]*$/ { inhdr = 1; hi = i; next }
+  inhdr && /defaultMode:[ \t]*["\047]?keep/ { print FILENAME; nextfile }' configs/traefik/*.tpl 2>/dev/null | sort -u)
 # Отрендеренный сосед .tpl несёт значения .env (ключ bouncer, хеш замка): вне .gitignore
 # его закоммитит `git add -A` из make ship.
 if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
@@ -231,10 +262,45 @@ if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   done < <(find configs -type f -name '*.tpl' | sort)
 fi
 if [ ${#edge_bad[@]} -eq 0 ]; then
-  rec "edge defaults" PASS "" "OK — crowdsec@file на каждом роутере, Host в правилах, сервисы с роутером без портов, docker-сокет — только у traefik, sanitizePath не тронут, отрендеренные конфиги под .gitignore"
+  rec "edge defaults" PASS "" "OK — crowdsec@file на каждом роутере, Host в правилах, сервисы с роутером без портов и не в сети хоста, docker-сокет — только у traefik, у traefik — порты 80 и 443, API и dashboard закрыты, sanitizePath не тронут, журнал без лишних заголовков, отрендеренные конфиги под .gitignore"
 else
   detail=$(printf '%s\n' "${edge_bad[@]}")
   rec "edge defaults" FAIL "$(printf '%s' "$detail" | paste -sd';' - | sed 's/;/; /g')" "$detail"
+fi
+
+# 7. Скрипты стека и расписания. Синтаксическую ошибку в задании расписания деплой не
+#    видит: задание падает в свой час. Строку расписания не той формы crond пропускает
+#    молча. Интерпретатор — по первой строке файла; расписание — пять полей времени и
+#    команда, файл задания edge (/opt/edge/<имя> — каталог configs/crowdsec) существует.
+sh_bad=()
+while IFS= read -r f; do
+  case "$(head -n 1 "$f")" in
+    '#!/bin/sh'*) sh -n "$f" 2>/dev/null || sh_bad+=("$f: синтаксис sh") ;;
+    '#!'*bash*)   bash -n "$f" 2>/dev/null || sh_bad+=("$f: синтаксис bash") ;;
+  esac
+done < <(find configs containers scripts -type f | sort)
+for f in configs/*/crontab containers/*/crontab; do
+  [ -f "$f" ] || continue
+  while IFS= read -r line; do
+    [ -n "$line" ] && sh_bad+=("$f: $line")
+  done < <(awk '
+    /^[ \t]*(#|$)/ { next }
+    {
+      ok = (NF >= 6)
+      for (i = 1; i <= 5 && ok; i++) if ($i !~ /^[0-9*\/,-]+$/) ok = 0
+      if (!ok) { print "строка " FNR " — не «пять полей времени и команда»"; next }
+      for (i = 6; i <= NF; i++) if ($i ~ /^\/opt\/edge\//) {
+        job = $i; sub(/^\/opt\/edge\//, "", job)
+        if ((getline probe < ("configs/crowdsec/" job)) < 0) print "строка " FNR " — нет задания configs/crowdsec/" job
+        close("configs/crowdsec/" job)
+      }
+    }' "$f")
+done
+if [ ${#sh_bad[@]} -eq 0 ]; then
+  rec "stack scripts" PASS "" "OK — синтаксис шелл-скриптов configs/, containers/, scripts/; форма расписаний"
+else
+  detail=$(printf '%s\n' "${sh_bad[@]}")
+  rec "stack scripts" FAIL "$(printf '%s' "$detail" | paste -sd';' - | sed 's/;/; /g')" "$detail"
 fi
 
 [ "$DETAILED" = "0" ] && echo
