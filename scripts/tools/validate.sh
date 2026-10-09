@@ -159,42 +159,70 @@ fi
 
 # 6. Умолчания безопасности edge — по тексту compose/ и configs/, без docker и .env:
 #    то, что снаружи выглядит рабочим стеком, а запрос пускает мимо edge.
+#    Пределы — проверка читает текст, а не разобранный YAML и не итог `compose config`:
+#      - роутеры видит только в labels сервисов compose; роутеры file-провайдера
+#        (configs/traefik/dynamic/) и labels из extends, якорей и override-файлов — нет;
+#      - `${VAR}` не раскрывает: цепочка начинается с crowdsec@file буквально;
+#      - порт любого назначения у сервиса с включённым роутером — отказ
+#        (правило compose-and-services), порт сервиса без роутера — нет;
+#      - поведение edge (заголовки, лимиты, редиректы, порядок цепочек) не видит.
 edge_bad=()
-# Роутеры из labels (map- и list-форма): у каждого есть цепочка, она начинается с
-# crowdsec@file, а правило называет хост — catch-all отдаёт сервис чужому Host.
+# Один проход по сервисам. Роутеры из labels (map- и list-форма, значение в одну строку
+# или с продолжением): у каждого есть цепочка, она начинается с crowdsec@file, а правило
+# называет хост — catch-all отдаёт сервис чужому Host. Сервис с включённым роутером не
+# публикует порт: это вход мимо edge — без crowdsec, лимитов и Host-роутинга.
+# docker-сокет — только у сервиса traefik.
 while IFS= read -r line; do
   [ -n "$line" ] && edge_bad+=("$line")
 done < <(awk '
-  /^[ \t]*#/ { next }
-  match($0, /traefik\.http\.routers\.[A-Za-z0-9_-]+\.(rule|middlewares)["\047]?[:=]/) {
-    key = substr($0, RSTART, RLENGTH); val = substr($0, RSTART + RLENGTH)
-    n = split(key, part, "."); name = part[4]; field = part[5]; sub(/["\047]?[:=]$/, "", field)
-    gsub(/^[ \t"\047]+|[ \t"\047]+$/, "", val)
-    id = FILENAME ": роутер " name
-    seen[id] = 1
-    if (field == "rule") rule[id] = val; else chain[id] = val
+  function ltrim(s) { sub(/^[ \t]+/, "", s); return s }
+  FNR == 1 { insvc = 0; si = -1; svc = ""; pend = "" }
+  /^[ \t]*(#|$)/ { next }
+  {
+    match($0, /^[ \t]*/); i = RLENGTH
+    if (pend != "") {
+      if (i > pi) { val[pend] = val[pend] " " ltrim($0); next }
+      pend = ""
+    }
+    if (i == 0) { insvc = ($0 ~ /^services:/); si = -1; svc = ""; next }
+    if (!insvc) next
+    if (si < 0) si = i
+    if (i == si) {
+      svc = ltrim($0); sub(/[ \t]*:.*$/, "", svc); gsub(/["\047]/, "", svc)
+      file[FILENAME SUBSEP svc] = FILENAME; name[FILENAME SUBSEP svc] = svc; next
+    }
+    id = FILENAME SUBSEP svc
+    if ($0 ~ /^[ \t]+ports:/) ports[id] = 1
+    if ($0 ~ /docker\.sock/) sock[id] = 1
+    if ($0 ~ /traefik\.enable["\047]?[:=][ \t]*["\047]?true/) on[id] = 1
+    if (match($0, /traefik\.http\.routers\.[A-Za-z0-9_-]+\.(rule|middlewares)["\047]?[:=]/)) {
+      key = substr($0, RSTART, RLENGTH); rest = substr($0, RSTART + RLENGTH)
+      split(key, part, "."); field = part[5]; sub(/["\047]?[:=]$/, "", field)
+      r = FILENAME ": роутер " part[4]
+      seen[r] = 1; pend = r SUBSEP field; pi = i
+      rest = ltrim(rest); if (rest ~ /^[>|][+-]?[ \t]*$/) rest = ""
+      val[pend] = rest
+    }
   }
   END {
-    for (id in seen) {
-      if (!(id in chain)) print id " — без цепочки middlewares"
-      else if (chain[id] !~ /^crowdsec@file(,|\$|$)/) print id " — цепочка начинается не с crowdsec@file"
-      if ((id in rule) && rule[id] !~ /Host(Regexp)?\(/) print id " — правило не называет Host"
+    for (r in seen) {
+      if (!((r SUBSEP "middlewares") in val)) print r " — без цепочки middlewares"
+      else {
+        chain = val[r SUBSEP "middlewares"]; gsub(/^[ \t"\047]+|[ \t"\047]+$/, "", chain)
+        if (chain !~ /^crowdsec@file(,|\$|$)/) print r " — цепочка начинается не с crowdsec@file"
+      }
+      if (((r SUBSEP "rule") in val) && val[r SUBSEP "rule"] !~ /Host(Regexp)?\(/) print r " — правило не называет Host"
     }
-  }' compose/*.yml | sort)
-for f in compose/*.yml; do
-  # Порт сервиса с Traefik-роутером — вход мимо edge: без crowdsec, лимитов и Host-роутинга.
-  if grep -qE '^[^#]*traefik\.enable' "$f" && grep -qE '^[[:space:]]*ports:' "$f"; then
-    edge_bad+=("$f: сервис с Traefik-роутером публикует порт (ports:)")
-  fi
-  if [ "$f" != compose/traefik.yml ] && grep -qE '^[^#]*docker\.sock' "$f"; then
-    edge_bad+=("$f: docker-сокет — только у traefik")
-  fi
-done
+    for (id in file) {
+      if ((id in on) && (id in ports)) print file[id] ": сервис с Traefik-роутером публикует порт (ports:) — " name[id]
+      if ((id in sock) && name[id] != "traefik") print file[id] ": docker-сокет — только у traefik — " name[id]
+    }
+  }' docker-compose.yml compose/*.yml | sort)
 # sanitizePath — умолчание Traefik (включён): правила на путь сопоставляются с приведённым
-# путём, и выключенный он открывает запрет /_image записью //_image.
+# путём, и выключенный он открывает запрет /_image записью //_image. Комментарий не считается.
 while IFS= read -r line; do
   [ -n "$line" ] && edge_bad+=("$line: sanitizePath — умолчание Traefik не трогаем")
-done < <(grep -rilE 'sanitizePath' compose configs docker-compose.yml 2>/dev/null | sort)
+done < <(grep -rilE '^[^#]*sanitizePath' compose configs docker-compose.yml 2>/dev/null | sort)
 # Отрендеренный сосед .tpl несёт значения .env (ключ bouncer, хеш замка): вне .gitignore
 # его закоммитит `git add -A` из make ship.
 if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
