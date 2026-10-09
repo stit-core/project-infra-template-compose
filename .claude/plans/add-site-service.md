@@ -240,6 +240,9 @@ blocked-by: —
   не статикой — S7: `make accept` — записи `Host` (выше), код отказа WAF 429 решением на свой адрес (на VPS это шлюз
   сети docker), лишние заголовки и порядок цепочки `staging`; смок — «контейнер healthy, а на `/` отвечает не сайт» и
   не-прод без замка. Ожидание healthy в `bump` и возврат тега держит гейт этапа (`s3-inner.sh bump`).
+- `make new-env` пишет `ROBOTS_POLICY` по `ENV` (`prod` — `index`, иначе `noindex`) и `HOST_ROLE=all` (N6): свежий
+  `.env` покрывает активные ключи `.env.example` — `make doctor` без WARN, не-прод закрыт от индексации с первого
+  деплоя; `noindex` без замка при профиле `site` — WARN `doctor` и строка `make deploy` (Р6).
 - Журнал — файл в каталоге хоста `/var/log/traefik`, не docker-источник: `acquis.yaml` и монтирование `/var/log` у
   `crowdsec` рассчитаны на этот путь; docker-сокет второму контейнеру — права тому, кто разбирает чужой ввод.
 - Расписание (ротация журнала, обновление allowlist) живёт в стеке, как cron бэкапа, а не на хосте: правка доезжает
@@ -276,8 +279,8 @@ blocked-by: —
   CrowdSec начинают работать — свой аудит с рабочей станции может получить 429 (runbook).
 - Бэклог `I` (не тема фазы): `make validate` без `.env` не разбирает compose и не ловит `:latest`, хотя проза это
   обещает; источник `auth.log` у CrowdSec пуст на Debian 12 без rsyslog; `deploy.sh` глотает отказ
-  `git pull --ff-only`; `make new-env` не пишет `HOST_ROLE` — WARN `doctor`; роутеры file-провайдера (`dynamic/*.yml`)
-  проверка `edge defaults` не читает; API Traefik из контейнера (правило `traefik-routing`) отвечает 404.
+  `git pull --ff-only`; роутеры file-провайдера (`dynamic/*.yml`) проверка `edge defaults` не читает; API Traefik из
+  контейнера (правило `traefik-routing`) отвечает 404.
 
 ## Где мы сейчас
 Этап A (S1–S3) возвращён независимым валидатором: FAIL, блокирующее B1 — роутер `site-www` отдавал сайт мимо

@@ -85,7 +85,9 @@ PROJECT_NAME=acme ENV=prod DOMAIN=acme.com ACME_EMAIL=ops@acme.com \
 make new-env
 ```
 
-Создаёт `.env` (chmod 600) — identity + ACME. Секреты профилей дописываются по
+Создаёт `.env` (chmod 600) — identity + ACME и `ROBOTS_POLICY` по `ENV`: `prod` — `index`, любая
+другая среда — `noindex` (сайт не-прод среды закрыт от индексации с первого деплоя; замок с паролем —
+`STAGING_BASIC_AUTH_USERS`, `.env.example § profile site`). Секреты профилей дописываются по
 необходимости (шаг 6). `CROWDSEC_BOUNCER_API_KEY` заполняется автоматически на
 первом деплое. Другой registry — допишите `REGISTRY_HOST` (см. `.env.example`). Строка
 `# COMPOSE_PROFILES=` закомментирована — раскомментируете по мере активации сервисов.
