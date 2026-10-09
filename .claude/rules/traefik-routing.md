@@ -34,13 +34,14 @@ paths:
 | `compress@file` | Сжатие `br` / `gzip` | Роуты, отдающие HTML |
 | `form-rate-limit@file`, `form-body-limit@file` | Лимит частоты и тела публичной формы | Роут публичного POST формы |
 | `retry@file` | Повтор запроса при гонке пересоздания сервиса | Только идемпотентные роуты (GET / HEAD) |
-| `www-to-apex@file` | `www.${DOMAIN}` → `${DOMAIN}` одним 301 | Роут `www` |
+| `www-to-apex@file` | Любой адрес роутера → `https://${DOMAIN}/<путь>` одним 301; хост regexp не называет — его выбрал роутер | Роут `www`, сервис — `noop@internal` |
 | `deny-all@file` | 403 на edge, до сервиса | Путь без внешнего доступа |
 | `staging-noindex@file`, `staging-auth@file` | Не-прод контур: `X-Robots-Tag` и basicAuth — парой и в этом порядке | Роуты не-прод среды |
 
 **Правило:**
 - Любой публичный сервис → минимум `crowdsec@file`.
 - Публичный API (backend) → `crowdsec@file,secure-headers@file,rate-limit@file`.
+- Роутер, который только редиректит, → `service: noop@internal`. Правило `Host()` принимает и `Host` с портом, заглавными или точкой в конце; запрос, на котором regexp редиректа не сработал, middleware передаёт дальше — в сервис роутера, мимо цепочек основного роутера.
 - Внутренние сервисы — без traefik labels вообще.
 
 Forward-auth в стеке нет — IDP на проектной стороне нет. Служебный UI (например, MinIO Console) закрыт `crowdsec@file` + `rate-limit@file`; сузить доступ — IP-allowlist'ом или отключением роутера.

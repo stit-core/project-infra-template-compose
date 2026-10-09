@@ -83,12 +83,14 @@ services:
       traefik.http.routers.site-image.service: site
 
       # www → apex одним 301, отдельным роутером: regexp не гоняется на запросах apex.
+      # Роутер не проксирует — сервис noop@internal: запрос, на котором редирект не
+      # сработал, получает 418 от Traefik, а не сайт в обход цепочек роутеров apex.
       traefik.http.routers.site-www.rule: Host(`www.${DOMAIN}`)
       traefik.http.routers.site-www.entrypoints: websecure
       traefik.http.routers.site-www.tls: "true"
       traefik.http.routers.site-www.tls.certresolver: letsencrypt
       traefik.http.routers.site-www.middlewares: crowdsec@file,www-to-apex@file
-      traefik.http.routers.site-www.service: site
+      traefik.http.routers.site-www.service: noop@internal
 
       traefik.http.services.site.loadbalancer.server.port: "3000"
       # Проверка на стороне Traefik снимает сервер с балансировки, когда процесс
