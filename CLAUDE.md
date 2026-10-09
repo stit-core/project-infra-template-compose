@@ -98,10 +98,12 @@ Always-on (traefik / crowdsec / landing) поднимается на identity + 
 | OPS | `ps` / `logs SVC=` / `restart SVC=` / `recreate SVC=` / `build SVC=` | статус / логи / рестарт / пересоздать (подхват нового значения `.env` или тега) / сборка образа сервиса |
 | | `bump SVC= TAG=` | бамп image-тега: правит `<SVC>_TAG` в `.env` на VPS + force-recreate, ждёт healthy. Единственный канон бампа |
 | | `backup` / `restore-pg SNAPSHOT=` | one-shot backup / restore postgres из restic |
+| | `allowlist` | allowlist ботов в CrowdSec: сети вендоров по `ai-bots.sources` и `robots.txt` сайта |
 | INTEL | `status` / `search Q= [P=]` | cockpit-сводка / поиск по compose+configs+scripts+docs |
 | PROVISION | `new-env` | bootstrap `.env` на чистом VPS |
 | SETUP | `setup` | git-хуки (commit-msg + pre-commit) + PyYAML для frontmatter-проверки |
 | META | `plan-check` / `project-check` | структура планов / инфра-слой `docs/project/` (stack + сервисы) |
+| | `bots-sources` | печать реестра ботов соседа `<org>/site` → `configs/crowdsec/ai-bots.sources` |
 
 Произвольная команда на VPS — `bash scripts/tools/ssh.sh exec '<command>'` (одной строкой в
 кавычках; задокументированное исключение make-first — make-слой ломает вложенные кавычки,

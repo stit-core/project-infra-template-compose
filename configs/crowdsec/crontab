@@ -4,3 +4,6 @@
 # Ротация журнала доступа Traefik: раз в сутки и вне очереди — когда файл перерос 256 МиБ.
 17 3 * * *    sh /opt/edge/rotate-access-log.sh
 */10 * * * *  sh /opt/edge/rotate-access-log.sh 268435456
+#
+# Allowlist ботов: сети вендоров из ai-bots.sources — раз в неделю, в понедельник.
+23 4 * * 1    sh /opt/edge/bots-allowlist.sh

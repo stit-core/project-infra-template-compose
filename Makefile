@@ -1,4 +1,4 @@
-.PHONY: help validate doctor check ship deploy render env-form ps logs restart recreate build bump backup restore-pg status search new-env setup plan-check project-check
+.PHONY: help validate doctor check ship deploy render env-form ps logs restart recreate build bump backup allowlist restore-pg status search new-env setup plan-check project-check bots-sources
 
 SHELL := /usr/bin/env bash
 
@@ -112,6 +112,13 @@ backup: ## one-shot backup (на VPS; с workstation — через ssh)
 	@if [ -f .env ]; then docker exec backup /usr/local/bin/backup-now; \
 	else bash scripts/tools/ssh.sh exec make backup; fi
 
+# Кого robots.txt сайта пускает, того CrowdSec не банит: сети ботов из
+# configs/crowdsec/ai-bots.sources — в cscli allowlists. То же делают make deploy (только
+# недостающие списки) и расписание edge раз в неделю.
+allowlist: ## allowlist ботов в CrowdSec: сети вендоров по ai-bots.sources и robots.txt сайта (на VPS; с workstation — через ssh)
+	@if [ -f .env ]; then docker exec crowdsec sh /opt/edge/bots-allowlist.sh; \
+	else bash scripts/tools/ssh.sh exec make allowlist; fi
+
 restore-pg: ## restore postgres из restic: make restore-pg SNAPSHOT=latest
 	@if [ -z "$(SNAPSHOT)" ]; then echo "usage: make restore-pg SNAPSHOT=<id|latest>"; exit 2; fi
 	@if [ -f .env ]; then bash scripts/restore-pg.sh "$(SNAPSHOT)"; \
@@ -148,3 +155,6 @@ plan-check: ## Формат планов .claude/plans/ (A=<файл> — оди
 
 project-check: ## Валидатор инфра-слоя docs/project/ (stack + service-doc'и; A=<path> override)
 	@bash scripts/tools/validate-project-doc.sh $(A)
+
+bots-sources: ## Источники allowlist ботов: печать реестра соседа <org>/site → configs/crowdsec/ai-bots.sources (SITE_REPO_PATH=)
+	@bash scripts/tools/bots-sources.sh

@@ -23,10 +23,12 @@ paths:
 | OPS | `ps` / `logs SVC=` / `restart SVC=` / `recreate SVC=` / `build SVC=` | статус / логи / рестарт / пересоздать (подхват нового значения `.env` или тега) / сборка образа сервиса (на VPS) |
 | | `bump SVC= TAG=` | бамп image-тега: `<SVC>_TAG` в `.env` на VPS + force-recreate, ждёт healthy. Теги — строго через `.env` |
 | | `backup` / `restore-pg SNAPSHOT=` | one-shot backup / restore postgres из restic |
+| | `allowlist` | allowlist ботов в CrowdSec: сети вендоров по `configs/crowdsec/ai-bots.sources` и `robots.txt` сайта |
 | INTEL | `status` / `search Q= [P=]` | cockpit-сводка (локальный `status.sh` + серверный смок `== Server ==` по SSH при `.env.local`) / поиск по compose+configs+scripts+docs |
 | PROVISION | `new-env` | bootstrap `.env` на чистом VPS |
 | SETUP | `setup` | симлинк git-хуков (commit-msg, pre-commit) в `.git/hooks/` + PyYAML для frontmatter-проверки |
 | META | `plan-check` / `project-check` | формат планов `.claude/plans/` / инфра-слой `docs/project/` (stack + сервисы) |
+| | `bots-sources` | печать реестра ботов соседа `<org>/site` → `configs/crowdsec/ai-bots.sources` (локально, нужен сосед) |
 
 Канонический gate перед claim «готово» / push — **`make check`** (validate + doctor + plan-check + project-check).
 

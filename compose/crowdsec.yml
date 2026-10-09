@@ -4,8 +4,9 @@ services:
     container_name: crowdsec
     restart: unless-stopped
     # Рядом с CrowdSec — crond: расписание edge (configs/crowdsec/crontab) живёт в стеке, и
-    # правку доносит make deploy. /docker_start.sh — entrypoint образа; init — чтобы PID 1
-    # прибирал за заданиями расписания.
+    # правку доносит make deploy. Задания — ротация журнала доступа и allowlist ботов: им
+    # нужны каталог журнала и cscli. /docker_start.sh — entrypoint образа; init — чтобы
+    # PID 1 прибирал за заданиями расписания.
     init: true
     entrypoint: ["/bin/bash", "-c", "crontab /opt/edge/crontab && crond -f -L /dev/stdout & exec /bin/bash /docker_start.sh"]
     environment:

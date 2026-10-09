@@ -57,6 +57,23 @@ Bouncer Traefik спрашивает решение у LAPI CrowdSec на каж
 - 429 одному адресу, а не всем — решение о бане: `docker exec crowdsec cscli decisions list`; снять — `docker exec crowdsec cscli decisions delete --ip <адрес>`.
 - Источник журнала пуст (`docker exec crowdsec cscli metrics show acquisition` — нет строки `file:/var/log/traefik/access.log`) — сценарии не работают: сверь `configs/crowdsec/acquis.yaml` и каталог `/var/log/traefik` на хосте, затем `make restart SVC=crowdsec`.
 
+## Allowlist ботов в CrowdSec
+
+Кого `robots.txt` сайта пускает, того edge не банит: у каждого бота из `configs/crowdsec/ai-bots.sources` с адресом списка сетей вендора — свой allowlist `bot-<токен>`. Обновляет задание `configs/crowdsec/bots-allowlist.sh`: расписание стека раз в неделю, `make allowlist` (все списки), `make deploy` (только недостающие и не обновлявшиеся дольше шести дней).
+
+```bash
+docker exec crowdsec cscli allowlists list          # allowlist bot-…: адрес источника, дата обновления, число сетей
+docker exec crowdsec cscli allowlists check <адрес>  # в каком allowlist адрес
+make allowlist                                        # обновить все списки сейчас
+```
+
+- **`WARN <бот>: источник не ответил или не дал ни одной сети`** — прежний allowlist бота остаётся (записи живут 21 день); повтори `make allowlist`. Источник не отвечает неделями или сменил формат — задача репо сайта: адрес списка живёт в его реестре ботов.
+- **`WARN <бот>: сети шире порога отвергнуты`** — в ответе вендора сеть шире `/16` (IPv4) или `/32` (IPv6): она в allowlist не попадает, остальные сети приняты.
+- **`сервис site не отвечает — allowlist не меняется`** — задание читает политику с `http://site:3000/robots.txt`: `make ps`, `make logs SVC=site`.
+- **Сайт сменил политику ИИ-ботов** (строка `AI-BOTS` handoff релиза): после `make bump SVC=site` — `make allowlist`; allowlist бота, которого `robots.txt` закрыл именной группой, снимается.
+- **Сменилась версия реестра ботов** (та же строка, WARN `bots sources` в `make doctor`): в хабе `make bots-sources` (нужен сосед `<org>/site` на теге релиза), затем `make ship`.
+- **Бот получил 429 от WAF**: `docker exec crowdsec cscli decisions list`; адреса из списка вендора там быть не должно — сверь `cscli allowlists check <адрес>` и дату обновления списка.
+
 ## Журнал доступа Traefik
 
 `/var/log/traefik/access.log` на хосте: JSON-строка на каждый ответ, с `request_User-Agent` и `X-Request-Id`. Его читает CrowdSec. Ротация — расписание стека (`configs/crowdsec/crontab`, crond в контейнере `crowdsec`): раз в сутки и вне очереди, когда файл перерос 256 МиБ; копии — `access.log.1.gz` (свежая) … `access.log.14.gz`.

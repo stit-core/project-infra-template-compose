@@ -35,9 +35,17 @@ declare -A ROLE_FILES=(
 sel="${ROLE_FILES[$HOST_ROLE]:-}"
 [ -n "$sel" ] || { echo "ERR: unknown HOST_ROLE=$HOST_ROLE (all|edge|db|storage)" >&2; exit 1; }
 
-prev_sha=$(git rev-parse HEAD 2>/dev/null || echo "none")
+prev_sha=${DEPLOY_PREV_SHA:-$(git rev-parse HEAD 2>/dev/null || echo "none")}
 git pull --ff-only origin main || true
 new_sha=$(git rev-parse HEAD 2>/dev/null || echo "none")
+
+# Этот pull мог обновить и сам скрипт, а bash дочитывает прежнюю версию: новая логика
+# деплоя опоздала бы на один деплой. Продолжает новая версия — с тем же prev_sha.
+if [ -z "${DEPLOY_PREV_SHA:-}" ] && [ "$prev_sha" != "$new_sha" ] && [ "$prev_sha" != "none" ] \
+   && ! git diff --quiet "$prev_sha" "$new_sha" -- scripts/deploy.sh; then
+  echo "→ scripts/deploy.sh обновлён этим pull — продолжает новая версия"
+  DEPLOY_PREV_SHA=$prev_sha exec bash scripts/deploy.sh
+fi
 
 bash scripts/render-configs.sh
 
@@ -115,10 +123,11 @@ if [ "$prev_sha" != "$new_sha" ] && [ "$prev_sha" != "none" ]; then
     [crowdsec]="crowdsec"
     [postgres]="postgres"
   )
-  # Задания расписания edge (configs/crowdsec/*.sh) читаются при каждом запуске из
-  # смонтированного каталога — рестарт CrowdSec им не нужен.
+  # Задания расписания edge (configs/crowdsec/*.sh) и список источников allowlist
+  # читаются при каждом запуске из смонтированного каталога — рестарт CrowdSec им не
+  # нужен, а он — секунды отказа 429 новым клиентам.
   mapfile -t changed_dirs < <(git diff --name-only "$prev_sha" "$new_sha" -- configs/ \
-      ':!configs/crowdsec/*.sh' \
+      ':!configs/crowdsec/*.sh' ':!configs/crowdsec/ai-bots.sources' \
     | awk -F/ 'NF>=2 {print $2}' | sort -u)
   to_restart=()
   for d in "${changed_dirs[@]}"; do
@@ -162,6 +171,18 @@ if [ "$crowdsec_here" = 1 ]; then
     echo "→ traefik: плагин bouncer не загружен ($state) — рестарт, попытка $try"
     docker compose "${args[@]}" restart traefik
   done
+fi
+
+# Allowlist ботов: кого robots.txt сайта пускает, того CrowdSec не банит. Здесь — только
+# недостающие и давно не обновлявшиеся списки: к вендорам деплой без нужды не ходит;
+# полное обновление — make allowlist и расписание edge. Отказ источника деплой не роняет.
+if [ "$crowdsec_here" = 1 ]; then
+  case ",${COMPOSE_PROFILES:-}," in
+    *,site,*)
+      echo "→ allowlist ботов (CrowdSec)"
+      docker exec crowdsec sh /opt/edge/bots-allowlist.sh missing ||
+        echo "WARN: allowlist ботов обновлён не полностью — make allowlist (docs/reference/runbook.md)" ;;
+  esac
 fi
 
 docker compose "${args[@]}" ps

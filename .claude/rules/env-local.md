@@ -50,5 +50,5 @@ runtime-секреты приложения и **не** серверный `.env
 | `SSH_HOST` / `SSH_PORT` / `SSH_USER` | `scripts/tools/ssh.sh` (ops-вербы, exec-канал произвольных команд, серверный смок `make status`) | куда ходить; ключ — на машине |
 | `HOST` | `ssh.sh` (override `user@ip`) | разовая сессия на другой хост |
 | `PROJECT_NAME` | `ssh.sh` (`REMOTE_DIR=/opt/<p>-infra`) | имя проекта на VPS |
-| `<NAME>_REPO_PATH` (`STRATEGY_`/`BACKEND_`/`FRONTEND_`/`SITE_`/`MOBILE_`/…) | скиллы (init-project/stack-deep-dive/de-template/smartdev) + оркестрация по сиблингам (`CLAUDE.md § Оркестрация`) | путь к sibling-репо `<org>/<name>`; дефолт `../<name>` (резолв — `docs/reference/ecosystem.md`); **не секрет** (путь, читается grep'ом) |
+| `<NAME>_REPO_PATH` (`STRATEGY_`/`BACKEND_`/`FRONTEND_`/`SITE_`/`MOBILE_`/…) | скиллы (init-project/stack-deep-dive/de-template/smartdev) + оркестрация по сиблингам (`CLAUDE.md § Оркестрация`); `SITE_REPO_PATH` — ещё `make bots-sources` и `make doctor` (`scripts/tools/bots-sources.sh`) | путь к sibling-репо `<org>/<name>`; дефолт `../<name>` (резолв — `docs/reference/ecosystem.md`); **не секрет** (путь, читается grep'ом) |
 | `<TOKEN>` | по мере необходимости | токены, присланные оператором (registry/API/…) |

@@ -166,6 +166,14 @@ else
   fi
 fi
 
+# 8. Список источников allowlist ботов — та же версия реестра, что у соседа <org>/site
+#    (на VPS соседа нет — SKIP)
+read -r bots_status bots_note < <(bash scripts/tools/bots-sources.sh check 2>&1)
+case "$bots_status" in
+  PASS|WARN|SKIP) st "bots sources" "$bots_status" "$bots_note" ;;
+  *) st "bots sources" WARN "scripts/tools/bots-sources.sh check: $bots_status $bots_note" ;;
+esac
+
 echo
 if [ "$fail" -eq 0 ]; then
   echo "OK"
