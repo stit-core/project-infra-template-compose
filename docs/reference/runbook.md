@@ -46,6 +46,17 @@ make restart SVC=traefik                     # повторить загрузк
 
 `make deploy` сверяет строку `Plugins loaded` сам: при сбое рестартует Traefik до двух раз, а если не помогло — отказывает с `ERR: traefik: плагин bouncer не загружен`; тогда проверь выход VPS в сеть (`plugins.traefik.io`). После рестарта вне деплоя — `make restart`, перезагрузка хоста — сверяй ту же строку лога сам.
 
+## Edge отвечает 429 на всех адресах
+
+**Симптом:** любой адрес отвечает `429`, и новому клиенту тоже; `make ps` — `crowdsec` не healthy или перезапускается.
+
+Bouncer Traefik спрашивает решение у LAPI CrowdSec на каждый новый адрес клиента (вердикт держит в кеше до 60 с) и, пока LAPI не отвечает, отказывает — 429. Поэтому `crowdsec` здоров, только когда LAPI отвечает, и Traefik стартует после него.
+
+- `docker logs crowdsec --tail=50` — есть строка `CrowdSec Local API listening`? Первый старт ставит коллекции из хаба CrowdSec: до минуты, нужен выход в сеть.
+- Рестарт и пересоздание `crowdsec` (`make restart SVC=crowdsec`, деплой с правкой `configs/crowdsec/acquis.yaml` или `crontab`) — 6–8 секунд отказа 429 клиентам без вердикта в кеше: без нужды его не рестартуют.
+- 429 одному адресу, а не всем — решение о бане: `docker exec crowdsec cscli decisions list`; снять — `docker exec crowdsec cscli decisions delete --ip <адрес>`.
+- Источник журнала пуст (`docker exec crowdsec cscli metrics show acquisition` — нет строки `file:/var/log/traefik/access.log`) — сценарии не работают: сверь `configs/crowdsec/acquis.yaml` и каталог `/var/log/traefik` на хосте, затем `make restart SVC=crowdsec`.
+
 ## Журнал доступа Traefik
 
 `/var/log/traefik/access.log` на хосте: JSON-строка на каждый ответ, с `request_User-Agent` и `X-Request-Id`. Его читает CrowdSec. Ротация — расписание стека (`configs/crowdsec/crontab`, crond в контейнере `crowdsec`): раз в сутки и вне очереди, когда файл перерос 256 МиБ; копии — `access.log.1.gz` (свежая) … `access.log.14.gz`.

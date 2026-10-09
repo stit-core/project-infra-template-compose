@@ -3,7 +3,11 @@ filenames:
 labels:
   type: syslog
 ---
+# Журнал доступа Traefik (configs/traefik/traefik.yml.tpl). Каталог отслеживается и пока в
+# нём нет файла: CrowdSec стартует раньше Traefik, а источник с пустым glob без
+# force_inotify остался бы без чтения до рестарта.
 filenames:
   - /var/log/traefik/*.log
+force_inotify: true
 labels:
   type: traefik

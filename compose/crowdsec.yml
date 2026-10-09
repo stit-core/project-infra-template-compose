@@ -9,6 +9,8 @@ services:
     init: true
     entrypoint: ["/bin/bash", "-c", "crontab /opt/edge/crontab && crond -f -L /dev/stdout & exec /bin/bash /docker_start.sh"]
     environment:
+      # crowdsecurity/linux несёт whitelist-good-actors — постоверфлоу rdns и
+      # seo-bots-whitelist: без них сценарии обхода банят поисковых ботов.
       COLLECTIONS: "crowdsecurity/traefik crowdsecurity/linux crowdsecurity/sshd"
       GID: "1000"
     volumes:
@@ -24,8 +26,11 @@ services:
     networks:
       - proxy
     healthcheck:
-      test: ["CMD", "cscli", "version"]
-      interval: 30s
+      # Здоров — когда LAPI отвечает и crond жив, а не когда запущен процесс: пока LAPI не
+      # готов, bouncer Traefik отказывает всем (429), поэтому Traefik стартует после этой
+      # пробы (depends_on). Первый старт ставит коллекции из хаба — до LAPI десятки секунд.
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/health && pgrep crond >/dev/null"]
+      interval: 10s
       timeout: 5s
       retries: 3
-      start_period: 30s
+      start_period: 120s

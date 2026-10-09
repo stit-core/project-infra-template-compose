@@ -83,7 +83,9 @@ crowdsec_here=0
 case "$HOST_ROLE" in all|edge) crowdsec_here=1 ;; esac
 if [ "$crowdsec_here" = 1 ]; then
   echo "→ crowdsec early (для bouncer auto-register)"
-  docker compose "${args[@]}" up -d --wait --wait-timeout 60 crowdsec
+  # Ждёт готовности LAPI (healthcheck сервиса): на первом старте CrowdSec ставит коллекции
+  # из хаба, и до неё проходят десятки секунд.
+  docker compose "${args[@]}" up -d --wait --wait-timeout 180 crowdsec
 fi
 
 # CrowdSec bouncer auto-register. Если в .env ключ пустой — генерим сейчас,
