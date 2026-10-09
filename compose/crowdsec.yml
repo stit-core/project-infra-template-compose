@@ -3,6 +3,11 @@ services:
     image: crowdsecurity/crowdsec:v1.7.7
     container_name: crowdsec
     restart: unless-stopped
+    # Поисковика без списка сетей (Яндекс) от сценариев обхода бережёт один запрос PTR в
+    # момент переполнения (постоверфлоу rdns): запрос без ответа — бан его адреса на 4 часа.
+    # Резолвер контейнера повторяет запрос до пяти раз вместо двух.
+    dns_opt:
+      - "attempts:5"
     # Рядом с CrowdSec — crond: расписание edge (configs/crowdsec/crontab) живёт в стеке, и
     # правку доносит make deploy. Задания — ротация журнала доступа и allowlist ботов: им
     # нужны каталог журнала и cscli. /docker_start.sh — entrypoint образа; init — чтобы

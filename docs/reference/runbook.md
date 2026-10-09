@@ -79,6 +79,18 @@ make allowlist                                        # обновить все 
 - **Свой allowlist** называй не с `bot-`: имена `bot-…` — за заданием, список с таким именем, которого нет среди нужных, оно удаляет.
 - **Бот получил 429 от WAF**: `docker exec crowdsec cscli decisions list`; адреса из списка вендора там быть не должно — сверь `cscli allowlists check <адрес>` и дату обновления списка.
 
+## Бан адреса поисковика
+
+Поисковика без списка сетей (Яндекс; остальным — страховка к allowlist) от сценариев обхода бережёт обратная запись DNS: при переполнении сценария CrowdSec один раз спрашивает PTR адреса (постоверфлоу `rdns`) и сверяет суффикс со списком `seo-bots-whitelist`. Запрос без ответа — бан адреса поисковика на 4 часа: резолвер контейнера повторяет запрос до пяти раз (`dns_opt` в `compose/crowdsec.yml`), но пока DNS VPS не отвечает, бан состоится.
+
+```bash
+docker exec crowdsec cscli decisions list                 # адреса под баном и сценарий
+dig +short -x <адрес>                                     # PTR на yandex.ru / yandex.net / yandex.com, googlebot.com, search.msn.com — поисковик
+docker exec crowdsec cscli decisions delete --ip <адрес>  # снять бан
+```
+
+Баны поисковиков повторяются — проверь резолвер VPS: `dig -x <адрес>` обязан отвечать за доли секунды.
+
 ## Журнал доступа Traefik
 
 `/var/log/traefik/access.log` на хосте: JSON-строка на каждый ответ, с `request_User-Agent` и `X-Request-Id`. Его читает CrowdSec. Ротация — расписание стека (`configs/crowdsec/crontab`, crond в контейнере `crowdsec`): раз в сутки и вне очереди, когда файл перерос 256 МиБ; копии — `access.log.1.gz` (свежая) … `access.log.14.gz`.
