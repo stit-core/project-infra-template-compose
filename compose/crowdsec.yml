@@ -3,14 +3,24 @@ services:
     image: crowdsecurity/crowdsec:v1.7.7
     container_name: crowdsec
     restart: unless-stopped
+    # Рядом с CrowdSec — crond: расписание edge (configs/crowdsec/crontab) живёт в стеке, и
+    # правку доносит make deploy. /docker_start.sh — entrypoint образа; init — чтобы PID 1
+    # прибирал за заданиями расписания.
+    init: true
+    entrypoint: ["/bin/bash", "-c", "crontab /opt/edge/crontab && crond -f -L /dev/stdout & exec /bin/bash /docker_start.sh"]
     environment:
       COLLECTIONS: "crowdsecurity/traefik crowdsecurity/linux crowdsecurity/sshd"
       GID: "1000"
     volumes:
       - ./configs/crowdsec/acquis.yaml:/etc/crowdsec/acquis.yaml:ro
+      # Расписание и его задания — каталогом: правку задания контейнер видит без рестарта.
+      - ./configs/crowdsec:/opt/edge:ro
       - crowdsec-data:/var/lib/crowdsec/data
       - crowdsec-config:/etc/crowdsec
       - /var/log:/var/log:ro
+      # Журнал доступа Traefik: запись — для ротации; каталог хоста создаётся уже здесь,
+      # раньше старта Traefik.
+      - /var/log/traefik:/var/log/traefik
     networks:
       - proxy
     healthcheck:

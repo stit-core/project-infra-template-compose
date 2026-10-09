@@ -1,0 +1,6 @@
+# Расписание edge: crond рядом с CrowdSec (compose/crowdsec.yml), время — UTC.
+# Правку расписания доносит make deploy: он рестартует crowdsec, crontab ставится на старте.
+#
+# Ротация журнала доступа Traefik: раз в сутки и вне очереди — когда файл перерос 256 МиБ.
+17 3 * * *    sh /opt/edge/rotate-access-log.sh
+*/10 * * * *  sh /opt/edge/rotate-access-log.sh 268435456

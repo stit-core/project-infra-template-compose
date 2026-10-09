@@ -56,6 +56,12 @@ Forward-auth в стеке нет — IDP на проектной стороне
 
 Dashboard не expose'им — на проектной стороне он не нужен (single-tenant): в static-конфиге `api.insecure: false`, роутера на dashboard нет. Если для отладки нужен — точечно через `docker exec traefik wget ... /api/...`.
 
+## Журнал доступа
+
+`accessLog` в static-конфиге — файл `/var/log/traefik/access.log` в каталоге хоста: JSON, каждый ответ (и 2xx — их считают сценарии обхода CrowdSec), из заголовков — `User-Agent` и `X-Request-Id`. Файл читает CrowdSec (`configs/crowdsec/acquis.yaml`); ротация — расписание стека (`configs/crowdsec/crontab`), копией и сбросом активного файла: Traefik переоткрывает журнал только по сигналу. Фильтр статусов и лишние заголовки запроса в журнал не добавляются.
+
+`providers.docker.allowEmptyServices: true`: контейнер без здоровья (неудачная выкатка, unhealthy) оставляет свои роутеры, и его адреса отвечают 5xx, а не роутером ниже приоритетом.
+
 ## gRPC / WebSocket
 
 gRPC — `&& Headers(\`Content-Type\`, \`application/grpc\`)` рулом + `loadbalancer.server.scheme: h2c`. WebSocket работает прозрачно.
@@ -63,5 +69,5 @@ gRPC — `&& Headers(\`Content-Type\`, \`application/grpc\`)` рулом + `load
 ## После правки
 
 - `compose/*.yml` labels → `make deploy` (Traefik watcher подхватит).
-- `configs/traefik/traefik.yml.tpl` (static-конфиг, security-sensitive; рендерится в `configs/traefik/traefik.yml`) → **рестарт** Traefik (`make restart SVC=traefik`; при deploy git-diff по `configs/traefik/` рестартует его сам).
+- `configs/traefik/traefik.yml.tpl` (static-конфиг, security-sensitive; рендерится в `configs/traefik/traefik.yml`) → **рестарт** Traefik (`make restart SVC=traefik`; при deploy git-diff по `configs/traefik/` рестартует его сам). Плагин bouncer Traefik качает из сети при каждом старте: сбой загрузки — 404 на всех роутерах; `make deploy` сверяет строку лога `Plugins loaded` и рестартует сам, после ручного рестарта её сверяет оператор (runbook).
 - `configs/traefik/dynamic/*.yml` (dynamic) → подхватится через `watch: true`. `.tpl` рендерятся через `scripts/render-configs.sh`.
