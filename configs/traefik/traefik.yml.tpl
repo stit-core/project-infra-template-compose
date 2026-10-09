@@ -55,13 +55,17 @@ certificatesResolvers:
         entryPoint: web
 
 experimental:
+  # Плагин bouncer Traefik качает из сети при каждом старте. Без него Traefik не стартует:
+  # с выключенными плагинами роутеры с crowdsec@file не собираются — 404 на всём edge при
+  # healthy до следующего рестарта. Отказ старта поднимает политика restart контейнера:
+  # загрузка повторяется сама, edge в это время закрыт.
+  abortOnPluginFailure: true
   plugins:
     crowdsec-bouncer:
       moduleName: "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
       version: "v1.4.4"
 
 log:
-  # Не тише INFO: по строке «Plugins loaded» make deploy сверяет загрузку плагина bouncer.
   level: INFO
 
 # Журнал доступа — файл в каталоге хоста (compose/traefik.yml): его читают CrowdSec
