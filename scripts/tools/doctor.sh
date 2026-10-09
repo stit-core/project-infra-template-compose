@@ -38,7 +38,7 @@ st() {
 
 echo "== doctor =="
 
-# 0. Docker Engine — ключу healthcheck.start_interval (compose/site.yml) нужен Engine ≥ 25:
+# 1. Docker Engine — ключу healthcheck.start_interval (compose/site.yml) нужен Engine ≥ 25:
 #    на старом движке такой контейнер не создаётся, а плагин compose тех лет не
 #    разбирает сам файл — тогда красный и compose config ниже.
 if ! command -v docker >/dev/null 2>&1; then
@@ -68,7 +68,7 @@ else
   esac
 fi
 
-# 1. compose config — синтаксис при реальном .env
+# 2. compose config — синтаксис при реальном .env
 if ! command -v docker >/dev/null 2>&1; then
   st "compose config" SKIP "docker недоступен"
 elif [ ! -f .env ]; then
@@ -85,7 +85,7 @@ else
   fi
 fi
 
-# 2. .env identity — без неё интерполяция compose и ACME-рендер не работают
+# 3. .env identity — без неё интерполяция compose и ACME-рендер не работают
 if [ ! -f .env ]; then
   st ".env identity" SKIP "нет .env (pre-bootstrap)"
 else
@@ -99,7 +99,7 @@ else
   fi
 fi
 
-# 3. .env preflight — замок не-прод среды и пара её контуров; тот же скрипт
+# 4. .env preflight — замок не-прод среды и пара её контуров; тот же скрипт
 #    останавливает make render и make deploy
 if [ ! -f .env ]; then
   st ".env preflight" SKIP "нет .env"
@@ -115,7 +115,7 @@ else
   fi
 fi
 
-# 4. configs отрендерены (render-configs.sh: envsubst *.tpl)
+# 5. configs отрендерены (render-configs.sh: envsubst *.tpl)
 if [ ! -f .env ]; then
   st "configs render" SKIP "нет .env"
 elif [ -s configs/traefik/traefik.yml ]; then
@@ -124,7 +124,7 @@ else
   st "configs render" WARN "configs/traefik/traefik.yml пуст/нет — make render/deploy"
 fi
 
-# 5. DNS preflight (LE HTTP-01) — advisory, self-skip без .env
+# 6. DNS preflight (LE HTTP-01) — advisory, self-skip без .env
 if [ ! -f .env ]; then
   st "dns" SKIP "нет .env"
 else
@@ -136,7 +136,7 @@ else
   fi
 fi
 
-# 6. .env покрывает обязательные ключи .env.example
+# 7. .env покрывает обязательные ключи .env.example
 if [ ! -f .env ] || [ ! -f .env.example ]; then
   st ".env coverage" SKIP "нет .env / .env.example"
 else

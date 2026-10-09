@@ -183,7 +183,7 @@ done
 # sanitizePath — умолчание Traefik (включён): правила на путь сопоставляются с приведённым
 # путём, и выключенный он открывает запрет /_image записью //_image.
 while IFS= read -r line; do
-  [ -n "$line" ] && edge_bad+=("${line%%:*}: sanitizePath — умолчание Traefik не трогаем")
+  [ -n "$line" ] && edge_bad+=("$line: sanitizePath — умолчание Traefik не трогаем")
 done < <(grep -rilE 'sanitizePath' compose configs docker-compose.yml 2>/dev/null | sort)
 # Отрендеренный сосед .tpl несёт значения .env (ключ bouncer, хеш замка): вне .gitignore
 # его закоммитит `git add -A` из make ship.
@@ -193,7 +193,7 @@ if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   done < <(find configs -type f -name '*.tpl' | sort)
 fi
 if [ ${#edge_bad[@]} -eq 0 ]; then
-  rec "edge defaults" PASS "" "OK — crowdsec@file на каждом роутере, Host в правилах, порты и docker-сокет — только у traefik, sanitizePath не тронут, отрендеренные конфиги под .gitignore"
+  rec "edge defaults" PASS "" "OK — crowdsec@file на каждом роутере, Host в правилах, сервисы с роутером без портов, docker-сокет — только у traefik, sanitizePath не тронут, отрендеренные конфиги под .gitignore"
 else
   detail=$(printf '%s\n' "${edge_bad[@]}")
   rec "edge defaults" FAIL "$(printf '%s' "$detail" | paste -sd';' - | sed 's/;/; /g')" "$detail"

@@ -95,7 +95,7 @@ bump: ## бамп image-тега через .env (<SVC>_TAG) + recreate, ждё�
 			echo "✗ $(SVC):$(TAG) не поднялся — $$var=$$old возвращён в .env, сервис поднимается на нём" >&2; \
 			$$up $(SVC) || echo "✗ $(SVC):$$old тоже не поднялся — make ps, make logs SVC=$(SVC)" >&2; \
 		else \
-			echo "✗ $(SVC):$(TAG) не поднялся; прежнего тега нет — $$var=$(TAG) остался в .env" >&2; \
+			echo "✗ $(SVC):$(TAG) не поднялся; вернуться не на что — $$var=$(TAG) остался в .env" >&2; \
 		fi; \
 		exit 1; \
 	else bash scripts/tools/ssh.sh exec make bump SVC=$(SVC) TAG=$(TAG); fi

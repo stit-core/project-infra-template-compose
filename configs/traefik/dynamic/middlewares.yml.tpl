@@ -86,9 +86,9 @@ http:
 
     staging-auth:
       basicAuth:
-        # users, а не usersFile: смена пароля меняет этот файл, и Traefik применяет её сам,
-        # а отдельный файл пользователей он перечитывает только с рестартом. Форму значения
-        # держит scripts/preflight-env.sh.
+        # users, а не usersFile: смена пароля меняет этот файл, и Traefik пересобирает
+        # цепочку сам; правка отдельного файла пользователей пересборку не вызывает, и
+        # прежний пароль жил бы до рестарта. Форму значения держит scripts/preflight-env.sh.
         users:
           - '${STAGING_BASIC_AUTH_USERS}'
         realm: "staging"
