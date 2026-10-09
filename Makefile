@@ -93,10 +93,10 @@ bump: ## бамп image-тега через .env (<SVC>_TAG) + recreate, ждё�
 		if [ -n "$$old" ] && [ "$$old" != "$(TAG)" ]; then \
 			sed -i "s|^$$var=.*|$$var=$$old|" .env; \
 			echo "→ $$var=$$old (.env): $(SVC):$(TAG) не поднялся, возврат на прежний тег"; \
-			if $$up $(SVC); then echo "✗ $(SVC):$(TAG) не поднялся — $$var=$$old возвращён в .env, сервис поднят на нём" >&2; \
-			else echo "✗ $(SVC):$(TAG) не поднялся, $(SVC):$$old тоже — $$var=$$old в .env; make ps, make logs SVC=$(SVC)" >&2; fi; \
+			if $$up $(SVC); then echo "ERR: $(SVC):$(TAG) не поднялся — $$var=$$old возвращён в .env, сервис поднят на нём" >&2; \
+			else echo "ERR: $(SVC):$(TAG) не поднялся, $(SVC):$$old тоже — $$var=$$old в .env; make ps, make logs SVC=$(SVC)" >&2; fi; \
 		else \
-			echo "✗ $(SVC):$(TAG) не поднялся; вернуться не на что — $$var=$(TAG) остался в .env" >&2; \
+			echo "ERR: $(SVC):$(TAG) не поднялся; вернуться не на что — $$var=$(TAG) остался в .env" >&2; \
 		fi; \
 		exit 1; \
 	else bash scripts/tools/ssh.sh exec make bump SVC=$(SVC) TAG=$(TAG); fi

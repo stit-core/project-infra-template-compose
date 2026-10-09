@@ -164,7 +164,7 @@ blocked-by: —
     `www.p7.test`; `make validate` → `compose syntax PASS`, `.env coverage PASS` · Закрывает: AC1, AC2, AC3, AC4, AC5
     · Зависит от: S2
   - Сделано: `compose/site.yml`, секция `profile site`, `ROLE_FILES[edge]`, `www` в preflight, `bump` с `--wait`,
-    рендер без перезаписи неизменённого файла; по отчёту валидатора — `802d907`…`178fa70` («Решения», B1 и N1–N7).
+    рендер без перезаписи неизменённого файла; по отчёту валидатора — коммиты после `53601cc` («Решения», B1 и N1–N7).
     Гейт этапа на свежем стенде (`M/p7/stage-a.sh`, логи `M/p7/stage-a*.log`): S3 — 270 проверок, расхождений 0
 
 ### Этап B — журнал и CrowdSec
