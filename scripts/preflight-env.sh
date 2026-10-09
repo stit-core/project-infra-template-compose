@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
-# Preflight .env: форма строк файла, замок не-прод среды и пара её контуров.
-#   ENV-ERR:  строку шелл и compose прочтут по-разному или не прочтут вовсе, либо замок,
-#             с которым роутеры сайта не собираются или войти нельзя, — код 1;
-#   ENV-WARN: среда поднимется, но закрыта не так, как задумано.
+# Preflight .env: форма строк файла, запись DOMAIN, замок не-прод среды и пара её контуров.
+#   ENV-ERR:  строку шелл и compose прочтут по-разному или не прочтут вовсе; замок, с
+#             которым роутеры сайта не собираются или войти нельзя; DOMAIN, с которым
+#             образ сайта не стартует, — код 1;
+#   ENV-WARN: среда поднимется, но не так, как задумано.
 # Значений не печатает — только ключ и номер строки.
 #
 # Бежит раньше, чем .env прочтут шелл и compose: на строке не той формы они сами печатают
-# её кусок — хеш, пароль. Зовут scripts/render-configs.sh (с ним make render и make deploy)
-# и make doctor; в режиме `form` (только форма строк) — make validate и ops-вербы Makefile.
+# её кусок — хеш, пароль. Зовут scripts/render-configs.sh (с ним make render и make deploy),
+# make doctor и make new-env; в режиме `form` (только форма строк) — make validate и
+# ops-вербы Makefile.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -57,6 +59,20 @@ case ",$(val COMPOSE_PROFILES)," in *,site,*) site=1 ;; esac
 lock=$(val STAGING_BASIC_AUTH_USERS)
 if [ -n "$lock" ] && ! printf '%s\n' "$lock" | grep -qE '^[A-Za-z0-9._@-]+:[$]2[aby][$][0-9]{2}[$][./A-Za-z0-9]{53}$'; then
   echo "$lock_text"; rc=1
+fi
+
+# DOMAIN сайт получает как SITE_URL=https://<DOMAIN> и проверяет строго: с другой записью
+# хоста его образ не стартует, и make deploy узнаёт об этом только по нездоровому
+# контейнеру. Без профиля site запись стеку не мешает — предупреждение.
+domain=$(val DOMAIN)
+label='[a-z0-9]([a-z0-9-]*[a-z0-9])?'
+if [ -n "$domain" ] && ! printf '%s\n' "$domain" | grep -qE "^$label(\\.$label)*\$"; then
+  text="DOMAIN — нужна запись хоста: строчные латинские буквы, цифры и дефис, IDN — в punycode (xn--…), без схемы, порта, пути и точки на конце"
+  if [ "$site" = 1 ]; then
+    echo "ENV-ERR: $text: сайт получает его как SITE_URL, и с другой записью его образ не стартует."; rc=1
+  else
+    echo "ENV-WARN: $text: профиль site с другой записью не развернётся."
+  fi
 fi
 
 # Не-прод среду сайта закрывает пара: ROBOTS_POLICY=noindex и замок.

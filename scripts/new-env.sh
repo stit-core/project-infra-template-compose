@@ -40,7 +40,9 @@ else
   echo "=== Project identity ==="
   prompt PROJECT_NAME "PROJECT_NAME (lowercase, e.g. acme)"
   prompt ENV          "ENV (dev/prod/...)"
-  prompt DOMAIN       "DOMAIN (e.g. acme.com)"
+  # Запись хоста: сайт получает её как SITE_URL и с другой не стартует — форму держит
+  # scripts/preflight-env.sh (ниже и на каждом make deploy).
+  prompt DOMAIN       "DOMAIN (e.g. acme.com: строчные, IDN — в punycode xn--…, без https:// и точки на конце)"
 
   echo
   echo "=== ACME (Let's Encrypt) ==="
@@ -93,6 +95,7 @@ HOST_ROLE=all
 EOF
   chmod 0600 .env
   echo "OK: .env записан (chmod 0600)."
+  bash scripts/preflight-env.sh || true
 fi
 
 cat <<EOF

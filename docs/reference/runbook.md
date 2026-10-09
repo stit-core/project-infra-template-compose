@@ -145,6 +145,7 @@ apt-get update && apt-get install --only-upgrade docker-ce docker-ce-cli contain
 - **Порядок включения.** Сначала `make deploy` с `STAGING_BASIC_AUTH_USERS` в `.env`, потом `make bump SVC=site` с содержимым, которое должно быть закрыто. Замок встаёт пересозданием контейнера сайта: запросы, начатые в долю секунды между остановкой прежнего контейнера и снятием его роутеров, ещё проходят по прежней цепочке — без пароля.
 - **`make deploy` отказывает с `ENV-ERR: STAGING_BASIC_AUTH_USERS`** — значение не `'user:hash'` в одинарных кавычках, логин вне `A-Za-z0-9._@-` или хеш не bcrypt целиком: `htpasswd -nbB <user> '<пароль>'` (`.env.example § profile site`). Стек при отказе не тронут — прежний замок действует.
 - **Прод-среда отвечает `X-Robots-Tag: noindex`.** `make new-env` открывает индексацию только при `ENV=prod` буквально; прод-среде с другим именем (`production`, `PROD`) `ROBOTS_POLICY=index` в `.env` ставит оператор, затем `make deploy`.
+- **`make deploy` отказывает с `ENV-ERR: DOMAIN`** — при профиле `site` домен обязан быть записью хоста: строчные буквы, IDN — в punycode, без схемы, порта, пути и точки на конце. Сайт получает его как `SITE_URL` и с другой записью не стартует.
 
 ## Образ сервиса не пуллится из registry
 
