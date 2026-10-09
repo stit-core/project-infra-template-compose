@@ -19,8 +19,17 @@ set +a
 # для staging-тестов). envsubst не умеет ${VAR:-default}, поэтому здесь.
 export ACME_CASERVER="${ACME_CASERVER:-https://acme-v02.api.letsencrypt.org/directory}"
 
+# Неизменённый файл не перезаписывается, изменённый пишется одним вызовом: за
+# каталогом dynamic следит Traefik, и файл, прочитанный посреди записи, на
+# секунды оставляет роутеры без middleware. Запись — поверх (inode тот же):
+# bind-mount одного файла подмены не видит.
 while IFS= read -r tpl; do
   out="${tpl%.tpl}"
-  envsubst < "$tpl" > "$out"
-  echo "rendered $out"
+  new=$(envsubst < "$tpl")
+  if [ -f "$out" ] && [ "$new" = "$(cat "$out")" ]; then
+    echo "unchanged $out"
+  else
+    printf '%s\n' "$new" > "$out"
+    echo "rendered $out"
+  fi
 done < <(find configs -type f -name '*.tpl')
