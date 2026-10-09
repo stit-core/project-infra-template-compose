@@ -1,0 +1,98 @@
+services:
+  site:
+    image: ${REGISTRY_HOST:-git.stit.tech}/${PROJECT_NAME}/site:${SITE_TAG}
+    container_name: site
+    restart: unless-stopped
+    # Opt-in: COMPOSE_PROFILES=site. Без опубликованного образа `compose up --wait`
+    # упадёт на pull'е — первый тег ставит `make bump SVC=site TAG=<tag>`.
+    profiles: [site]
+    # При старте entrypoint штампует SITE_URL в выход сборки внутри образа
+    # (/app/dist/client), поэтому здесь нет read_only, тома на этом пути и user:
+    # (файлы принадлежат node — чужой uid ломает штамповку).
+    init: true
+    # Больше SHUTDOWN_TIMEOUT_MS образа (15 с): меньше — SIGKILL посреди дренажа.
+    stop_grace_period: 20s
+    # Ключи формы и наблюдаемости — с умолчаниями (.env.example § profile site):
+    # обязательная переменная выключенного профиля уронила бы `compose config` всего стека.
+    environment:
+      # Канонический origin, без хвостового слеша. Смена домена — пересоздание
+      # контейнера (make recreate), не restart: origin уже проштампован в файлы.
+      SITE_URL: https://${DOMAIN}
+      ROBOTS_POLICY: ${ROBOTS_POLICY:-index}
+      RELEASE: ${SITE_TAG}
+      LOG_LEVEL: ${SITE_LOG_LEVEL:-info}
+      # ≈ 75 % mem_limit: без потолка GC узнаёт о лимите поздно — OOM-kill вместо сборки мусора.
+      NODE_OPTIONS: --max-old-space-size=384
+      INDEXNOW_KEY: ${SITE_INDEXNOW_KEY:-}
+      FORM_DELIVERY: ${SITE_FORM_DELIVERY:-smtp}
+      SMTP_URL: ${SITE_SMTP_URL:-}
+      FORM_TO: ${SITE_FORM_TO:-}
+      FORM_FROM: ${SITE_FORM_FROM:-}
+      FORM_BACKEND_URL: ${SITE_FORM_BACKEND_URL:-}
+      SENTRY_DSN: ${SITE_SENTRY_DSN:-}
+      SENTRY_ENVIRONMENT: ${ENV}
+    mem_limit: 512m
+    cpus: 1.0
+    # Порт наружу не публикуется: чужой Host до сервиса не пускает только роутинг edge.
+    networks:
+      - proxy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 15s
+      # Роутеры контейнера в состоянии starting Traefik не строит: при пересоздании
+      # запросы уходят мимо сайта до первой удачной пробы — на старте она частая.
+      start_interval: 1s
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: proxy
+
+      # Корень ${DOMAIN} — исключение из сабдоменного канона; заглушку (priority 1)
+      # роутер перебивает приоритетом. Только GET и HEAD: статик-хендлер отдаёт файл
+      # на любой метод, а POST у сайта один — форма.
+      traefik.http.routers.site.rule: Host(`${DOMAIN}`) && (Method(`GET`) || Method(`HEAD`))
+      traefik.http.routers.site.entrypoints: websecure
+      traefik.http.routers.site.tls: "true"
+      traefik.http.routers.site.tls.certresolver: letsencrypt
+      # SITE_EDGE_EXTRA_MW — контур не-прод среды (.env.example § profile site).
+      traefik.http.routers.site.middlewares: crowdsec@file,rate-limit@file,secure-headers@file,compress@file,retry@file${SITE_EDGE_EXTRA_MW:-}
+
+      # Публичный POST формы: свой лимит частоты и тела; без retry (повтор — вторая
+      # заявка) и без compress.
+      traefik.http.routers.site-form.rule: Host(`${DOMAIN}`) && Path(`/api/contact`) && Method(`POST`)
+      traefik.http.routers.site-form.priority: "100"
+      traefik.http.routers.site-form.entrypoints: websecure
+      traefik.http.routers.site-form.tls: "true"
+      traefik.http.routers.site-form.tls.certresolver: letsencrypt
+      traefik.http.routers.site-form.middlewares: crowdsec@file,form-rate-limit@file,form-body-limit@file,secure-headers@file${SITE_EDGE_EXTRA_MW:-}
+      traefik.http.routers.site-form.service: site
+
+      # /_image — endpoint изображений Astro: картинки готовит сборка, и запрос на
+      # трансформацию (sharp — CPU и RAM) не должен доходить до процесса. Маршрут и
+      # его подпути, а не префикс имени: public/_images/… правило не задевает.
+      # Приоритет по умолчанию — длина правила, у site она растёт с доменом: 1000
+      # выше её при любом домене.
+      traefik.http.routers.site-image.rule: Host(`${DOMAIN}`) && (Path(`/_image`) || PathPrefix(`/_image/`))
+      traefik.http.routers.site-image.priority: "1000"
+      traefik.http.routers.site-image.entrypoints: websecure
+      traefik.http.routers.site-image.tls: "true"
+      traefik.http.routers.site-image.tls.certresolver: letsencrypt
+      traefik.http.routers.site-image.middlewares: crowdsec@file,deny-all@file
+      traefik.http.routers.site-image.service: site
+
+      # www → apex одним 301, отдельным роутером: regexp не гоняется на запросах apex.
+      traefik.http.routers.site-www.rule: Host(`www.${DOMAIN}`)
+      traefik.http.routers.site-www.entrypoints: websecure
+      traefik.http.routers.site-www.tls: "true"
+      traefik.http.routers.site-www.tls.certresolver: letsencrypt
+      traefik.http.routers.site-www.middlewares: crowdsec@file,www-to-apex@file
+      traefik.http.routers.site-www.service: site
+
+      traefik.http.services.site.loadbalancer.server.port: "3000"
+      # Проверка на стороне Traefik снимает сервер с балансировки, когда процесс
+      # перестал отвечать, не дожидаясь трёх провалов healthcheck контейнера.
+      traefik.http.services.site.loadbalancer.healthcheck.path: /healthz
+      traefik.http.services.site.loadbalancer.healthcheck.interval: 5s
+      traefik.http.services.site.loadbalancer.healthcheck.timeout: 2s

@@ -80,6 +80,7 @@ Default-стек поднимается **без** секретов профил
 | `minio` | `storage` | `MINIO_*`, `APP_S3_*`, `BACKUP_S3_*` |
 | `backup` | `storage` | `RESTIC_*`, `BACKUP_AWS_*`, `POSTGRES_*` |
 | `backend` | `backend` | `OIDC_*`, `JWT_SECRET`, `POSTGRES_*`, `BACKEND_TAG` |
+| `site` | `site` | `SITE_TAG`, `ROBOTS_POLICY`, канал формы (`SITE_FORM_*`, `SITE_SMTP_URL`); на не-прод — `SITE_EDGE_EXTRA_MW`, `STAGING_BASIC_AUTH_USERS` |
 
 Включить postgres + backend = `COMPOSE_PROFILES=postgres,backend` в `.env` на VPS + `make ship` (их секции в `.env` должны быть заполнены). `storage` требует одновременного `postgres` (backup делает pg_dumpall) — `deploy.sh` валидирует на single-host.
 

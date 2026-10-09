@@ -3,7 +3,7 @@
 #
 # Multi-env: на каждом VPS свой ENV (dev/prod/...) и свой .env.
 # Стартовый .env — identity (PROJECT_NAME, ENV, DOMAIN) + ACME. Секреты
-# профилей (postgres/storage/backend) оператор дописывает руками по мере
+# профилей (postgres/storage/backend/site) оператор дописывает руками по мере
 # активации — контракт и комментарии как сгенерировать в .env.example.
 #
 # Non-interactive:
@@ -64,11 +64,18 @@ ACME_CASERVER=https://acme-v02.api.letsencrypt.org/directory
 #   postgres  — POSTGRES_USER / POSTGRES_PASSWORD / POSTGRES_DB
 #   storage   — MINIO_* + APP_S3_* + BACKUP_S3_* + RESTIC_* + BACKUP_AWS_* (+ postgres профиль)
 #   backend   — OIDC_* + JWT_SECRET (+ секция postgres) + BACKEND_TAG ниже
+#   site      — ROBOTS_POLICY (index — прод, noindex — не-прод) + канал формы
+#               SITE_FORM_* / SITE_SMTP_URL + SITE_TAG ниже; на не-прод ещё
+#               SITE_EDGE_EXTRA_MW + STAGING_BASIC_AUTH_USERS
 # COMPOSE_PROFILES=
 
 # Image-тег backend; раскомментировать вместе с профилем backend.
 # Бамп — \`make bump SVC=backend TAG=<tag>\`.
 # BACKEND_TAG=
+
+# Image-тег site: первый тег и каждый следующий ставит
+# \`make bump SVC=site TAG=<tag>\` при профиле site в COMPOSE_PROFILES.
+# SITE_TAG=
 
 CROWDSEC_BOUNCER_API_KEY=
 EOF

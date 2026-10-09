@@ -36,16 +36,12 @@ blocked-by: —
 - **Обвязка I.** `CLAUDE.md` (make-first, planning-first, границы: static-конфиг Traefik — «сначала спросить»,
   `--no-verify`, force-push, `docker volume rm`, `down -v` — никогда), `.claude/rules/*`, скилл `/plan` (форма этого
   файла), гейт `make check` = `validate` + `doctor` + `plan-check` + `project-check`; хуки ставит `make setup`.
-- **Исходная картина I (`d8458e3`, стенд — `M/p7/baseline.log`).** `compose/site.yml` нет; always-on — `traefik`,
-  `crowdsec`, `landing` (заглушка корня, `priority: 1`); `secure-headers` несёт `sslRedirect` и `browserXssFilter`,
-  `Permissions-Policy` нет; журнал доступа — stdout, только статусы 400–599, без заголовков запроса; `acquis.yaml`
-  читает `/var/log/traefik/*.log`, который никто не пишет; постоверфлоу в compose не заданы — `rdns` и
-  `seo-bots-whitelist` приходят с коллекцией `crowdsecurity/traefik`; `make bump` не ждёт healthy; в
-  `ROLE_FILES[edge]` и в DNS-preflight сайта нет; смок — `10-host`, `20-containers`; проза: корень — заглушка, `site`
-  добавляет `/add-service`, `<org>/site` читает `fsd/<surface>/`. `compose syntax` без `.env` — SKIP.
+- **Что осталось от исходной картины** (`d8458e3`, стенд — `M/p7/baseline.log`): журнал доступа — stdout, только
+  статусы 400–599, без заголовков запроса; `acquis.yaml` читает `/var/log/traefik/*.log`, который никто не пишет;
+  постоверфлоу в compose не заданы — `rdns` и `seo-bots-whitelist` приходят с коллекцией `crowdsecurity/traefik`;
+  смок — `10-host`, `20-containers`; проза: корень — заглушка, `<org>/site` читает `fsd/<surface>/`.
 - **Факты, снятые при планировании** (пробы на образах машины, без проброса портов; контейнеры проб убраны):
-  - Traefik `v3.6.16`: четыре роутера § 1.1 разбираются; `User-Agent: keep` даёт ключ `request_User-Agent`; на HEAD
-    `compress` не работает — сжатие проверяется на GET.
+  - Traefik `v3.6.16`: `User-Agent: keep` даёт ключ `request_User-Agent`; на HEAD `compress` не работает.
   - CrowdSec `v1.7.7` (Alpine 3.21, entrypoint `/bin/bash /docker_start.sh`): в образе есть `crond`, `wget`, `yq`,
     `flock`, нет `curl` и `jq`; `cscli allowlists` — `create`, `add` (сети, срок `-e`, комментарий `-d`), `remove`,
     `inspect`, `check`, правится только на LAPI; постоверфлоу ставит `POSTOVERFLOWS`. Парсер `traefik-logs` берёт
@@ -53,21 +49,17 @@ blocked-by: —
     40 разных не-статических путей при утечке 0,5 с, статус не смотрит; `http-bad-user-agent` — два запроса за
     минуту, в его списке `CCBot`; частные адреса (сеть docker) до сценариев не доходят (`crowdsecurity/whitelists`).
   - Плагин bouncer `v1.4.4`, режим `live`: вердикт — и «чист», и «бан» — живёт в кеше до 60 с.
-  - Compose: обязательная переменная (`${VAR:?…}`) у сервиса с выключенным профилем роняет `docker compose config`
-    всего стека — ключи сайта остаются с умолчаниями.
   - Реестр: печать § 1.5 — 25 строк; 20 с `ip_list_url` (18 разных адресов, `claude.com/crawling/bots.json` — общий
     для трёх ботов), `YandexBot` — только `rdns_suffix`, 4 строки без обоих полей (`meta-*`, `MistralAI-Training`).
 - **Стенд** — одноразовый «VPS в контейнере», `M/p7/stand.sh` (справка — шапка скрипта): `image` — образы сайта из
-  worktree `M/wt-p7-site`; `up <ревизия I>` — контейнер `p7-vps` (`docker:dind`, привилегированный, без проброса
-  портов), в нём origin и клон `I` в `/opt/p7-infra`, инструменты хаба, registry `127.0.0.1:5000`, образы стека,
-  `.env` от `make new-env` (`PROJECT_NAME=p7`, `DOMAIN=p7.test`, `ACME_CASERVER` — закрытый локальный адрес:
-  сертификат самоподписанный); `sync` — рабочее дерево `I` коммитом в origin стенда, в клон оно приезжает как на
-  VPS, с `git pull` из `make deploy`; `sh '<команда>'` — команда в клоне; `down` — убрать. «На стенде `X`» =
-  `M/exclusive.sh M/p7/stand.sh sh 'X'`; `scurl` = `curl -sk --resolve p7.test:443:127.0.0.1` там же. Стенд один на
-  машину: поднял — убрал. Адрес клиента стенда частный (шлюз сети `proxy`), поэтому баны по сети показываются
-  строками журнала с публичным `ClientHost` и `cscli decisions list`, а ответ bouncer — решением `cscli decisions
-  add` на адрес клиента. Теги в registry стенда: `<тег>` = `v1.0.0` — сборка HEAD `R`, `<битый>` = `v1.0.1-broken` —
-  образ без `/healthz`, `<asdt>` = `v1.0.2-asdt` — сборка с `AI_BOTS_POLICY = 'allow-search-deny-training'`.
+  worktree `M/wt-p7-site`; `up <ревизия I>` — контейнер `p7-vps` (`docker:dind`, без проброса портов) с клоном `I` в
+  `/opt/p7-infra`, registry `127.0.0.1:5000` и `.env` от `make new-env` (`DOMAIN=p7.test`, сертификат
+  самоподписанный); `sync` — рабочее дерево `I` коммитом в origin стенда, в клон оно приезжает как на VPS, с `git
+  pull` из `make deploy`; `down` — убрать. «На стенде `X`» = `M/exclusive.sh M/p7/stand.sh sh 'X'`; `scurl` = `curl
+  -sk --resolve p7.test:443:127.0.0.1` там же. Стенд один на машину: поднял — убрал. Адрес клиента стенда частный
+  (шлюз сети `proxy`): баны по сети показываются строками журнала с публичным `ClientHost` и `cscli decisions list`,
+  ответ bouncer — решением `cscli decisions add` на адрес клиента. Теги registry стенда: `<тег>` = `v1.0.0` (HEAD
+  `R`), `<битый>` = `v1.0.1-broken` (без `/healthz`), `<asdt>` = `v1.0.2-asdt` (`allow-search-deny-training`).
 - **Гейт шага:** до коммита — `make check` в `I` → `✓ check clean` и проверка шага на стенде с рабочим деревом
   (`sync`): там `make validate` → `compose syntax PASS`. **Гейт этапа:** проверки шагов этапа на свежем стенде с
   нуля (`up <последний коммит>`, первый `make deploy`) — исполнитель и, независимо, валидатор.
@@ -84,11 +76,12 @@ blocked-by: —
 - Хвосты обвязки `I` вне темы сайта — строками в `backlog.md` (раздел «Handoff»).
 
 ## Критерии приёмки
-- [ ] **AC1** — `make bump SVC=site` проходит на стенде шаблона (критерий фазы программы): на чистом стенде при
+- [x] **AC1** — `make bump SVC=site` проходит на стенде шаблона (критерий фазы программы): на чистом стенде при
   профиле `site` и заполненной секции `.env` выкатка образа сайта из registry даёт здоровый сервис со штамповкой
   origin; образ, который не становится healthy, и тег без образа — отказ верба; возврат на рабочий тег — снова healthy.
   Проверка: на стенде `make bump SVC=site TAG=<тег>` → код 0, `make ps` → `site` healthy, `make logs SVC=site` →
   `[entrypoint] stamped https://__site_origin__ -> https://p7.test`; `TAG=<битый>` и тег без образа → код ≠ 0
+  - Подтверждено: стенд (`M/p7/s3-check.log`): код 0 за 4 с, healthy, штамповка; `<битый>` и тег без образа — код 2
 - [ ] **AC2** — Edge отдаёт сайт одной формой адреса и только своим методам и хосту: `/` — 200; адрес без страницы —
   404; `http://` — один 301/308 на `https://`; `www` — один 301 на apex; `/index.html`, `<страница>/index.html` и
   `<страница>/` — один 301 на канон; `%2F` в пути — 404; `//<страница>` — 200 с canonical на канон; `/_image`,
@@ -96,25 +89,30 @@ blocked-by: —
   не доходит; порт контейнера не опубликован. Проверка: на стенде `make accept SVC=site` → разделы адреса и методов
   без ✗; 23 строки матрицы формы адреса `M/p3c/edge-contract.mjs` через edge стенда (TLS и `Host` стенда — вариант
   скрипта в `M/p7/`) → расхождений 0; `docker port site` → пусто
-- [ ] **AC3** — Заголовки безопасности — один список § 1.3: от edge — `Strict-Transport-Security: max-age=31536000;
+- [x] **AC3** — Заголовки безопасности — один список § 1.3: от edge — `Strict-Transport-Security: max-age=31536000;
   includeSubDomains`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`,
   `Permissions-Policy: camera=(), microphone=(), geolocation=()`; от приложения — `Content-Security-Policy` с
   `frame-ancestors 'none'`; `X-Frame-Options` и `X-XSS-Protection` не ставит никто; HTML сжат. Состав общий — те же
   заголовки edge у ответа заглушки. Проверка: на стенде `scurl -o /dev/null -D - -H 'Accept-Encoding: br'
   https://p7.test/` → пять заголовков и `content-encoding: br`, двух лишних нет; `scurl -o /dev/null -D - -X POST
   https://p7.test/` (отвечает заглушка) → четыре заголовка edge
-- [ ] **AC4** — Избыточный трафик получает 429, а не 403: серия POST на `/api/contact` упирается в лимит формы, и
+  - Подтверждено: стенд (`s3-check.log`): пять заголовков и `br`, лишних нет; `POST /` — 405 заглушки, четыре edge
+- [x] **AC4** — Избыточный трафик получает 429, а не 403: серия POST на `/api/contact` упирается в лимит формы, и
   заявка сверх лимита до процесса не доходит; тело формы больше 64 КиБ без `Content-Length` — 413 от edge; отказ WAF
   (решение CrowdSec о бане) — тоже 429; у лимитов нет `sourceCriterion`, в цепочке формы нет `retry` и `compress`.
   Проверка: на стенде 8 POST с `Origin: https://p7.test` и незаполненной формой → пять ответов формы (200), затем
   429, ни одного 403 и 303; вне серии chunked-тело 70 КБ → 413; `cscli decisions add --ip <адрес клиента>` → через
   ≤ 60 с `/` — 429, после `decisions delete` — 200
-- [ ] **AC5** — Не-прод закрыт тремя контурами и включается переменными `.env`: при `SITE_EDGE_EXTRA_MW`,
+  - Подтверждено: стенд (`s3-check.log`): серия — `200` × 5, `429` × 3, до процесса дошло 5; chunked 70 КБ — 413, до
+    процесса 0; решение на адрес клиента — 429 в пределах 60 с, после `decisions delete` — 200
+- [x] **AC5** — Не-прод закрыт тремя контурами и включается переменными `.env`: при `SITE_EDGE_EXTRA_MW`,
   `STAGING_BASIC_AUTH_USERS` и `ROBOTS_POLICY=noindex` `/` без пароля — 401 с `X-Robots-Tag: noindex, nofollow,
   noarchive`, с паролем — 200 с тем же заголовком, `robots.txt` сервиса — `Disallow: /`; при пустых переменных замка и
   заголовка нет; отрендеренный файл замка в git не попадает. Проверка: стенд в не-прод профиле — `scurl -I
   https://p7.test/` → 401 и заголовок, `scurl -u <пользователь>:<пароль>` → 200; `git status --short` после
   `make render` → файла замка нет; прод-профиль → 200 без `X-Robots-Tag`
+  - Подтверждено: стенд (`s3-check.log`): без пароля — 401 с `X-Robots-Tag`, с паролем — 200 с ним же, `robots.txt`
+    сервиса — `Disallow: /`; после `make render` файла замка в `git status` нет; прод-профиль — 200 без заголовка
 - [ ] **AC6** — Журнал доступа полон и читается: каждая запись, и 2xx, — JSON-строка в `/var/log/traefik/access.log`
   с `request_User-Agent`; `X-Request-Id` ответа on-demand маршрута есть и в записи журнала, и в строке лога сайта;
   CrowdSec читает журнал с первого деплоя; ротация идёт в стеке без действий оператора и чтения не рвёт. Проверка: на
@@ -163,10 +161,9 @@ blocked-by: —
   - Проверка: `M/exclusive.sh M/p7/stand.sh up d8458e3` → на стенде `make ps`: `traefik`, `crowdsec`, `landing`
     healthy; `M/p7/baseline.log` — три красных факта; `stand.sh down` → `docker ps -a` без `p7-`; `make plan-check`
     → OK · Зависит от: —
-  - Сделано: план и хуки (`commit-msg`, `pre-commit`) на месте; `stand.sh` и `baseline.sh` — в `M/p7/`, образ сайта —
-    HEAD `R` `1c49139`. Свежий стенд `d8458e3`: первый `make deploy` — код 0, три сервиса healthy, `compose syntax
-    PASS`; `make bump SVC=site` — `no such service`, код 2; источников acquisition — 0; у заглушки `x-xss-protection:
-    1; mode=block`, `Permissions-Policy` нет; после `down` контейнеров `p7-` нет; `make plan-check` — OK
+  - Сделано: план и хуки (`commit-msg`, `pre-commit`) на месте; `stand.sh` и `baseline.sh` — в `M/p7/`. Свежий стенд
+    `d8458e3`: первый `make deploy` — код 0, три сервиса healthy; `make bump SVC=site` — `no such service`, код 2;
+    источников acquisition — 0; у заглушки `x-xss-protection: 1; mode=block`, `Permissions-Policy` нет; `down` — чисто
 - [x] **S2** — Middleware edge — по § 1.3: `secure-headers` в составе списка (без XSS-фильтра и `sslRedirect`, с
   `Permissions-Policy`), `compress`, `www-to-apex`, `form-rate-limit`, `form-body-limit`, `retry`, `deny-all`, контур
   staging (`staging-noindex` перед `staging-auth`; файл замка рендерится из `.env` и не попадает в git), отказ WAF —
@@ -174,12 +171,10 @@ blocked-by: —
   - Проверка: на стенде `make deploy` → лог Traefik без ошибок конфигурации; `scurl -I https://p7.test/` (заглушка)
     → четыре заголовка edge, `X-XSS-Protection` нет; решение `cscli decisions add` на адрес клиента → 429;
     `make validate` → OK · Закрывает: AC3, AC4, AC5 · Зависит от: S1
-  - Сделано: `middlewares.yml.tpl` — состав § 1.3, `staging.htpasswd.tpl`, `.gitignore`, `STAGING_BASIC_AUTH_USERS` в
-    `.env.example`, таблица правила `traefik-routing`. Стенд (`M/p7/s2-check.{sh,log}`): деплой рестартует Traefik,
-    ошибок конфигурации 0; у заглушки 4 из 4 заголовков edge, лишних 0; решение на адрес клиента → 429, после
-    `decisions delete` → 200; проба каждого middleware на роутерах стенда — `br` и `gzip`, 301 на apex, 403, 413,
-    пять ответов и 429, 401 с `X-Robots-Tag`; файл замка равен строке `htpasswd`, в `git status` его нет
-- [ ] **S3** — Сервис `site` в стеке и выкатка: `compose/site.yml` по § 1.1 (профиль `site`; роутеры `site`,
+  - Сделано: `middlewares.yml.tpl` — состав § 1.3, `staging.htpasswd.tpl`, `.gitignore`, ключ в `.env.example`. Стенд
+    (`M/p7/s2-check.{sh,log}`): ошибок конфигурации 0; у заглушки 4 заголовка edge, лишних 0; решение на адрес клиента
+    → 429; проба каждого middleware — `br` и `gzip`, 301 на apex, 403, 413, 429, 401 с `X-Robots-Tag`; замка в git нет
+- [x] **S3** — Сервис `site` в стеке и выкатка: `compose/site.yml` по § 1.1 (профиль `site`; роутеры `site`,
   `site-form`, `site-image`, `site-www`; healthcheck контейнера и сервиса Traefik), секция `profile site` в
   `.env.example` и подсказки `make new-env`, `site` в роли `edge`, `www` в DNS-preflight, `make bump` ждёт healthy
   - Проверка: на стенде `make bump SVC=site TAG=<тег>` → код 0, `site` healthy, строка штамповки; `TAG=<битый>` →
@@ -187,6 +182,10 @@ blocked-by: —
     профиль); `HOST_ROLE=edge` → `make deploy` поднимает `site`; DNS-preflight при профиле `site` называет
     `www.p7.test`; `make validate` → `compose syntax PASS`, `.env coverage PASS` · Закрывает: AC1, AC2, AC3, AC4, AC5
     · Зависит от: S2
+  - Сделано: `compose/site.yml`, секция `profile site` и подсказки `new-env`, `ROLE_FILES[edge]`, `www` в preflight,
+    `bump` с `--wait --wait-timeout 90`, рендер без перезаписи неизменённого файла, строки прозы и правил о составе
+    стека. Стенд `331dd9c` с рабочим деревом (`M/p7/s3-check.{sh,log}`): 88 проверок, расхождений 0 — выкатка, адрес,
+    методы, `/_image`, `www`, заголовки, форма, WAF, не-прод и обратно, `HOST_ROLE=edge`, `validate`, `doctor`
 
 ### Этап B — журнал и CrowdSec
 - [ ] **S4** — Журнал доступа — файл `/var/log/traefik/access.log`: JSON, все статусы, `User-Agent` и
@@ -247,11 +246,17 @@ blocked-by: —
 - Порядок контура staging — `staging-noindex`, затем `staging-auth`: иначе ответ 401 уходит без `X-Robots-Tag`
   (факт Traefik `v3.6.16`). Значение переменной — `,staging-noindex@file,staging-auth@file`.
 - Смена пароля замка staging — `make deploy` и `make restart SVC=traefik`: `usersFile` Traefik читает при сборке
-  цепочки, а перерендер одного файла замка конфигурацию не меняет (стенд: старый пароль жив до рестарта). Строка — в
-  `.env.example`; в правило `secrets-and-env` — S9. Формат хеша — bcrypt как самый стойкий: `$apr1$…` envsubst не
-  портит (подставленное значение он не разбирает), ловушка значения одна — кавычки в `.env` (Р15 покрытия).
-- Отказ тела формы сверх лимита Traefik пишет в свой лог уровнем `ERR` (`vulcand/oxy/buffer`) — это ответ 413
-  клиенту, а не ошибка конфигурации: проверка «лог без ошибок» (AC11) такие строки не считает.
+  цепочки (стенд: старый пароль жив до рестарта); строка — в `.env.example`, в правило `secrets-and-env` — S9. Хеш —
+  bcrypt как самый стойкий; `$apr1$…` envsubst не портит, ловушка значения одна — кавычки в `.env` (Р15, Р17).
+- Отказ тела сверх лимита Traefik пишет в лог уровнем `ERR` (`vulcand/oxy/buffer`): это ответ 413, а не ошибка
+  конфигурации — проверка «лог без ошибок» (AC11) такие строки не считает.
+- Healthcheck `site` — с `start_interval: 1s`: роутеры контейнера в состоянии `starting` docker-провайдер Traefik не
+  строит, и при пересоздании ~5 с отвечала заглушка (стенд; стало ~2 с, `bump` — 2 с вместо 6). Нужен Docker ≥ 25.
+  Остаток окна в 503 превращает `providers.docker.allowEmptyServices` (static-конфиг) — на усмотрение S4 (Р18).
+- `render-configs.sh` не перезаписывает неизменённый файл: файл `dynamic`, прочитанный watcher'ом Traefik посреди
+  записи, оставлял роутеры без middleware (стенд: ошибка разбора на 30 рендеров; после правки — 0).
+- Первый разворот: профиль `site` в `.env`, затем `make bump` (ставит `SITE_TAG`); профиль без тега роняет
+  `make deploy` (`invalid reference format`), `bump` без профиля поднимает сервис мимо `make deploy`.
 - Политику сайта задание allowlist читает с `robots.txt` сервиса напрямую (`site:3000`), не через публичный адрес:
   на не-прод тот отвечает 401, на стенде домена нет. Нет сервиса `site` или ответа — allowlist не меняется.
 - Список источников — файл хаба из печати контракта, а не копия реестра: пересборка — команда хаба, вызывающая
@@ -280,14 +285,14 @@ blocked-by: —
 ## Handoff
 - Репо сайта (через дирижёра): расхождения и уточнения контракта — § 3 файла покрытия.
 - Оператору форка: секция `profile site` в `.env` (тег, канал формы, на не-прод — три переменные staging), DNS-запись
-  `www`, после первого деплоя — `make accept SVC=site`. Обновление действующего VPS: `make deploy` рестартует Traefik
-  (static-конфиг) — секунды простоя; с полным журналом сценарии обхода CrowdSec начинают работать — свой аудит с
-  рабочей станции может получить 429 (runbook).
+  `www`, Docker Engine ≥ 25 на VPS, после первого деплоя — `make accept SVC=site`. Обновление действующего VPS:
+  `make deploy` рестартует Traefik (static-конфиг) — секунды простоя; с полным журналом сценарии обхода CrowdSec
+  начинают работать — свой аудит с рабочей станции может получить 429 (runbook).
 - Бэклог `I` (не тема фазы): `make validate` без `.env` не разбирает compose и не ловит `:latest`, хотя проза это
   обещает; источник `auth.log` у CrowdSec пуст на Debian 12 без rsyslog; `configs/landing/index.html` не в
-  `.gitignore`; `deploy.sh` глотает отказ `git pull --ff-only`.
+  `.gitignore`; `deploy.sh` глотает отказ `git pull --ff-only`; `make new-env` не пишет `HOST_ROLE` — WARN `doctor`.
 
 ## Где мы сейчас
-Этап A: S1 и S2 закрыты — edge несёт состав middleware § 1.3, отказ WAF — 429, контур staging собран и проверен на
-роутерах пробы стенда. Следующий шаг — S3: `compose/site.yml` с четырьмя роутерами, секция `profile site`, роль
-`edge`, `www` в DNS-preflight, `make bump` ждёт healthy; им подтверждаются AC1 и, на сайте, AC3–AC5.
+Этап A: S1–S3 закрыты, AC1 и AC3–AC5 подтверждены на стенде — сервис `site` в стеке, `make bump` ждёт healthy. Дальше
+— гейт этапа на свежем стенде с нуля (`M/p7/stage-a.sh`) и независимый валидатор этапа; затем S4 (этап B): журнал
+доступа — файл с `User-Agent`, ротация в стеке, static-конфиг отдельным коммитом.

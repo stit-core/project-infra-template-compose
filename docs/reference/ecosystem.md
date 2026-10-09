@@ -109,8 +109,8 @@ Git-хостинг и container registry — Gitea `git.stit.tech`.
 - **Тег — строго в `.env`** на VPS: `<SVC>_TAG` (UPPER_SNAKE от `SVC`), не литерал в compose.
 - **Выкатка — только здесь:** `make bump SVC=<svc> TAG=<tag>` правит `<SVC>_TAG` в `.env` на VPS и
   пересоздаёт сервис, compose сам пуллит отсутствующий образ. Rollback — тот же верб со старым тегом.
-- **Из коробки** в стеке — `compose/backend.yml`; frontend, site и бот добавляются `/add-service` по
-  карте сервисов `docs/project/stack.md`.
+- **Из коробки** в стеке — `compose/backend.yml` и `compose/site.yml` (профили `backend` и `site`); frontend и
+  бот добавляются `/add-service` по карте сервисов `docs/project/stack.md`.
 - **Mobile** в этот контракт не входит: образа и compose-сервиса у приложения нет, релиз в магазины —
   `/release` в `<org>/mobile`. Его инфра-поверхность (например, раздача `.well-known` для deep links,
   хосты API) приходит в хаб INFRA-HANDOFF-блоком.

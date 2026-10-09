@@ -95,6 +95,7 @@ identity + ACME из `.env`, других секретов не требует.
 | `postgres` | postgres | `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` |
 | `storage` | minio, minio-init, backup | `MINIO_*`, `APP_S3_*`, `BACKUP_S3_*`, `RESTIC_*`, `BACKUP_AWS_*` (+ обязательно `postgres` профиль) |
 | `backend` | backend | `OIDC_*`, `JWT_SECRET` (+ секция postgres) + `BACKEND_TAG` |
+| `site` | site | `SITE_TAG`, `ROBOTS_POLICY`, канал формы (`SITE_FORM_*`, `SITE_SMTP_URL`); на не-прод — `SITE_EDGE_EXTRA_MW`, `STAGING_BASIC_AUTH_USERS` |
 
 Значения оператор берёт из `.env.example` (комментарии объясняют, как
 сгенерировать каждое), генерирует пароли (`openssl rand`) и дописывает в

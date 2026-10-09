@@ -28,7 +28,7 @@ HOST_ROLE=$(sed -nE 's/^HOST_ROLE=//p' .env | tail -1)
 HOST_ROLE="${HOST_ROLE:-all}"
 declare -A ROLE_FILES=(
   [all]="docker-compose.yml compose/*.yml"
-  [edge]="docker-compose.yml compose/traefik.yml compose/crowdsec.yml compose/landing.yml compose/backend.yml"
+  [edge]="docker-compose.yml compose/traefik.yml compose/crowdsec.yml compose/landing.yml compose/backend.yml compose/site.yml"
   [db]="docker-compose.yml compose/postgres.yml"
   [storage]="docker-compose.yml compose/minio.yml compose/backup.yml"
 )

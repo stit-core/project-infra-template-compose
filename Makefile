@@ -75,8 +75,9 @@ build: ## пересобрать образ сервиса с build-context (н�
 
 # Единственный канон бампа image-тега: тег живёт в .env как <SVC>_TAG
 # (UPPER_SNAKE). Верб правит .env на VPS и пересоздаёт сервис —
-# compose сам подтянет отсутствующий образ (pull policy=missing).
-bump: ## бамп image-тега через .env (<SVC>_TAG) + recreate: make bump SVC=backend TAG=v1.2.3
+# compose сам подтянет отсутствующий образ (pull policy=missing) — и ждёт
+# healthy: образ, который не поднялся за 90 с, — отказ верба, а не «успех».
+bump: ## бамп image-тега через .env (<SVC>_TAG) + recreate, ждёт healthy: make bump SVC=backend TAG=v1.2.3
 	@if [ -z "$(SVC)" ] || [ -z "$(TAG)" ]; then echo 'usage: make bump SVC=<name> TAG=<tag>'; exit 2; fi
 	@if [ -f .env ]; then \
 		var=$$(echo "$(SVC)" | tr '[:lower:]-' '[:upper:]_')_TAG; \
@@ -84,7 +85,7 @@ bump: ## бамп image-тега через .env (<SVC>_TAG) + recreate: make bu
 		elif grep -q "^# $$var=" .env; then sed -i "s|^# $$var=.*|$$var=$(TAG)|" .env; \
 		else printf '%s=%s\n' "$$var" "$(TAG)" >> .env; fi; \
 		echo "→ $$var=$(TAG) (.env)"; \
-		docker compose $(COMPOSE_ARGS) up -d --no-deps --force-recreate $(SVC); \
+		docker compose $(COMPOSE_ARGS) up -d --no-deps --force-recreate --wait --wait-timeout 90 $(SVC); \
 	else bash scripts/tools/ssh.sh exec make bump SVC=$(SVC) TAG=$(TAG); fi
 
 backup: ## one-shot backup (на VPS; с workstation — через ssh)

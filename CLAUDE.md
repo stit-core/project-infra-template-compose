@@ -42,8 +42,8 @@
 один VPS на среду (dev/staging/prod); отсюда ведутся программы сквозных задач и выкатка тегов, сервис-репо
 лежат рядом sibling-checkout'ами. Карта репо, флоу и контракты — канон `docs/reference/ecosystem.md`.
 **Образы сервисов** — из registry `REGISTRY_HOST` (дефолт `git.stit.tech`); теги — строго в `.env`
-(`<SVC>_TAG`), выкатка — `make bump SVC=<svc> TAG=<tag>`. Из коробки в стеке — `compose/backend.yml`;
-frontend / site / бот добавляются `/add-service`.
+(`<SVC>_TAG`), выкатка — `make bump SVC=<svc> TAG=<tag>`. Из коробки в стеке — `compose/backend.yml` и
+`compose/site.yml`; frontend и бот добавляются `/add-service`.
 **Читает:** `<org>/strategy` (форк `business-strategy-template`) — продуктовый контекст (vision,
 surfaces), read-only; резолв пути — `docs/reference/ecosystem.md`.
 
@@ -80,7 +80,7 @@ surfaces), read-only; резолв пути — `docs/reference/ecosystem.md`.
 | Backup | restic + pg_dumpall + crond в alpine, пишет в `$RESTIC_REPOSITORY` | `compose/backup.yml`, `containers/backup/` |
 
 Always-on (traefik / crowdsec / landing) поднимается на identity + ACME из `.env`. `postgres` /
-`storage` (minio + backup) / `backend` — opt-in через `COMPOSE_PROFILES`, активируются после
+`storage` (minio + backup) / `backend` / `site` — opt-in через `COMPOSE_PROFILES`, активируются после
 заполнения их секций секретов в `.env` (единственный источник секретов, живёт только на VPS).
 Сети: `proxy` (наружу), `backend-net` (internal). См. `.claude/rules/multi-env.md` +
 `docs/reference/architecture.md`.
@@ -96,7 +96,7 @@ Always-on (traefik / crowdsec / landing) поднимается на identity + 
 | SHIP | `ship MSG="..."` | commit + check + push + (на main) ssh-deploy. Канон |
 | | `deploy` / `render` | server-side: git pull → render → compose up --wait / envsubst для `*.tpl` |
 | OPS | `ps` / `logs SVC=` / `restart SVC=` / `recreate SVC=` / `build SVC=` | статус / логи / рестарт / пересоздать (подхват нового значения `.env` или тега) / сборка образа сервиса |
-| | `bump SVC= TAG=` | бамп image-тега: правит `<SVC>_TAG` в `.env` на VPS + force-recreate. Единственный канон бампа |
+| | `bump SVC= TAG=` | бамп image-тега: правит `<SVC>_TAG` в `.env` на VPS + force-recreate, ждёт healthy. Единственный канон бампа |
 | | `backup` / `restore-pg SNAPSHOT=` | one-shot backup / restore postgres из restic |
 | INTEL | `status` / `search Q= [P=]` | cockpit-сводка / поиск по compose+configs+scripts+docs |
 | PROVISION | `new-env` | bootstrap `.env` на чистом VPS |

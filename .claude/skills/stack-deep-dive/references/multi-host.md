@@ -32,11 +32,11 @@ VPS (несколько серверов на одну среду). **Шабло
 | Роль | compose-файлы | несёт |
 |---|---|---|
 | `all` | `docker-compose.yml` + все `compose/*.yml` | весь стек (single-host, дефолт) |
-| `edge` | docker-compose + traefik + crowdsec + landing + backend | edge + app |
+| `edge` | docker-compose + traefik + crowdsec + landing + backend + site | edge + app |
 | `db` | docker-compose + postgres | Postgres |
 | `storage` | docker-compose + minio + backup | MinIO + restic-backup |
 
-`COMPOSE_PROFILES` гейтит postgres/storage/backend и при split — на split-хосте
+`COMPOSE_PROFILES` гейтит postgres/storage/backend/site и при split — на split-хосте
 ставится профиль его роли (`db` → `COMPOSE_PROFILES=postgres`, `storage` →
 `storage`). Дефолт `HOST_ROLE=all` поднимает `docker-compose.yml` + все `compose/*.yml`.
 

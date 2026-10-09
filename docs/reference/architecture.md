@@ -33,7 +33,7 @@ Single-VPS docker-compose стек одного проекта (дефолт). �
 
 | Network | Тип | Кто в ней |
 |---|---|---|
-| `proxy` | bridge (наружу через traefik) | Traefik (edge), CrowdSec, landing, backend (входящий HTTPS), minio (S3 + Console), backup (исходящий к внешнему S3) |
+| `proxy` | bridge (наружу через traefik) | Traefik (edge), CrowdSec, landing, site и backend (входящий HTTPS), minio (S3 + Console), backup (исходящий к внешнему S3) |
 | `backend-net` | bridge, **internal** | postgres, backend, minio, minio-init, backup |
 
 Постгрес НЕ в `proxy` — он недоступен извне. Backend стучится в постгрес по hostname `postgres` через `backend-net`.
@@ -125,7 +125,7 @@ Postgres / MinIO+backup / edge+app на отдельных VPS (нескольк
   | Роль | сервисы | профиль |
   |---|---|---|
   | `all` | весь стек (single-host, дефолт) | как в `.env` |
-  | `edge` | traefik, crowdsec, landing, backend | `backend` |
+  | `edge` | traefik, crowdsec, landing, backend, site | `backend`, `site` |
   | `db` | postgres | `postgres` |
   | `storage` | minio, backup | `storage` |
 
@@ -152,7 +152,7 @@ TLS/шифрование cross-host трафика; репликация / HA / 
 
 - **NATS** (event bus) — `compose/nats.yml` + добавь в backend-net.
 - **Redis** (cache) — `compose/redis.yml` + backend-net.
-- **Frontend** (static SPA или SSR) — `compose/frontend.yml` с traefik labels на корневой `${DOMAIN}`.
+- **Frontend** (SPA за логином) — `compose/frontend.yml` с traefik labels на свой сабдомен (`app.${DOMAIN}`); корень `${DOMAIN}` занимает сайт (`compose/site.yml`, профиль `site`).
 - **Worker** (отдельный binary) — `compose/worker.yml`, обычно тот же image что backend, но `command: /app/worker`.
 
 Принцип: один файл = один сервис. Makefile собирает `-f` аргументы автоматически.
