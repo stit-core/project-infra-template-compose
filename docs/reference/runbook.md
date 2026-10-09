@@ -51,8 +51,8 @@ docker logs traefik --tail=5   # «unable to install plugin crowdsec-bouncer» �
 
 Bouncer Traefik спрашивает решение у LAPI CrowdSec на каждый новый адрес клиента (вердикт держит в кеше до 60 с) и, пока LAPI не отвечает, отказывает — 429. Поэтому `crowdsec` здоров, только когда LAPI отвечает, и Traefik стартует после него.
 
-- `docker logs crowdsec --tail=50` — есть строка `CrowdSec Local API listening`? Первый старт ставит коллекции из хаба CrowdSec: до минуты, нужен выход в сеть.
-- Рестарт и пересоздание `crowdsec` (`make restart SVC=crowdsec`, деплой с правкой `configs/crowdsec/acquis.yaml` или `crontab`) — 6–8 секунд отказа 429 клиентам без вердикта в кеше: без нужды его не рестартуют.
+- `docker logs crowdsec 2>&1 | grep 'Local API listening'` — строка есть? Нет — LAPI ещё не поднялся: первый старт ставит коллекции из хаба CrowdSec — до минуты, нужен выход в сеть. Хвост лога (`--tail`) занят строками LAPI — он пишет каждую пробу здоровья и каждый вопрос bouncer о новом адресе клиента; нужное ищут через `grep`: `level=error`, `crond:`, `bots-allowlist`, `rotate-access-log`.
+- Рестарт и пересоздание `crowdsec` (`make restart SVC=crowdsec`, деплой с правкой `compose/crowdsec.yml`, `configs/crowdsec/acquis.yaml` или `crontab`) — 6–8 секунд отказа 429 клиентам без вердикта в кеше: без нужды его не рестартуют.
 - 429 одному адресу, а не всем — решение о бане: `docker exec crowdsec cscli decisions list`; снять — `docker exec crowdsec cscli decisions delete --ip <адрес>`.
 - Источник журнала пуст (`docker exec crowdsec cscli metrics show acquisition` — нет строки `file:/var/log/traefik/access.log`) — сценарии не работают: сверь `configs/crowdsec/acquis.yaml` и каталог `/var/log/traefik` на хосте, затем `make restart SVC=crowdsec`.
 
@@ -96,6 +96,31 @@ docker exec crowdsec cscli decisions delete --ip <адрес>  # снять ба
 
 - **Журнал растёт, копий нет:** `docker exec crowdsec crontab -l` — расписание на месте? `docker exec crowdsec pgrep crond` — crond жив? Нет — `make restart SVC=crowdsec`. Ротация руками — `docker exec crowdsec sh /opt/edge/rotate-access-log.sh`.
 - **Правка расписания** — `configs/crowdsec/crontab`, затем `make ship`: деплой рестартует `crowdsec`, crontab ставится на старте контейнера.
+
+## Вербы отказывают с `ENV-ERR`
+
+**Симптом:** `make deploy`, `render`, `ps`, `logs`, `restart`, `recreate`, `build`, `bump`, `restore-pg` отвечают `ENV-ERR: <ключ> — .env, строка <N>: нужна форма KEY=значение…` и ничего не делают; `make doctor` и `make validate` называют ту же строку красной проверкой.
+
+Строка `.env` не той формы: шелл скриптов и compose прочли бы её по-разному, а в тексте своих ошибок напечатали бы кусок значения — хеш, пароль. Поэтому вербы останавливаются раньше чтения файла. Отказ дают: пробел у `=`, значение с пробелом, `$` или знаком шелла без одинарных кавычек, `export KEY=…`, подстановка `"…${VAR}…"`, комментарий или пробел после значения, перевод строки CRLF. Сам `docker compose` такие строки читает — стек, поднятый раньше, продолжает работать.
+
+Аварию при такой строке разбирают без этих вербов:
+
+```bash
+make status                       # смок: хост, контейнеры, edge — .env не читает
+docker ps                         # состояние контейнеров
+docker logs <сервис> --tail=100   # лог сервиса
+make doctor                       # ключ и номер каждой строки не той формы (первые пять)
+```
+
+Исправь строку по номеру — значение в одинарные кавычки, комментарий отдельной строкой — и повтори верб.
+
+## Деплой пересоздаёт Traefik и CrowdSec
+
+Правка их compose-файлов (образ, healthcheck, тома, `dns_opt`) пересоздаёт контейнеры edge. На стенде это 10–11 секунд без ответа сервисов: дважды отказ соединения на 2–3 секунды (пересоздание и рестарт Traefik) и 5–6 секунд 429, пока bouncer не получит вердикт у поднявшегося LAPI. Правка одного `configs/traefik/` — рестарт Traefik, секунды.
+
+`scripts/deploy.sh`, обновлённый тем же `git pull`, продолжает новой версией сам — строка `→ scripts/deploy.sh обновлён этим pull`. `deploy.sh` без этой передачи доходит по-своему, и шаги новой версии остаются несделанными: после `make deploy` при профиле `site` нет строки `→ allowlist ботов (CrowdSec)` — запусти `make deploy` второй раз.
+
+Перед обновлением `make doctor` назовёт строки `.env`, которые деплой отвергнет (`ENV-ERR`): `export KEY=…`, `$` без одинарных кавычек, комментарий после значения.
 
 ## Postgres dead / data lost / wrong migration
 

@@ -84,7 +84,7 @@ Docker фиксирует environment в container config в момент **со
 сравнивает интерполированный конфиг и пересоздаёт затронутые сервисы сам;
 точечно — `make recreate SVC=<svc>`. Bind-mounted конфиги compose так НЕ
 отслеживает — сервисы с изменёнными `configs/<dir>/` рестартует `deploy.sh`
-по git-diff'у (traefik/crowdsec/postgres). Исключение — задания расписания edge
+по git-diff'у (traefik/crowdsec/postgres) и ждёт их healthy. Исключение — задания расписания edge
 (`configs/crowdsec/*.sh`): контейнер читает их из смонтированного каталога при
 каждом запуске.
 
