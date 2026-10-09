@@ -13,6 +13,11 @@ cd "$(dirname "$0")/.."
 [ -f .env ] || { echo "ERR: .env missing" >&2; exit 1; }
 docker info >/dev/null 2>&1 || { echo "ERR: docker not reachable" >&2; exit 1; }
 
+# Форма строк .env — раньше первого чтения ключа: построчное чтение ниже верно только на
+# строке вида KEY=значение, и значение — без обрамляющих кавычек.
+bash scripts/preflight-env.sh form
+envval() { sed -n "s/^$1=//p" .env | tail -n 1 | tr -d "\"'"; }
+
 # Identity: .env обязан содержать PROJECT_NAME и ENV — без них не резолвятся
 # image-пути registry и APP_ENV.
 grep -qE '^PROJECT_NAME=.+' .env || { echo "ERR: PROJECT_NAME пустой в .env" >&2; exit 1; }
@@ -24,7 +29,7 @@ grep -qE '^ENV=.+'          .env || { echo "ERR: ENV пустой в .env (dev/p
 # Карта роль → compose-файлы. Граница (cross-host сеть / репликация / HA — дело
 # потребителя) и эндпоинты в .env (PG_HOST/PG_PORT, RESTIC_REPOSITORY) —
 # docs/reference/architecture.md § Multi-host split.
-HOST_ROLE=$(sed -nE 's/^HOST_ROLE=//p' .env | tail -1)
+HOST_ROLE=$(envval HOST_ROLE)
 HOST_ROLE="${HOST_ROLE:-all}"
 declare -A ROLE_FILES=(
   [all]="docker-compose.yml compose/*.yml"
@@ -59,7 +64,7 @@ bash scripts/preflight-dns.sh || true
 # Только single-host: при split postgres на db-хосте, backup на storage-хосте
 # делает pg_dumpall по сети (PG_HOST из .env) — co-location не требуется
 # (cross-host доступ — дело потребителя).
-COMPOSE_PROFILES=$(sed -nE 's/^COMPOSE_PROFILES=//p' .env | tail -1)
+COMPOSE_PROFILES=$(envval COMPOSE_PROFILES)
 if [ "$HOST_ROLE" = all ]; then
   case ",${COMPOSE_PROFILES:-}," in
     *,storage,*)
