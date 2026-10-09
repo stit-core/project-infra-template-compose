@@ -145,37 +145,11 @@ if [ "$prev_sha" != "$new_sha" ] && [ "$prev_sha" != "none" ]; then
     if [ ${#final[@]} -gt 0 ]; then
       echo "Restarting services with changed configs: ${final[*]}"
       docker compose "${args[@]}" restart "${final[@]}"
+      # Рестарт возвращается, не дожидаясь здоровья, а Traefik без плагина bouncer не
+      # стартует вовсе (abortOnPluginFailure): деплой ждёт healthy и после рестарта.
+      docker compose "${args[@]}" up -d --wait --wait-timeout 180 "${final[@]}"
     fi
   fi
-fi
-
-# Плагин bouncer Traefik качает из сети при каждом старте. Сбой загрузки — плагины
-# выключены, роутеры с crowdsec@file не собираются: 404 на всём edge до следующего
-# рестарта. Сверяется журнал текущего запуска Traefik; сбой лечит рестарт.
-traefik_plugins() { # loaded | disabled | pending
-  local started
-  started=$(docker inspect traefik --format '{{.State.StartedAt}}' 2>/dev/null) || { echo pending; return; }
-  case "$(docker logs --since "$started" traefik 2>&1)" in
-    *"Plugins are disabled"*) echo disabled ;;
-    *"Plugins loaded"*) echo loaded ;;
-    *) echo pending ;;
-  esac
-}
-if [ "$crowdsec_here" = 1 ]; then
-  for try in 1 2 3; do
-    for _ in $(seq 30); do
-      state=$(traefik_plugins)
-      [ "$state" = pending ] || break
-      sleep 1
-    done
-    [ "$state" = loaded ] && break
-    if [ "$try" = 3 ]; then
-      echo "ERR: traefik: плагин bouncer не загружен ($state) — роутеры с crowdsec@file не собраны, edge отвечает 404; docker logs traefik, затем make restart SVC=traefik (docs/reference/runbook.md)" >&2
-      exit 1
-    fi
-    echo "→ traefik: плагин bouncer не загружен ($state) — рестарт, попытка $try"
-    docker compose "${args[@]}" restart traefik
-  done
 fi
 
 # Allowlist ботов: кого robots.txt сайта пускает, того CrowdSec не банит. Здесь — только

@@ -33,18 +33,17 @@ docker logs traefik --tail=200 | grep -i 'acme\|challenge'
 - Rate limit LE: 50 cert/week per registered domain. Если хитанули — ждать неделю или использовать staging endpoint (отдельный `caServer` в traefik.yml).
 - `/letsencrypt/acme.json` существует и `chmod 0600`? Иногда после восстановления volume'а права слетают.
 
-## Edge отвечает 404 на всех адресах после рестарта Traefik
+## Traefik перезапускается, edge не отвечает
 
-**Симптом:** после рестарта Traefik (деплой с правкой `configs/traefik/`, `make restart SVC=traefik`, перезагрузка хоста) все адреса отвечают `404 page not found`, а `make ps` показывает `traefik` healthy.
+**Симптом:** после рестарта Traefik (деплой с правкой `configs/traefik/`, `make restart SVC=traefik`, перезагрузка хоста) соединения на 80 и 443 отклоняются, `make ps` показывает `traefik` в состоянии `restarting`, `make deploy` отказывает с `container traefik is unhealthy`.
 
-Плагин bouncer CrowdSec Traefik качает из сети при каждом старте. Сбой загрузки выключает плагины, и роутеры с `crowdsec@file` — то есть все — не собираются:
+Плагин bouncer CrowdSec Traefik качает из сети при каждом старте и без него не стартует (`experimental.abortOnPluginFailure` в static-конфиге): с выключенными плагинами роутеры с `crowdsec@file` — то есть все — не собрались бы, и edge отвечал бы 404 при `healthy`.
 
 ```bash
-docker logs traefik 2>&1 | grep -i plugin   # «Plugins loaded» — норма, «Plugins are disabled» — сбой загрузки
-make restart SVC=traefik                     # повторить загрузку
+docker logs traefik --tail=5   # «unable to install plugin crowdsec-bouncer» — нет выхода к plugins.traefik.io
 ```
 
-`make deploy` сверяет строку `Plugins loaded` сам: при сбое рестартует Traefik до двух раз, а если не помогло — отказывает с `ERR: traefik: плагин bouncer не загружен`; тогда проверь выход VPS в сеть (`plugins.traefik.io`). После рестарта вне деплоя — `make restart`, перезагрузка хоста — сверяй ту же строку лога сам.
+Лечится само: политика `restart` повторяет старт (пауза между попытками растёт до минуты), и Traefik поднимается, как только VPS видит сеть. Проверь выход VPS в сеть; после — `make deploy` или `make ps`.
 
 ## Edge отвечает 429 на всех адресах
 

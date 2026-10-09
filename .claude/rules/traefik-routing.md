@@ -69,5 +69,5 @@ gRPC — `&& Headers(\`Content-Type\`, \`application/grpc\`)` рулом + `load
 ## После правки
 
 - `compose/*.yml` labels → `make deploy` (Traefik watcher подхватит).
-- `configs/traefik/traefik.yml.tpl` (static-конфиг, security-sensitive; рендерится в `configs/traefik/traefik.yml`) → **рестарт** Traefik (`make restart SVC=traefik`; при deploy git-diff по `configs/traefik/` рестартует его сам). Плагин bouncer Traefik качает из сети при каждом старте: сбой загрузки — 404 на всех роутерах; `make deploy` сверяет строку лога `Plugins loaded` и рестартует сам, после ручного рестарта её сверяет оператор (runbook).
+- `configs/traefik/traefik.yml.tpl` (static-конфиг, security-sensitive; рендерится в `configs/traefik/traefik.yml`) → **рестарт** Traefik (`make restart SVC=traefik`; при deploy git-diff по `configs/traefik/` рестартует его сам). Плагин bouncer Traefik качает из сети при каждом старте, и без него не стартует (`experimental.abortOnPluginFailure`): контейнер перезапускает политика `restart`, пока плагин не загрузится, edge в это время закрыт, а не работает без WAF. `make deploy` после рестарта ждёт healthy и при сбое отказывает (runbook).
 - `configs/traefik/dynamic/*.yml` (dynamic) → подхватится через `watch: true`. `.tpl` рендерятся через `scripts/render-configs.sh`.
