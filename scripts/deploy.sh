@@ -40,9 +40,9 @@ declare -A ROLE_FILES=(
 sel="${ROLE_FILES[$HOST_ROLE]:-}"
 [ -n "$sel" ] || { echo "ERR: unknown HOST_ROLE=$HOST_ROLE (all|edge|db|storage)" >&2; exit 1; }
 
-# Рестарт по дифу конфигов (ниже) считается от ревизии последнего удачного деплоя — ссылки
-# refs/deploy/ok, а не от HEAD до pull: деплой, который отказал после pull (рендер, compose),
-# иначе унёс бы этот диф с собой, и следующий не рестартовал бы сервисы с изменёнными конфигами.
+# Рестарт по дифу конфигов (ниже) считается от ревизии, конфиги которой сервисы уже подхватили, —
+# ссылки refs/deploy/ok: её пишут сам рестарт и конец удачного деплоя. От HEAD до pull диф терялся
+# бы: деплой, отказавший между pull и рестартом (рендер, compose), унёс бы его с собой.
 prev_sha=${DEPLOY_PREV_SHA:-$(git rev-parse -q --verify 'refs/deploy/ok^{commit}' || git rev-parse HEAD 2>/dev/null || echo "none")}
 [ "$prev_sha" = none ] || git update-ref refs/deploy/ok "$prev_sha"
 head_sha=$(git rev-parse HEAD 2>/dev/null || echo "none")
@@ -150,6 +150,8 @@ if [ "$prev_sha" != "$new_sha" ] && [ "$prev_sha" != "none" ]; then
     if [ ${#final[@]} -gt 0 ]; then
       echo "Restarting services with changed configs: ${final[*]}"
       docker compose "${args[@]}" restart "${final[@]}"
+      # Сервисы уже на новых конфигах — и когда здоровья ниже деплой не дождётся.
+      [ "$new_sha" = none ] || git update-ref refs/deploy/ok "$new_sha"
       # Рестарт возвращается, не дожидаясь здоровья, а Traefik без плагина bouncer не
       # стартует вовсе (abortOnPluginFailure): деплой ждёт healthy и после рестарта.
       docker compose "${args[@]}" up -d --wait --wait-timeout 180 "${final[@]}"
