@@ -40,14 +40,19 @@ declare -A ROLE_FILES=(
 sel="${ROLE_FILES[$HOST_ROLE]:-}"
 [ -n "$sel" ] || { echo "ERR: unknown HOST_ROLE=$HOST_ROLE (all|edge|db|storage)" >&2; exit 1; }
 
-prev_sha=${DEPLOY_PREV_SHA:-$(git rev-parse HEAD 2>/dev/null || echo "none")}
+# Рестарт по дифу конфигов (ниже) считается от ревизии последнего удачного деплоя — ссылки
+# refs/deploy/ok, а не от HEAD до pull: деплой, который отказал после pull (рендер, compose),
+# иначе унёс бы этот диф с собой, и следующий не рестартовал бы сервисы с изменёнными конфигами.
+prev_sha=${DEPLOY_PREV_SHA:-$(git rev-parse -q --verify 'refs/deploy/ok^{commit}' || git rev-parse HEAD 2>/dev/null || echo "none")}
+[ "$prev_sha" = none ] || git update-ref refs/deploy/ok "$prev_sha"
+head_sha=$(git rev-parse HEAD 2>/dev/null || echo "none")
 git pull --ff-only origin main || true
 new_sha=$(git rev-parse HEAD 2>/dev/null || echo "none")
 
 # Этот pull мог обновить и сам скрипт, а bash дочитывает прежнюю версию: новая логика
 # деплоя опоздала бы на один деплой. Продолжает новая версия — с тем же prev_sha.
-if [ -z "${DEPLOY_PREV_SHA:-}" ] && [ "$prev_sha" != "$new_sha" ] && [ "$prev_sha" != "none" ] \
-   && ! git diff --quiet "$prev_sha" "$new_sha" -- scripts/deploy.sh; then
+if [ -z "${DEPLOY_PREV_SHA:-}" ] && [ "$head_sha" != "$new_sha" ] && [ "$head_sha" != "none" ] \
+   && ! git diff --quiet "$head_sha" "$new_sha" -- scripts/deploy.sh; then
   echo "→ scripts/deploy.sh обновлён этим pull — продолжает новая версия"
   DEPLOY_PREV_SHA=$prev_sha exec bash scripts/deploy.sh
 fi
@@ -151,6 +156,7 @@ if [ "$prev_sha" != "$new_sha" ] && [ "$prev_sha" != "none" ]; then
     fi
   fi
 fi
+[ "$new_sha" = none ] || git update-ref refs/deploy/ok "$new_sha"
 
 # Allowlist ботов: кого robots.txt сайта пускает, того CrowdSec не банит. Здесь — только
 # недостающие и давно не обновлявшиеся списки: к вендорам деплой без нужды не ходит;
