@@ -8,7 +8,8 @@
 #
 # FAIL только на том, что точно ломает стек И actionable здесь (compose
 # config invalid, .env без identity, строка .env не той формы, замок не-прод
-# среды, с которым не войти, Docker Engine старше 25 при профиле site).
+# среды, с которым не войти, Docker Engine старше 25 при профиле site, пустой
+# тег образа включённого сервиса).
 # DNS — WARN (traefik сам ретрайнет ACME, см. preflight-dns.sh).
 # Поэтому на чистом лаптоп-чекауте (нет .env/docker) doctor = OK (всё SKIP) —
 # make check остаётся зелёным.
@@ -166,7 +167,27 @@ else
   fi
 fi
 
-# 8. Список источников allowlist ботов — та же версия реестра, что у соседа <org>/site
+# 8. Тег образа сервис-репо (${<SVC>_TAG}) у включённого сервиса не пуст: с пустым make deploy
+#    падает на ссылке образа (invalid reference format). Первый тег ставит make bump.
+if [ ! -f .env ]; then
+  st "image tags" SKIP "нет .env"
+elif [ "$env_rc" -ne 0 ]; then
+  st "image tags" SKIP "$env_skip"
+else
+  profiles=",$(sed -nE 's/^COMPOSE_PROFILES=//p' .env | tail -n 1 | tr -d "\"'"),"
+  empty=""
+  for f in compose/*.yml; do
+    var=$(sed -nE 's/^[[:space:]]*image:.*\$\{([A-Z0-9_]+_TAG)\}.*/\1/p' "$f" | head -n 1)
+    [ -n "$var" ] || continue
+    p=$(sed -nE 's/^[[:space:]]*profiles:[[:space:]]*\[[[:space:]]*([a-z0-9_-]+).*/\1/p' "$f" | head -n 1)
+    if [ -n "$p" ]; then case "$profiles" in *",$p,"*) ;; *) continue ;; esac; fi
+    [ -n "$(sed -n "s/^$var=//p" .env | tail -n 1 | tr -d "\"'")" ] || empty="$empty $var"
+  done
+  if [ -z "$empty" ]; then st "image tags" PASS
+  else st "image tags" FAIL "пусто при включённом профиле:$empty — make deploy упадёт; первый тег — make bump SVC=<svc> TAG=<тег>"; fi
+fi
+
+# 9. Список источников allowlist ботов — та же версия реестра, что у соседа <org>/site
 #    (на VPS соседа нет — SKIP)
 read -r bots_status bots_note < <(bash scripts/tools/bots-sources.sh check 2>&1)
 case "$bots_status" in

@@ -4,7 +4,9 @@
 #   bots-allowlist.sh [all|missing|state]
 # all (умолчание) обновляет allowlist каждого бота; missing — только отсутствующие и те,
 # что не обновлялись дольше шести дней: деплой не ходит к вендорам без нужды; state —
-# идёт ли задание сейчас, ничего не меняя (смок).
+# сверка для смока, ничего не меняя: идёт ли задание; allowlist нужных ботов — есть ли все,
+# сети и возраст; кто из ботов под баном — адрес из allowlist или PTR поисковика, которого
+# бережёт только rDNS.
 #
 # Кого сайт пускает, того edge не банит. Источники — ai-bots.sources рядом (печать реестра
 # ботов сайта, make bots-sources): строка «назначение токен ip_list_url rdns». Бот с
@@ -46,9 +48,12 @@ MAX_BYTES=2097152
 MAX_NETS=4096
 MAX_V4=262144
 MAX_V6=65536
-# Сроки в секундах: одна попытка загрузки и задание целиком.
+# Сроки в секундах: одна попытка загрузки, задание целиком, сверка state. Allowlist старше
+# STALE — источник не обновлялся: расписание — раз в неделю.
 FETCH_SEC=30
 JOB_SEC=600
+STATE_SEC=60
+STALE=691200
 mode=${1:-all}
 tmp=${2:-}
 
@@ -73,15 +78,16 @@ if [ -z "$tmp" ]; then
     if [ "$mode" = state ]; then say "задание идёт ($age с)"; else say "уже идёт ($age с) — пропуск"; fi
     exit 0
   fi
-  [ "$mode" != state ] || { say "задание не идёт"; exit 0; }
-  touch "$LOCK"
+  # Сверка идёт без замка: задание она не задерживает.
+  sec=$JOB_SEC
+  if [ "$mode" = state ]; then say "задание не идёт"; exec 9>&-; sec=$STATE_SEC; else touch "$LOCK"; fi
   tmp=$(mktemp -d) || exit 1
-  setsid timeout "$JOB_SEC" sh "$0" "$mode" "$tmp" &
+  setsid timeout "$sec" sh "$0" "$mode" "$tmp" &
   job=$!
   trap 'kill -- "-$job" 2>/dev/null; rm -f "$tmp"/*; rmdir "$tmp" 2>/dev/null' EXIT
   trap 'exit 143' HUP INT TERM
   wait "$job" 2>/dev/null; rc=$?
-  [ "$rc" -le 2 ] || { say "WARN задание прервано (код $rc; срок — $JOB_SEC с) — allowlist обновлён не полностью"; rc=2; }
+  [ "$rc" -le 2 ] || { say "WARN задание прервано (код $rc; срок — $sec с) — allowlist обновлён не полностью"; rc=2; }
   exit "$rc"
 fi
 [ -d "$tmp" ] || { say "рабочего каталога нет: $tmp"; exit 1; }
@@ -99,17 +105,17 @@ get() { # <адрес> <файл>
 }
 # Сертификат источника сверяет помощник ssl_client: без него wget busybox идёт по https,
 # не проверяя сертификат.
-command -v ssl_client >/dev/null || { say "в образе нет ssl_client: сертификат источника не проверить — allowlist не меняется"; exit 1; }
+command -v ssl_client >/dev/null || { say "WARN в образе нет ssl_client: сертификат источника не проверить — allowlist не меняется"; exit 1; }
 
 version=$(sed -n '1s/^# crawlers\.yaml sha256:\([0-9a-f]\{12\}\)[0-9a-f]\{52\}$/\1/p' "$SRC" 2>/dev/null)
-[ -n "$version" ] || { say "нет списка источников или его первая строка — не версия реестра: $SRC (make bots-sources)"; exit 1; }
+[ -n "$version" ] || { say "WARN нет списка источников или его первая строка — не версия реестра: $SRC (make bots-sources)"; exit 1; }
 # Строки печати: назначение, токен, https-адрес списка сетей или «—», суффиксы rDNS или «—».
 grep -E '^(search|user_fetch|training) [A-Za-z0-9._-]+ (https://[A-Za-z0-9._~:/?#@!&=+%-]+|—) ([a-z0-9.,-]+|—)$' "$SRC" > "$tmp/bots"
 odd=$(grep -cvE '^(#|$)' "$SRC"); odd=$((odd - $(wc -l < "$tmp/bots")))
 
 # Политика сайта — robots.txt сервиса, а не публичный адрес: на не-прод тот за замком.
 get "$ROBOTS" "$tmp/robots" && grep -qi '^user-agent[[:space:]]*:' "$tmp/robots" ||
-  { say "сервис site не отвечает ($ROBOTS) — allowlist не меняется"; exit 1; }
+  { say "WARN сервис site не отвечает ($ROBOTS) — allowlist не меняется"; exit 1; }
 # Токены именных групп с полным запретом (группа `*` — не про ботов из списка).
 awk '{ sub(/#.*/, ""); gsub(/\r/, ""); line = tolower($0) }
      line ~ /^[ \t]*user-agent[ \t]*:/ { if (rules) { n = 0; rules = 0 }; v = line; sub(/^[^:]*:[ \t]*/, "", v); sub(/[ \t]+$/, "", v); agent[++n] = v; next }
@@ -124,15 +130,58 @@ while read -r purpose token url rdns; do
   echo "$token $url" >> "$tmp/want"
 done < "$tmp/bots"
 
-cscli allowlists list -o raw > "$tmp/have.csv" 2>/dev/null || { say "cscli allowlists не отвечает"; exit 1; }
-# name,description,created_at,…: имя и возраст в секундах для своих allowlist.
+cscli allowlists list -o raw > "$tmp/have.csv" 2>/dev/null || { say "WARN cscli allowlists не отвечает"; exit 1; }
+# name,description,created_at,…,size: имя, возраст в секундах и число сетей своих allowlist.
 now=$(date -u +%s)
-awk -F, -v p="$PREFIX" 'NR > 1 && index($1, p) == 1 { t = $3; sub(/T/, " ", t); sub(/Z$/, "", t); print $1 "," t }' "$tmp/have.csv" |
-  while IFS=, read -r name at; do echo "$name $((now - $(date -u -d "$at" +%s 2>/dev/null || echo 0)))"; done > "$tmp/have"
+awk -F, -v p="$PREFIX" 'NR > 1 && index($1, p) == 1 { t = $3; sub(/T/, " ", t); sub(/Z$/, "", t); print $1 "," t "," $6 }' "$tmp/have.csv" |
+  while IFS=, read -r name at size; do echo "$name $((now - $(date -u -d "$at" +%s 2>/dev/null || echo 0))) $size"; done > "$tmp/have"
+
+if [ "$mode" = state ]; then
+  # Allowlist: нужные против записанных — счёт, сети (пустой или шире пределов задания — не
+  # его работа), возраст; лишние — бот закрыт robots.txt или выпал из источников.
+  line=$(awk -v p="$PREFIX" -v stale="$STALE" -v max="$((2 * MAX_NETS))" '
+    function hum(t) { return t < 7200 ? int(t / 60) " мин" : t < 172800 ? int(t / 3600) " ч" : int(t / 86400) " дн" }
+    FILENAME == ARGV[1] { want[p $1] = 1; nw++; next }
+    { age[$1] = $2; size[$1] = $3 }
+    END {
+      for (n in want) {
+        if (!(n in age)) { miss = miss " " substr(n, length(p) + 1); continue }
+        nh++; nets += size[n]; if (age[n] > old) old = age[n]
+        if (age[n] > stale) late = late " " n
+        if (size[n] < 1 || size[n] > max) odd = odd " " n
+      }
+      for (n in age) if (!(n in want)) extra = extra " " n
+      s = sprintf("allowlist ботов: %d из %d, сетей %d", nh, nw, nets) (nh ? ", старший — " hum(old) : "")
+      if (miss != "") w = w "; нет:" miss
+      if (late != "") w = w "; старше " hum(stale) ":" late
+      if (odd != "") w = w "; сетей вне предела:" odd
+      if (extra != "") w = w "; лишние:" extra
+      print (w != "" ? "WARN " s w " — make allowlist" : s) }' "$tmp/want" "$tmp/have")
+  say "$line"
+  # Баны: адрес из allowlist ботов или PTR поисковика без списка сетей (его бережёт только
+  # rDNS) — среди локальных решений, до 30 свежих адресов.
+  cscli decisions list -o raw > "$tmp/dec.csv" 2>/dev/null || { say "WARN cscli decisions не отвечает"; exit 2; }
+  awk -F, 'NR > 1 && ($2 == "crowdsec" || $2 == "cscli") && $3 ~ /^Ip:/ { print substr($3, 4) }' "$tmp/dec.csv" | awk '!seen[$0]++' | head -n 30 > "$tmp/banned"
+  awk '$3 == "—" && $4 != "—" { n = split($4, a, ","); for (i = 1; i <= n; i++) print a[i] }' "$tmp/bots" | sort -u > "$tmp/rdns"
+  : > "$tmp/hits"
+  while read -r ip; do
+    if cscli allowlists check "$ip" < /dev/null 2>/dev/null | grep -q " from $PREFIX"; then echo "$ip (allowlist)" >> "$tmp/hits"; fi
+    ( name=$(timeout 3 nslookup "$ip" 2>/dev/null | sed -n 's/.*name = //p' | head -n 1); name=${name%.}
+      while read -r suf; do case "$name" in *."$suf") echo "$ip ($name)" >> "$tmp/hits"; break ;; esac; done < "$tmp/rdns" ) &
+  done < "$tmp/banned"
+  wait
+  if [ -s "$tmp/hits" ]; then
+    say "WARN под баном боты: $(sort -u "$tmp/hits" | head -n 5 | tr '\n' ' ')— снять: cscli decisions delete --ip <адрес> (docs/reference/runbook.md)"
+    exit 2
+  fi
+  say "под баном ботов нет (локальных решений: $(wc -l < "$tmp/banned"))"
+  case "$line" in WARN*) exit 2 ;; esac
+  exit 0
+fi
 
 # Чужой и закрытый: allowlist бота, которого нет среди нужных, удаляется.
 removed=0
-while read -r name age; do
+while read -r name age size; do
   awk -v t="${name#"$PREFIX"}" '$1 == t { found = 1 } END { exit !found }' "$tmp/want" && continue
   cscli allowlists delete "$name" >/dev/null 2>&1 && removed=$((removed + 1))
 done < "$tmp/have"

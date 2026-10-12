@@ -1,4 +1,4 @@
-.PHONY: help validate doctor check ship deploy render env-form ps logs restart recreate build bump backup allowlist restore-pg status search new-env setup plan-check project-check bots-sources
+.PHONY: help validate doctor check ship deploy render env-form ps logs restart recreate build bump backup allowlist accept restore-pg status search new-env setup plan-check project-check bots-sources
 
 SHELL := /usr/bin/env bash
 
@@ -118,6 +118,15 @@ backup: ## one-shot backup (на VPS; с workstation — через ssh)
 allowlist: ## allowlist ботов в CrowdSec: сети вендоров по ai-bots.sources и robots.txt сайта (на VPS; с workstation — через ssh)
 	@if [ -f .env ]; then docker exec crowdsec sh /opt/edge/bots-allowlist.sh; \
 	else bash scripts/tools/ssh.sh exec make allowlist; fi
+
+# Приёмка после деплоя — «Приёмка первого деплоя» контракта сервиса машиной, в профиле среды
+# (прод или не-прод за замком): смок edge и сайта, адрес, записи Host, методы, заголовки, лимит
+# формы, UA-проба по ai-bots.sources, журнал, отказ WAF. .env не читает: домен и среду берёт у
+# запущенного контейнера.
+accept: ## приёмка сервиса после деплоя (на VPS; с workstation — через ssh): make accept SVC=site
+	@if [ -z "$(SVC)" ]; then echo "usage: make accept SVC=site"; exit 2; fi
+	@if [ -f .env ]; then bash scripts/tools/accept.sh $(SVC); \
+	else bash scripts/tools/ssh.sh exec make accept SVC=$(SVC); fi
 
 restore-pg: ## restore postgres из restic: make restore-pg SNAPSHOT=latest
 	@if [ -z "$(SNAPSHOT)" ]; then echo "usage: make restore-pg SNAPSHOT=<id|latest>"; exit 2; fi
