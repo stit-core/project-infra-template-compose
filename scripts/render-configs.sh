@@ -34,8 +34,14 @@ export STAGING_BASIC_AUTH_USERS="${STAGING_BASIC_AUTH_USERS:-nobody:*}"
 # каталогом dynamic следит Traefik, и с файлом, прочитанным посреди записи,
 # роутеры не собираются — секунды 404 на всём edge. Запись — поверх (inode
 # тот же): bind-mount одного файла подмены не видит.
+#
+# Конфиги Traefik несут ключ bouncer и хеш замка — они только владельцу: Traefik
+# читает их root'ом в контейнере. Страницу заглушки nginx читает не root'ом.
 while IFS= read -r tpl; do
   out="${tpl%.tpl}"
+  case "$out" in configs/traefik/*) mode=600 ;; *) mode=644 ;; esac
+  [ -f "$out" ] || ( umask 077; : > "$out" )
+  [ "$(stat -c %a "$out")" = "$mode" ] || chmod "$mode" "$out"
   new=$(envsubst < "$tpl")
   if [ -f "$out" ] && [ "$new" = "$(cat "$out")" ]; then
     echo "unchanged $out"

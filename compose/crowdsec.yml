@@ -11,9 +11,10 @@ services:
     # Рядом с CrowdSec — crond: расписание edge (configs/crowdsec/crontab) живёт в стеке, и
     # правку доносит make deploy. Задания — ротация журнала доступа и allowlist ботов: им
     # нужны каталог журнала и cscli. /docker_start.sh — entrypoint образа; init — чтобы
-    # PID 1 прибирал за заданиями расписания.
+    # PID 1 прибирал за заданиями расписания. Каталог журнала — только root: в записях
+    # адреса и User-Agent клиентов, а читают его Traefik, CrowdSec и задания — root'ом.
     init: true
-    entrypoint: ["/bin/bash", "-c", "crontab /opt/edge/crontab && crond -f -L /dev/stdout & exec /bin/bash /docker_start.sh"]
+    entrypoint: ["/bin/bash", "-c", "chmod 700 /var/log/traefik; crontab /opt/edge/crontab && crond -f -L /dev/stdout & exec /bin/bash /docker_start.sh"]
     environment:
       # crowdsecurity/linux несёт whitelist-good-actors — постоверфлоу rdns и
       # seo-bots-whitelist: без них сценарии обхода банят поисковых ботов.

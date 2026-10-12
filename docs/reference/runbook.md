@@ -93,7 +93,7 @@ docker exec crowdsec cscli decisions delete --ip <адрес>  # снять ба
 
 ## Журнал доступа Traefik
 
-`/var/log/traefik/access.log` на хосте: JSON-строка на каждый ответ, с `request_User-Agent` и `X-Request-Id`. Его читает CrowdSec. Ротация — расписание стека (`configs/crowdsec/crontab`, crond в контейнере `crowdsec`): раз в сутки и вне очереди, когда файл перерос 256 МиБ; копии — `access.log.1.gz` (свежая) … `access.log.14.gz`.
+`/var/log/traefik/access.log` на хосте: JSON-строка на каждый ответ, с `request_User-Agent` и `X-Request-Id`. Его читает CrowdSec. Каталог — только root (`700`, ставит контейнер `crowdsec` на старте): в записях адреса и User-Agent клиентов; на хосте журнал читают от root. Ротация — расписание стека (`configs/crowdsec/crontab`, crond в контейнере `crowdsec`): раз в сутки и вне очереди, когда файл перерос 256 МиБ; копии — `access.log.1.gz` (свежая) … `access.log.14.gz`.
 
 - **Журнал растёт, копий нет:** `docker exec crowdsec crontab -l` — расписание на месте? `docker exec crowdsec pgrep crond` — crond жив? Нет — `make restart SVC=crowdsec`. Ротация руками — `docker exec crowdsec sh /opt/edge/rotate-access-log.sh`.
 - **Правка расписания** — `configs/crowdsec/crontab`, затем `make ship`: деплой рестартует `crowdsec`, crontab ставится на старте контейнера.
