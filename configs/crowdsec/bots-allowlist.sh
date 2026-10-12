@@ -55,11 +55,12 @@ tmp=${2:-}
 say() { echo "bots-allowlist: $*"; }
 case "$mode" in all|missing|state) ;; *) say "режим? all|missing|state"; exit 1 ;; esac
 
-# Одно задание за раз, и у него срок. Замок держит этот процесс, работу ведёт дочерний
-# (тот же файл со вторым аргументом — рабочим каталогом) — без дескриптора замка и своей
-# группой процессов: зависшая загрузка, её помощник ssl_client (через него wget ведёт TLS,
-# и он переживает wget, пока источник держит соединение) и cscli замка не держат, а с
-# концом задания снимаются всей группой.
+# Одно задание за раз, и у него срок. Работу ведёт дочерний процесс (тот же файл со вторым
+# аргументом — рабочим каталогом) своей группой и под timeout; замок держат оба — и без
+# надзирающего (SIGKILL) задание до своего конца остаётся одним. Загрузки замок не наследуют:
+# зависшая загрузка и её помощник ssl_client (через него wget ведёт TLS, и он переживает
+# wget, пока источник держит соединение) замка не держат, а с концом задания снимаются всей
+# группой — её снимает и надзирающий, и само задание.
 if [ -z "$tmp" ]; then
   exec 9>> "$LOCK"
   # Повтор через секунду: на миг замок берёт и проверка state.
@@ -75,22 +76,25 @@ if [ -z "$tmp" ]; then
   [ "$mode" != state ] || { say "задание не идёт"; exit 0; }
   touch "$LOCK"
   tmp=$(mktemp -d) || exit 1
-  setsid timeout "$JOB_SEC" sh "$0" "$mode" "$tmp" 9>&- &
+  setsid timeout "$JOB_SEC" sh "$0" "$mode" "$tmp" &
   job=$!
-  trap 'kill -- "-$job" 2>/dev/null; rm -f "$tmp"/*; rmdir "$tmp"' EXIT
+  trap 'kill -- "-$job" 2>/dev/null; rm -f "$tmp"/*; rmdir "$tmp" 2>/dev/null' EXIT
   trap 'exit 143' HUP INT TERM
   wait "$job" 2>/dev/null; rc=$?
   [ "$rc" -le 2 ] || { say "WARN задание прервано (код $rc; срок — $JOB_SEC с) — allowlist обновлён не полностью"; rc=2; }
   exit "$rc"
 fi
 [ -d "$tmp" ] || { say "рабочего каталога нет: $tmp"; exit 1; }
+# Задание — лидер своей группы (setsid): по концу, и по сроку, снимает её и свой каталог.
+trap 'trap "" TERM; kill -- "-$$" 2>/dev/null; rm -f "$tmp"/*; rmdir "$tmp" 2>/dev/null' EXIT
+trap 'exit 143' HUP INT TERM PIPE
 
 # Одна загрузка: ответ целиком, не больше MAX_BYTES (ulimit обрывает запись) и не дольше
 # FETCH_SEC; заголовки ответа — в <файл>.hdr. Фоном и с wait: о загрузке, снятой по сроку,
 # шелл иначе печатает «Terminated».
 get() { # <адрес> <файл>
   ( trap '' XFSZ; ulimit -f $((MAX_BYTES / 512))
-    exec timeout "$FETCH_SEC" wget -q -S -T 15 -U 'Mozilla/5.0 (compatible; edge-bots-allowlist)' -O "$2" "$1" ) 2> "$2.hdr" &
+    exec timeout "$FETCH_SEC" wget -q -S -T 15 -U 'Mozilla/5.0 (compatible; edge-bots-allowlist)' -O "$2" "$1" ) 2> "$2.hdr" 9>&- &
   wait $! 2>/dev/null
 }
 # Сертификат источника сверяет помощник ssl_client: без него wget busybox идёт по https,
@@ -175,7 +179,7 @@ fetch() { # <адрес> <файл>; причина отказа, если он�
 i=0; : > "$tmp/index"
 while read -r url; do
   i=$((i + 1)); echo "$i $url" >> "$tmp/index"
-  fetch "$url" "$tmp/r$i" &
+  fetch "$url" "$tmp/r$i" 9>&- &
 done < "$tmp/urls"
 wait
 
