@@ -156,8 +156,9 @@ identity + ACME из `.env`. `postgres` / `storage` (minio + backup) / `backend`
 
 ### Делать всегда
 - Перед claim «готово» — `make check` (validate + doctor + plan-check + project-check); после деплоя — `make ps`.
-- После выкатки сайта — `make accept SVC=site`; строка `AI-BOTS` его handoff — `make bots-sources` и
-  `make allowlist` (порядок — `docs/reference/ecosystem.md § Handoff-блок релиза`).
+- После выкатки сайта — `make accept SVC=site`. Другая версия реестра в строке `AI-BOTS` его handoff —
+  `make bots-sources` и `make allowlist`; allowlist первого релиза и новой политики `robots.txt` строит сам
+  `make bump SVC=site` (порядок — `docs/reference/ecosystem.md § Handoff-блок релиза`).
 - Любая новая `${VAR}` в compose/configs — в `.env.example` сразу.
 - Бамп инфра-образа (литеральная версия в `compose/<svc>.yml`) — отдельным коммитом после явного OK;
   тег образа сервис-репо — `make bump`.
