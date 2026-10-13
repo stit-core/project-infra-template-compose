@@ -63,7 +63,7 @@ A — Phase B (печать cross-repo next-steps).
 | `backup.yml` | в карте есть `datastore` minio (storage профиль) |
 | `backend.yml` | в карте есть `backend` с `hosting: here` |
 | `site.yml` | в карте есть сайт `<org>/site` с `hosting: here` |
-| `landing.yml` + `configs/landing/` | в карте **нет** сайта на корне; при сайте прунится и строка `configs/landing/index.html` в `.gitignore` |
+| `landing.yml` + `configs/landing/` | в карте **нет** сайта на корне; при сайте прунятся и строка `configs/landing/index.html` в `.gitignore`, и `compose/landing.yml` в `ROLE_FILES[edge]` |
 
 ### Шаги
 

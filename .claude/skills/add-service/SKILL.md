@@ -89,7 +89,8 @@ services:
 - имя сервиса, `container_name`, профиль, `<SVC>_TAG` и роутеры — по имени поверхности; домен — свой (переменная
   `.env` с комментарием в `.env.example`), а не `${DOMAIN}` сайта первой поверхности;
 - два роутера на домен: корень и `www`; `www` только редиректит — сервис `noop@internal` и свой `redirectRegex` на
-  этот домен в `configs/traefik/dynamic/` (общий `www-to-apex@file` ведёт на `${DOMAIN}`);
+  этот домен в `configs/traefik/dynamic/middlewares.yml.tpl`: домен — из `.env`, файл рендерится (общий
+  `www-to-apex@file` ведёт на `${DOMAIN}`);
 - обязательный env образа — origin (`SITE_URL: https://<домен>`) из `.env`; ключи профиля — с умолчанием `${…:-}`;
 - `init: true`; без `read_only`, тома на выходе сборки и `user:` — их ломает штамповка origin; `stop_grace_period`
   больше дренажа образа; `mem_limit` и `--max-old-space-size` ≈ 75 %;

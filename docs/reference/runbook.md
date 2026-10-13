@@ -142,7 +142,8 @@ make allowlist                                        # обновить все 
 
 ```bash
 docker exec crowdsec cscli decisions list                 # адреса под баном и сценарий
-dig +short -x <адрес>                                     # PTR на yandex.ru / yandex.net / yandex.com, googlebot.com, search.msn.com — поисковик
+dig +short -x <адрес>                                     # PTR на yandex.ru / yandex.net / yandex.com, googlebot.com, search.msn.com
+dig +short <имя из PTR>                                   # тот же адрес — поисковик: PTR пишет владелец адреса, прямую запись — домен
 docker exec crowdsec cscli decisions delete --ip <адрес>  # снять бан
 ```
 

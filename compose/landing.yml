@@ -13,9 +13,8 @@ services:
     # 3) если cert на сабдомены ещё не выпущен (DNS в процессе), оператор
     #    видит работающий HTTPS на корне и понимает что проблема не в стеке.
     #
-    # Когда появится клиентский landing/frontend на корне — он автоматически
-    # перебьёт этот сервис (priority=1 ниже traefik-default 0). После
-    # раскатки фронта compose/landing.yml + configs/landing/ можно удалить.
+    # Роутер сайта на корне (compose/site.yml) перебивает её приоритетом. При
+    # сайте на корне compose/landing.yml и configs/landing/ прунит /de-template.
     volumes:
       - ./configs/landing:/usr/share/nginx/html:ro
     networks:
@@ -32,8 +31,8 @@ services:
       traefik.http.routers.landing.entrypoints: websecure
       traefik.http.routers.landing.tls: "true"
       traefik.http.routers.landing.tls.certresolver: letsencrypt
-      # priority=1 — любой явный роутер на ${DOMAIN} (фронт) с дефолтным
-      # priority перебьёт landing без конфликтов.
+      # priority=1 — любой роутер на ${DOMAIN} (сайт) с priority по умолчанию
+      # (длина правила) перебьёт landing без конфликтов.
       traefik.http.routers.landing.priority: "1"
       traefik.http.routers.landing.middlewares: crowdsec@file,secure-headers@file,rate-limit@file
       traefik.http.services.landing.loadbalancer.server.port: "80"
