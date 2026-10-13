@@ -124,7 +124,7 @@ laptop оператора                          VPS
   `== Critical ==` (upstream/deploy-drift), активные планы из `.claude/plans/` (`validate-plan.sh --summary`).
 - **Серверный смок** (`== Server ==`): host-витали (load / RAM / swap / disk / OOM) + здоровье
   контейнеров (unhealthy / exited / restart-loop, автодискавери из `docker ps`) + edge (журнал доступа,
-  его чтение CrowdSec, allowlist и баны ботов) + сайт (liveness, ответ `/` по среде, `robots.txt`,
+  его разбор CrowdSec, allowlist и баны ботов) + сайт (liveness, ответ `/` по среде, `robots.txt`,
   `sitemap.xml`). Бежит **на хосте** — `scripts/tools/smoke-run.sh` гоняет drop-in
   `scripts/tools/smoke.d/*.sh` по порядку (`10-host`, `20-containers`, `30-edge`, `90-site`; `90-<svc>` —
   bespoke-сигнал сервиса).

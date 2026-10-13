@@ -28,7 +28,7 @@ make status
 - `== Critical ==` — `ATTENTION:`-строки git/deploy-drift (upstream behind) или `none`. Это
   pure-local (`status.sh`): docker тут не дёргается.
 - `== Server ==` — серверный смок VPS (host-витали load/RAM/swap/disk/OOM + здоровье
-  контейнеров unhealthy/exited/restart-loop + edge: журнал доступа, его чтение CrowdSec, allowlist и
+  контейнеров unhealthy/exited/restart-loop + edge: журнал доступа, его разбор CrowdSec, allowlist и
   баны ботов + сайт: liveness, `/` по среде, `robots.txt`, `sitemap.xml`). Собирает таргет `make status`
   через смок (`smoke-run.sh` на VPS / `ssh.sh smoke` с workstation). Свои `ATTENTION:`-строки — чейнить
   как Critical (→ triage); что значит каждая — `docs/reference/runbook.md`. `SKIP` — нет `.env.local`

@@ -15,7 +15,8 @@ Common failure modes на проектном VPS и что делать. Ordered
 | | `restart-loop: …` — перезапуск сейчас или второй за 10 минут | `make logs SVC=<svc>`; `traefik` — «Traefik перезапускается, edge не отвечает» |
 | `-- edge --` | `журнала доступа нет`, `журнал доступа N МиБ`, `запись старше 26 ч` | ротация или запись журнала не идёт — «Журнал доступа Traefik» |
 | | `edge не отвечает на 443` | `make ps`; `traefik` — «Traefik перезапускается, edge не отвечает» |
-| | `CrowdSec не читает журнал доступа` | проба через edge не прочитана: «Edge отвечает 429 на всех адресах», последний пункт |
+| | `CrowdSec не читает журнал доступа` | проба через edge не прочитана: «Edge отвечает 429 на всех адресах», последний пункт; файл журнала подменён руками, и Traefik пишет в удалённый, — `make restart SVC=traefik` |
+| | `CrowdSec не разбирает журнал доступа` | строки читаются, а парсер их не берёт — сценарии слепы: там же, последний пункт |
 | | `edge — allowlist ботов: N из M …` (нет, старше 8 дн, сетей вне предела, лишние) | `make allowlist`; его WARN — «Allowlist ботов в CrowdSec» |
 | | `edge — задание идёт … дольше своего срока`, `… не отвечает`, `нет списка источников`, `в образе нет ssl_client` | «Allowlist ботов в CrowdSec» |
 | | `edge — под баном боты: …` | адрес из allowlist или PTR поисковика без списка сетей под баном: снять — `docker exec crowdsec cscli decisions delete --ip <адрес>`; причина — «Бан адреса поисковика» |
@@ -107,7 +108,7 @@ Bouncer Traefik спрашивает решение у LAPI CrowdSec на каж
 - `docker logs crowdsec 2>&1 | grep 'Local API listening'` — строка есть? Нет — LAPI ещё не поднялся: первый старт ставит коллекции из хаба CrowdSec — до минуты, нужен выход в сеть. Хвост лога (`--tail`) занят строками LAPI — он пишет каждую пробу здоровья и каждый вопрос bouncer о новом адресе клиента; нужное ищут через `grep`: `level=error`, `crond:`, `bots-allowlist`, `rotate-access-log`.
 - Рестарт и пересоздание `crowdsec` (`make restart SVC=crowdsec`, деплой с правкой `compose/crowdsec.yml`, `configs/crowdsec/acquis.yaml` или `crontab`) — 6–8 секунд отказа 429 клиентам без вердикта в кеше: без нужды его не рестартуют.
 - 429 одному адресу, а не всем — решение о бане: `docker exec crowdsec cscli decisions list`; снять — `docker exec crowdsec cscli decisions delete --ip <адрес>`.
-- Источник журнала пуст (`docker exec crowdsec cscli metrics show acquisition` — нет строки `file:/var/log/traefik/access.log`) — сценарии не работают: сверь `configs/crowdsec/acquis.yaml` и каталог `/var/log/traefik` на хосте, затем `make restart SVC=crowdsec`.
+- Источник журнала пуст или не разбирается (`docker exec crowdsec cscli metrics show acquisition` — нет строки `file:/var/log/traefik/access.log` или у неё растут `Lines unparsed`, а не `Lines parsed`) — сценарии не работают: сверь `configs/crowdsec/acquis.yaml` (путь и `type: traefik`) и каталог `/var/log/traefik` на хосте, затем `make restart SVC=crowdsec`. После бампа образа Traefik или CrowdSec не разбирается — формат журнала разошёлся с парсером `crowdsecurity/traefik-logs`.
 
 ## Allowlist ботов в CrowdSec
 

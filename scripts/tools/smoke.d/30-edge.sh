@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# smoke.d/30-edge.sh — состояние edge: журнал доступа, его чтение CrowdSec, allowlist и баны ботов.
+# smoke.d/30-edge.sh — состояние edge: журнал доступа, его разбор CrowdSec, allowlist и баны ботов.
 # Часть drop-in смока (см. smoke-run.sh): бежит НА хосте, self exit 0; меняет только одно — проба
 # через edge (запрос на 127.0.0.1:443) оставляет строку в журнале. `ATTENTION:` в колонке 0:
 #   - журнала нет, в нём запись старше суток (суточная ротация не идёт) или он от 512 МиБ
 #     (не идёт внеочередная);
-#   - edge не ответил на пробу, или CrowdSec её не прочёл — источник acquisition не читает журнал;
+#   - edge не ответил на пробу, или CrowdSec её не разобрал: источник acquisition не читает журнал
+#     или читает, а парсер его строк не берёт (не тот тип источника) — сценарии слепы;
 #   - сверка задания allowlist (configs/crowdsec/bots-allowlist.sh state) — строкой WARN: задание
 #     идёт дольше своего срока, allowlist нужного бота нет, он старше недели с запасом, пуст или
 #     лишний, бот под баном.
@@ -48,24 +49,30 @@ else
     echo "ATTENTION: в журнале доступа запись старше ${JOURNAL_AGE_H} ч — суточная ротация не идёт (configs/crowdsec/crontab, docs/reference/runbook.md)"
 fi
 
-# Источник acquisition: проба через edge обязана прибавить строку к прочитанным CrowdSec.
-reads() {
-  docker exec crowdsec cscli metrics show acquisition -o json 2>/dev/null | tr -d ' \n' |
-    grep -o "\"file:$log\":{[^}]*}" | grep -o '"reads":[0-9]*' | cut -d: -f2
+# Источник acquisition: проба через edge обязана прибавить строку к разобранным CrowdSec, а не только к
+# прочитанным — строки, которые парсер не берёт, сценарии не видят.
+acq() { # «прочитано разобрано» у источника журнала
+  local j r p
+  j=$(docker exec crowdsec cscli metrics show acquisition -o json 2>/dev/null | tr -d ' \n' | grep -o "\"file:$log\":{[^}]*}")
+  r=$(grep -o '"reads":[0-9]*' <<<"$j" | cut -d: -f2); p=$(grep -o '"parsed":[0-9]*' <<<"$j" | cut -d: -f2)
+  echo "${r:-0} ${p:-0}"
 }
 if ! command -v curl >/dev/null 2>&1; then
   printf "  %-12s %s\n" "acquisition:" "SKIP (нет curl для пробы через edge)"
 else
-  r0=$(reads); r0=${r0:-0}
+  read -r r0 p0 < <(acq)
   code=$(curl -sk -o /dev/null -w '%{http_code}' --max-time 5 https://127.0.0.1/ 2>/dev/null)
   if [ "${code:-000}" = 000 ]; then
     printf "  %-12s %s\n" "acquisition:" "проба не прошла: edge не ответил на 127.0.0.1:443"
     echo "ATTENTION: edge не отвечает на 443 — make ps / triage"
   else
-    r1=$r0
-    for _ in 1 2 3 4 5; do sleep 1; r1=$(reads); r1=${r1:-0}; [ "$r1" -gt "$r0" ] && break; done
-    if [ "$r1" -gt "$r0" ]; then
-      printf "  %-12s %s\n" "acquisition:" "CrowdSec читает журнал (проба через edge прочитана, строк всего $r1)"
+    r1=$r0; p1=$p0
+    for _ in 1 2 3 4 5; do sleep 1; read -r r1 p1 < <(acq); [ "$p1" -gt "$p0" ] && break; done
+    if [ "$p1" -gt "$p0" ]; then
+      printf "  %-12s %s\n" "acquisition:" "CrowdSec разбирает журнал (проба через edge разобрана; строк прочитано $r1, разобрано $p1)"
+    elif [ "$r1" -gt "$r0" ]; then
+      printf "  %-12s %s\n" "acquisition:" "проба через edge прочитана, но не разобрана (строк прочитано $r1, разобрано $p1)"
+      echo "ATTENTION: CrowdSec не разбирает журнал доступа — тип источника в configs/crowdsec/acquis.yaml (docs/reference/runbook.md)"
     else
       printf "  %-12s %s\n" "acquisition:" "проба через edge не прочитана (строк источника: $r1)"
       echo "ATTENTION: CrowdSec не читает журнал доступа — configs/crowdsec/acquis.yaml (docs/reference/runbook.md)"
