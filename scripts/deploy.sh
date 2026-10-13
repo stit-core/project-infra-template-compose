@@ -13,6 +13,14 @@ cd "$(dirname "$0")/.."
 [ -f .env ] || { echo "ERR: .env missing" >&2; exit 1; }
 docker info >/dev/null 2>&1 || { echo "ERR: docker not reachable" >&2; exit 1; }
 
+# Рестарт по дифу конфигов (ниже) считается от ревизии, конфиги которой сервисы уже подхватили, —
+# ссылки refs/deploy/ok: её пишут сам рестарт и конец удачного деплоя. От HEAD до pull диф терялся
+# бы: деплой, отказавший между pull и рестартом (рендер, compose), унёс бы его с собой. Ссылка пишется
+# раньше проверки формы .env: её отказ в версии, которой деплой передал прежний скрипт (exec ниже),
+# ревизию не теряет.
+prev_sha=${DEPLOY_PREV_SHA:-$(git rev-parse -q --verify 'refs/deploy/ok^{commit}' || git rev-parse HEAD 2>/dev/null || echo "none")}
+[ "$prev_sha" = none ] || git update-ref refs/deploy/ok "$prev_sha"
+
 # Форма строк .env — раньше первого чтения ключа: построчное чтение ниже верно только на
 # строке вида KEY=значение, и значение — без обрамляющих кавычек.
 bash scripts/preflight-env.sh form
@@ -40,11 +48,6 @@ declare -A ROLE_FILES=(
 sel="${ROLE_FILES[$HOST_ROLE]:-}"
 [ -n "$sel" ] || { echo "ERR: unknown HOST_ROLE=$HOST_ROLE (all|edge|db|storage)" >&2; exit 1; }
 
-# Рестарт по дифу конфигов (ниже) считается от ревизии, конфиги которой сервисы уже подхватили, —
-# ссылки refs/deploy/ok: её пишут сам рестарт и конец удачного деплоя. От HEAD до pull диф терялся
-# бы: деплой, отказавший между pull и рестартом (рендер, compose), унёс бы его с собой.
-prev_sha=${DEPLOY_PREV_SHA:-$(git rev-parse -q --verify 'refs/deploy/ok^{commit}' || git rev-parse HEAD 2>/dev/null || echo "none")}
-[ "$prev_sha" = none ] || git update-ref refs/deploy/ok "$prev_sha"
 head_sha=$(git rev-parse HEAD 2>/dev/null || echo "none")
 git pull --ff-only origin main || true
 new_sha=$(git rev-parse HEAD 2>/dev/null || echo "none")
