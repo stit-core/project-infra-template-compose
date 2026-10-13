@@ -53,8 +53,8 @@ Single-VPS docker-compose стек одного проекта (дефолт). �
   `seo-bots-whitelist`), ИИ-ботов — allowlist сетей их вендоров: `configs/crowdsec/ai-bots.sources` (печать
   реестра ботов сайта, `make bots-sources`) против именных групп `robots.txt` сервиса `site`.
 - **Расписание edge** — crond в контейнере `crowdsec` (`configs/crowdsec/crontab`): ротация журнала (раз в
-  сутки и при 256 МиБ) и allowlist раз в неделю; allowlist обновляют ещё `make deploy` (недостающие списки) и
-  `make allowlist`.
+  сутки и при 256 МиБ) и allowlist раз в неделю; allowlist обновляют ещё `make deploy` и `make bump SVC=site`
+  (недостающие списки) и `make allowlist`.
 - **Не-прод контур** — `ROBOTS_POLICY=noindex` у сайта и цепочка `staging@file` (`X-Robots-Tag` и basicAuth)
   хвостом его роутеров, пока задан `STAGING_BASIC_AUTH_USERS`.
 

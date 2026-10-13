@@ -86,7 +86,10 @@ build: ## пересобрать образ сервиса с build-context (н�
 # healthy: образ, который не поднялся за 90 с, — отказ верба, а не «успех».
 # Отказ не оставляет среду на несостоявшемся теге: прежний тег возвращается
 # в .env (иначе на нём падает следующий make deploy), и сервис поднимается на нём.
-bump: ## бамп image-тега через .env (<SVC>_TAG) + recreate, ждёт healthy; отказ — возврат на прежний тег: make bump SVC=backend TAG=v1.2.3
+# Выкатку сайта завершает шаг allowlist ботов, как у make deploy: недостающие списки по
+# robots.txt нового образа, лишние снимаются. Без него первый релиз (профиль site и сразу
+# bump) оставался бы без allowlist до расписания. Отказ источника верб не роняет.
+bump: ## бамп image-тега через .env (<SVC>_TAG) + recreate, ждёт healthy; отказ — возврат на прежний тег; site — и allowlist ботов: make bump SVC=backend TAG=v1.2.3
 	@if [ -z "$(SVC)" ] || [ -z "$(TAG)" ]; then echo 'usage: make bump SVC=<name> TAG=<tag>'; exit 2; fi
 	@if [ -f .env ]; then \
 		var=$$(echo "$(SVC)" | tr '[:lower:]-' '[:upper:]_')_TAG; \
@@ -96,7 +99,12 @@ bump: ## бамп image-тега через .env (<SVC>_TAG) + recreate, ждё�
 		else printf '%s=%s\n' "$$var" "$(TAG)" >> .env; fi; \
 		echo "→ $$var=$(TAG) (.env)"; \
 		up="docker compose $(COMPOSE_ARGS) up -d --no-deps --wait --wait-timeout 90"; \
-		$$up --force-recreate $(SVC) && exit 0; \
+		if $$up --force-recreate $(SVC); then \
+			[ "$(SVC)" != site ] || { echo "→ allowlist ботов (CrowdSec)"; \
+				docker exec crowdsec sh /opt/edge/bots-allowlist.sh missing || \
+				echo "WARN: allowlist ботов обновлён не полностью — make allowlist (docs/reference/runbook.md)"; }; \
+			exit 0; \
+		fi; \
 		if [ -n "$$old" ] && [ "$$old" != "$(TAG)" ]; then \
 			sed -i "s|^$$var=.*|$$var=$$old|" .env; \
 			echo "→ $$var=$$old (.env): $(SVC):$(TAG) не поднялся, возврат на прежний тег"; \
@@ -113,8 +121,8 @@ backup: ## one-shot backup (на VPS; с workstation — через ssh)
 	else bash scripts/tools/ssh.sh exec make backup; fi
 
 # Кого robots.txt сайта пускает, того CrowdSec не банит: сети ботов из
-# configs/crowdsec/ai-bots.sources — в cscli allowlists. То же делают make deploy (только
-# недостающие списки) и расписание edge раз в неделю.
+# configs/crowdsec/ai-bots.sources — в cscli allowlists. То же делают make deploy и
+# make bump SVC=site (только недостающие списки) и расписание edge раз в неделю.
 allowlist: ## allowlist ботов в CrowdSec: сети вендоров по ai-bots.sources и robots.txt сайта (на VPS; с workstation — через ssh)
 	@if [ -f .env ]; then docker exec crowdsec sh /opt/edge/bots-allowlist.sh; \
 	else bash scripts/tools/ssh.sh exec make allowlist; fi

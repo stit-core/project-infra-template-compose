@@ -100,7 +100,7 @@ identity + ACME из `.env`. `postgres` / `storage` (minio + backup) / `backend`
 | SHIP | `ship MSG="..."` | commit + check + push + (на main) ssh-deploy. Канон |
 | | `deploy` / `render` | server-side: git pull → render → compose up --wait / envsubst для `*.tpl` |
 | OPS | `ps` / `logs SVC=` / `restart SVC=` / `recreate SVC=` / `build SVC=` | статус / логи / рестарт / пересоздать (подхват нового значения `.env` или тега) / сборка образа сервиса |
-| | `bump SVC= TAG=` | бамп image-тега: правит `<SVC>_TAG` в `.env` на VPS + force-recreate, ждёт healthy; отказ — возврат на прежний тег. Единственный канон бампа |
+| | `bump SVC= TAG=` | бамп image-тега: правит `<SVC>_TAG` в `.env` на VPS + force-recreate, ждёт healthy; отказ — возврат на прежний тег; `site` — и allowlist ботов. Единственный канон бампа |
 | | `backup` / `restore-pg SNAPSHOT=` | one-shot backup / restore postgres из restic |
 | | `allowlist` | allowlist ботов в CrowdSec: сети вендоров по `ai-bots.sources` и `robots.txt` сайта |
 | | `accept SVC=site` | приёмка сайта после деплоя машиной: смок edge и сайта, адрес, методы, заголовки, форма, UA-проба, журнал, отказ WAF; профиль среды — у контейнера |

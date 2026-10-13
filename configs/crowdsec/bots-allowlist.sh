@@ -1,6 +1,6 @@
 #!/bin/sh
 # Allowlist ботов в CrowdSec — задание расписания edge (configs/crowdsec/crontab), шаг
-# make deploy и верб make allowlist.
+# make deploy и make bump SVC=site, верб make allowlist.
 #   bots-allowlist.sh [all|missing|state]
 # all (умолчание) обновляет allowlist каждого бота; missing — только отсутствующие и те,
 # что не обновлялись дольше шести дней: деплой не ходит к вендорам без нужды; state —

@@ -136,8 +136,9 @@ Git-хостинг и container registry — Gitea `git.stit.tech`.
    `make bots-sources` (сосед `<org>/site` на теге релиза).
 5. Правки шагов 2–4 — одним коммитом, `make ship`.
 6. `ACTION` — `make bump SVC=<svc> TAG=vX.Y.Z`; `RISK` читается до него, откат — `make bump` с прежним тегом.
-7. `AI-BOTS` (сайт) называет другую политику или версию реестра, чем прошлый релиз, — `make allowlist`:
-   allowlist пересобирается по `robots.txt` нового образа.
+7. `AI-BOTS` (сайт) называет другую версию реестра, чем прошлый релиз, — `make allowlist`: списки всех ботов
+   обновляются по новому реестру сразу. Политику `robots.txt` нового образа allowlist получает шагом 6 —
+   `make bump SVC=site` завершает выкатку сайта недостающими списками и снимает списки закрытых ботов.
 8. Сайт — `make accept SVC=site` (код 0) после каждой выкатки; `make status` — блоки `-- edge --` и
    `-- site --` без `ATTENTION`. Что значит каждый ✗ и `ATTENTION` — `docs/reference/runbook.md`.
 
@@ -148,7 +149,7 @@ Git-хостинг и container registry — Gitea `git.stit.tech`.
 2. `.env` на VPS — секция `profile site` по `.env.example` (канал формы). На не-прод среде (`ROBOTS_POLICY=noindex`
    ставит `make new-env`) — ещё замок `STAGING_BASIC_AUTH_USERS` и `make deploy` до профиля: замок рендерится в
    конфиг edge раньше, чем появится содержимое сайта.
-3. `site` в `COMPOSE_PROFILES` и сразу `make bump SVC=site TAG=vX.Y.Z` — он ставит `SITE_TAG`: профиль без тега
-   роняет `make deploy` (FAIL `image tags` в `make doctor`), а бамп без профиля поднимает сервис, которым
-   `make deploy` не управляет.
+3. `site` в `COMPOSE_PROFILES` и сразу `make bump SVC=site TAG=vX.Y.Z` — он ставит `SITE_TAG`, а после healthy
+   строит allowlist ботов по `robots.txt` образа: профиль без тега роняет `make deploy` (FAIL `image tags` в
+   `make doctor`), а бамп без профиля поднимает сервис, которым `make deploy` не управляет.
 4. `make accept SVC=site` — код 0 в профиле среды (прод или не-прод за замком).
