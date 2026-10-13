@@ -87,7 +87,11 @@ if [ -z "$tmp" ]; then
   trap 'kill -- "-$job" 2>/dev/null; rm -f "$tmp"/*; rmdir "$tmp" 2>/dev/null' EXIT
   trap 'exit 143' HUP INT TERM
   wait "$job" 2>/dev/null; rc=$?
-  [ "$rc" -le 2 ] || { say "WARN задание прервано (код $rc; срок — $sec с) — allowlist обновлён не полностью"; rc=2; }
+  if [ "$rc" -gt 2 ]; then
+    if [ "$mode" = state ]; then say "WARN сверка прервана (код $rc; срок — $sec с)"
+    else say "WARN задание прервано (код $rc; срок — $sec с) — allowlist обновлён не полностью"; fi
+    rc=2
+  fi
   exit "$rc"
 fi
 [ -d "$tmp" ] || { say "рабочего каталога нет: $tmp"; exit 1; }
