@@ -30,9 +30,11 @@ Common failure modes на проектном VPS и что делать. Ordered
 
 Список «Приёмки первого деплоя» контракта сайта (`docs/reference/infra-handoff.md § 1.7` в `<org>/site`) —
 машиной, в профиле среды: замок в цепочке роутера `site` — не-прод (проверяется видимое без пароля: 401 с
-`X-Robots-Tag`), без замка — прод. Код 0 — всё зелёное, 1 — есть ✗, 2 — принимать нечего (контейнер `site` не
-запущен). Дренаж не проверяется — он останавливает сайт, его держит приёмка образа (`pnpm accept:image` в
-`<org>/site`); TLS — строка без оценки: до выпуска сертификата LE цепочка не проверена.
+`X-Robots-Tag`), без замка — прод. Код 0 — всё зелёное; иначе в выводе ✗ или «принимать нечего» (контейнер `site`
+не запущен). Дренаж не проверяется — он останавливает сайт, его держит приёмка образа (`pnpm accept:image` в
+`<org>/site`); TLS — строка без оценки: до выпуска сертификата LE цепочка не проверена. След приёмки — строки
+журнала доступа с меткой `make-accept` в User-Agent (отчёт «бот × статус» их не считает) и пять отказов формы
+`"result":"invalid"` в логе сайта; решение пробы WAF вместе с его тревогой CrowdSec приёмка снимает сама.
 
 | раздел с ✗ | что делать |
 |---|---|
@@ -154,13 +156,15 @@ docker exec crowdsec cscli decisions delete --ip <адрес>  # снять ба
 
 ## Отчёт «бот × статус»
 
-Кто из ботов приходил и что получил — по журналу доступа: активный файл и копии ротации за две недели. На VPS из
-`/opt/<p>-infra`, root'ом (каталог журнала — `700`); `jq` ставит роль `base`:
+Кто из ботов приходил и что получил — по журналу доступа: активный файл и копии ротации за две недели, без проб
+`make accept` (метка `make-accept` в User-Agent). На VPS из `/opt/<p>-infra`, root'ом (каталог журнала — `700`);
+`jq` ставит роль `base`:
 
 ```bash
 BOTS=$(awk 'NR > 1 { print $2 }' configs/crowdsec/ai-bots.sources | paste -sd'|')
 { zcat -f /var/log/traefik/access.log.*.gz 2>/dev/null; cat /var/log/traefik/access.log; } |
-  jq -r --arg bots "$BOTS" '(."request_User-Agent" // "" | capture("(?<bot>" + $bots + ")").bot) as $bot
+  jq -r --arg bots "$BOTS" 'select(."request_User-Agent" // "" | contains("make-accept") | not)
+    | (."request_User-Agent" // "" | capture("(?<bot>" + $bots + ")").bot) as $bot
     | [$bot, .DownstreamStatus] | @tsv' | sort | uniq -c | sort -rn
 ```
 

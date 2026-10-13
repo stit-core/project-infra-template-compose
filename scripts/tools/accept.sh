@@ -5,7 +5,8 @@
 # замка — прод. На не-прод edge без пароля отвечает 401 на всё, поэтому страницы, формы адреса и
 # сжатия проверяет прод-профиль, а не-прод — замок, X-Robots-Tag и то, что стоит до замка.
 #   - страница для проверок формы адреса — из sitemap.xml сайта, UA-проба — по токенам
-#     configs/crowdsec/ai-bots.sources: каждому тот же ответ, что без UA;
+#     configs/crowdsec/ai-bots.sources: каждому тот же ответ, что без UA; в User-Agent проб — метка
+#     make-accept: отчёт «бот × статус» (runbook) их не считает;
 #   - смок edge и сайта (smoke.d/30-edge.sh, 90-site.sh) — без ATTENTION;
 #   - сверх списка: записи Host на www и apex (порт, регистр, точка в конце), ключи записи журнала
 #     доступа, закрытые dashboard и API Traefik, отказ WAF — 429 адресу под решением (решение — на
@@ -13,7 +14,7 @@
 # Что сайт проверяет в образе сам (pnpm accept:image: отказ без SITE_URL, CSP, дренаж) — не здесь;
 # дренаж на работающей среде не проверяется: он останавливает сайт. TLS-цепочка — строка без оценки:
 # на стенде шаблона сертификат самоподписанный.
-# Код: 0 — всё зелёное; 1 — есть ✗; 2 — принимать нечего.
+# Код: 0 — всё зелёное, иначе — ✗ в выводе или «принимать нечего».
 set -uo pipefail
 cd "$(dirname "$0")/../.."
 
@@ -47,8 +48,9 @@ hdrs() { c -o /dev/null -D - "$@" | tr -d '\r'; }
 # Чей ответ: site — у ответов сайта CSP, иначе edge (сам Traefik или заглушка).
 who() { local h; h=$(hdrs "$@"); printf '%s %s' "$(grep -qi '^content-security-policy:' <<<"$h" && echo site || echo edge)" "$(head -n 1 <<<"$h" | grep -oE '[0-9]{3}' | head -n 1)"; }
 
+# Решение пробы WAF снимается вместе с его тревогой: в истории CrowdSec приёмка следа не оставляет.
 waf=""; dec=""
-cleanup() { [ -z "$dec" ] || docker exec crowdsec cscli decisions delete --ip "$dec" >/dev/null 2>&1; [ -z "$waf" ] || docker rm -f "$waf" >/dev/null 2>&1; }
+cleanup() { [ -z "$dec" ] || docker exec crowdsec cscli alerts delete --ip "$dec" >/dev/null 2>&1; [ -z "$waf" ] || docker rm -f "$waf" >/dev/null 2>&1; }
 trap cleanup EXIT
 
 if [ "$prod" = 1 ]; then profile="прод"; want=200; else profile="не-прод (замок)"; want=401; fi
@@ -77,6 +79,7 @@ if [ "$prod" = 1 ]; then
   check "/ — код и X-Robots-Tag" "$(head -n 1 <<<"$h" | grep -oE '[0-9]{3}') [$(grep -i '^x-robots-tag:' <<<"$h")]" '^200 \[\]$'
   robots=$(c "$U/robots.txt")
   check "robots.txt: группа *" "$(head -n 2 <<<"$robots" | tr '\n' ' ')" '^User-agent: \* Allow: / $'
+  check "robots.txt: Clean-param" "$(grep -i '^Clean-param:' <<<"$robots" | head -n 1 | cut -c1-80)" '^Clean-param: [^ ]'
   check "robots.txt: Sitemap" "$(grep -i '^Sitemap:' <<<"$robots" | head -n 1)" "^Sitemap: $origin/sitemap\\.xml\$"
   locs=$(c "$U/sitemap.xml" | grep -o '<loc>[^<]*</loc>')
   check "sitemap.xml: URL / не https://$host" "$(grep -c . <<<"$locs") / $(grep -vc "^<loc>$origin/" <<<"$locs")" '^[1-9][0-9]* / 0$'
@@ -141,7 +144,7 @@ check "серия POST /api/contact упирается в 429, без 403 и п�
 say "UA-проба: ответ edge тот же, что без UA ($want)"
 bad=""
 for ua in $(awk 'NR > 1 && NF == 4 { print $2 }' configs/crowdsec/ai-bots.sources); do
-  s=$(code -A "Mozilla/5.0 (compatible; $ua/1.0)" "$U/"); [ "$s" = "$want" ] || bad="$bad $ua=$s"
+  s=$(code -A "Mozilla/5.0 (compatible; $ua/1.0; make-accept)" "$U/"); [ "$s" = "$want" ] || bad="$bad $ua=$s"
 done
 check "ботов из ai-bots.sources — $(awk 'NR > 1 && NF == 4' configs/crowdsec/ai-bots.sources | wc -l | tr -d ' '), с другим ответом" "[${bad# }]" '^\[\]$'
 
