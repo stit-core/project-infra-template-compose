@@ -5,7 +5,7 @@
 ### Проектная VPS-инфра одним docker-compose стеком
 
 IaC-шаблон проектной инфры: один форк = один проект = один VPS на среду. Edge,
-Postgres, MinIO, backend, backup — декларативно,
+Postgres, MinIO, backend, индексируемый сайт, backup — декларативно,
 секреты в `.env` на VPS. Форк → `<org>/infra`, разворот за день.
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-2563eb)](LICENSE)
@@ -41,12 +41,13 @@ Postgres, MinIO, backend, backup — декларативно,
 
 | Слой | Что | Активация |
 |---|---|---|
-| **Edge** | Traefik v3 + CrowdSec — HTTP-01 LE, WAF, IP-bans | always-on |
-| **Landing** | заглушка корня `${DOMAIN}` под LE-cert | always-on |
+| **Edge** | Traefik v3 + CrowdSec — HTTP-01 LE, WAF, IP-bans, журнал доступа, allowlist поисковых и ИИ-ботов | always-on |
+| **Landing** | заглушка корня `${DOMAIN}` под LE-cert до первого деплоя сайта | always-on |
 | **DB** | Postgres 17 | profile `postgres` |
 | **Storage** | MinIO (S3 + Console) | profile `storage` |
 | **Backup** | restic + pg_dumpall + crond (alpine), daily → restic-репо | profile `storage` |
 | **App** | backend, образ из registry (`REGISTRY_HOST`, дефолт `git.stit.tech`) | profile `backend` |
+| **Site** | индексируемый сайт `<org>/site` на корне `${DOMAIN}` (`www` → корень) — `compose/site.yml`; приёмка — `make accept SVC=site` | profile `site` |
 
 Always-on поднимается на identity + ACME из `.env`; остальное — opt-in через
 `COMPOSE_PROFILES`, по мере заполнения их секций секретов в `.env`. Дефолт — single-host;
@@ -77,7 +78,9 @@ make ship        # check + push + (на main) ssh-deploy. На чистом де
 ```
 Минимальный стек (traefik / crowdsec / landing)
 живёт сразу. Дальше — активация профилей: допиши переменные профиля (см.
-`.env.example`) в `.env` на VPS → `COMPOSE_PROFILES` + `make ship`.
+`.env.example`) в `.env` на VPS → `COMPOSE_PROFILES` + `make ship`. Сайт выкатывается тегом:
+`make bump SVC=site TAG=vX.Y.Z`, затем `make accept SVC=site` (первый релиз —
+[`docs/reference/ecosystem.md`](docs/reference/ecosystem.md)).
 
 ## Принципы
 

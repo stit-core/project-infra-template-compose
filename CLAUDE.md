@@ -1,7 +1,7 @@
 # project-infra-template-compose — гайд для агентов
 
 Шаблон проектной инфры stit: docker-compose стек одного VPS на клиентский
-проект. Edge (Traefik v3 + CrowdSec) + Postgres + Minio + backend + backup.
+проект. Edge (Traefik v3 + CrowdSec) + Postgres + Minio + backend + сайт + backup.
 Копируется в `<client-org>/infra`, адаптируется под домен/стек.
 
 Этот файл — **always-on ядро + роутер**: здесь только то, что должно быть в контексте всегда
@@ -43,7 +43,9 @@
 лежат рядом sibling-checkout'ами. Карта репо, флоу и контракты — канон `docs/reference/ecosystem.md`.
 **Образы сервисов** — из registry `REGISTRY_HOST` (дефолт `git.stit.tech`); теги — строго в `.env`
 (`<SVC>_TAG`), выкатка — `make bump SVC=<svc> TAG=<tag>`. Из коробки в стеке — `compose/backend.yml` и
-`compose/site.yml`; frontend и бот добавляются `/add-service`.
+`compose/site.yml` (сайт на корне `${DOMAIN}`); frontend и бот добавляются `/add-service`. Handoff-блок
+релиза сервис-репо (у сайта — и строки `AI-BOTS`, `PROXY`) хаб применяет по шагам
+`docs/reference/ecosystem.md § Handoff-блок релиза`.
 **Читает:** `<org>/strategy` (форк `business-strategy-template`) — продуктовый контекст (vision,
 surfaces), read-only; резолв пути — `docs/reference/ecosystem.md`.
 
@@ -73,15 +75,17 @@ surfaces), read-only; резолв пути — `docs/reference/ecosystem.md`.
 
 | Слой | Что | Где |
 |---|---|---|
-| Edge | Traefik v3 + CrowdSec | `compose/traefik.yml`, `compose/crowdsec.yml` |
+| Edge | Traefik v3 + CrowdSec: журнал доступа, allowlist ботов, расписание edge | `compose/traefik.yml`, `compose/crowdsec.yml`, `configs/crowdsec/` |
 | DB | Postgres 17 | `compose/postgres.yml` |
 | App | Backend (`${REGISTRY_HOST}/${PROJECT_NAME}/backend`) | `compose/backend.yml` |
+| Site | Индексируемый сайт (`${REGISTRY_HOST}/${PROJECT_NAME}/site`) на корне `${DOMAIN}`, `www` → корень | `compose/site.yml` |
 | Storage | Minio (S3 + Console) на `s3.${DOMAIN}` / `minio.${DOMAIN}` | `compose/minio.yml` |
 | Backup | restic + pg_dumpall + crond в alpine, пишет в `$RESTIC_REPOSITORY` | `compose/backup.yml`, `containers/backup/` |
 
-Always-on (traefik / crowdsec / landing) поднимается на identity + ACME из `.env`. `postgres` /
-`storage` (minio + backup) / `backend` / `site` — opt-in через `COMPOSE_PROFILES`, активируются после
-заполнения их секций секретов в `.env` (единственный источник секретов, живёт только на VPS).
+Always-on (traefik / crowdsec / landing — заглушка корня до первого деплоя сайта) поднимается на
+identity + ACME из `.env`. `postgres` / `storage` (minio + backup) / `backend` / `site` — opt-in через
+`COMPOSE_PROFILES`, активируются после заполнения их секций секретов в `.env` (единственный источник
+секретов, живёт только на VPS).
 Сети: `proxy` (наружу), `backend-net` (internal). См. `.claude/rules/multi-env.md` +
 `docs/reference/architecture.md`.
 
@@ -96,9 +100,10 @@ Always-on (traefik / crowdsec / landing) поднимается на identity + 
 | SHIP | `ship MSG="..."` | commit + check + push + (на main) ssh-deploy. Канон |
 | | `deploy` / `render` | server-side: git pull → render → compose up --wait / envsubst для `*.tpl` |
 | OPS | `ps` / `logs SVC=` / `restart SVC=` / `recreate SVC=` / `build SVC=` | статус / логи / рестарт / пересоздать (подхват нового значения `.env` или тега) / сборка образа сервиса |
-| | `bump SVC= TAG=` | бамп image-тега: правит `<SVC>_TAG` в `.env` на VPS + force-recreate, ждёт healthy. Единственный канон бампа |
+| | `bump SVC= TAG=` | бамп image-тега: правит `<SVC>_TAG` в `.env` на VPS + force-recreate, ждёт healthy; отказ — возврат на прежний тег. Единственный канон бампа |
 | | `backup` / `restore-pg SNAPSHOT=` | one-shot backup / restore postgres из restic |
 | | `allowlist` | allowlist ботов в CrowdSec: сети вендоров по `ai-bots.sources` и `robots.txt` сайта |
+| | `accept SVC=site` | приёмка сайта после деплоя машиной: смок edge и сайта, адрес, методы, заголовки, форма, UA-проба, журнал, отказ WAF; профиль среды — у контейнера |
 | INTEL | `status` / `search Q= [P=]` | cockpit-сводка / поиск по compose+configs+scripts+docs |
 | PROVISION | `new-env` | bootstrap `.env` на чистом VPS |
 | SETUP | `setup` | git-хуки (commit-msg + pre-commit) + PyYAML для frontmatter-проверки |
@@ -115,10 +120,11 @@ Always-on (traefik / crowdsec / landing) поднимается на identity + 
 |---|---|
 | Архитектура, сети, профили, non-goals | `docs/reference/architecture.md` |
 | Инфра-слой проекта (stack + карта сервисов + service-doc'и) | `docs/project/README.md` (вход для `/init-project` + `/de-template`) |
-| Экосистема: карта репо, флоу, резолв сиблингов, контракт сервис-репо ↔ хаб | `docs/reference/ecosystem.md` |
+| Экосистема: карта репо, флоу, резолв сиблингов, контракт сервис-репо ↔ хаб, handoff-блок релиза | `docs/reference/ecosystem.md` |
 | Продуктовый контекст (vision/surfaces) | соседний `<org>/strategy` (форк `business-strategy-template`), читается cross-repo |
 | Per-env `.env`-контракт, multi-env, профили | `.claude/rules/multi-env.md` |
 | Compose-инварианты сервиса | `.claude/rules/compose-and-services.md` |
+| Edge: роутеры и middleware Traefik, журнал доступа, CrowdSec | `.claude/rules/traefik-routing.md` + `docs/reference/architecture.md` |
 | Секреты и `.env` | `.claude/rules/secrets-and-env.md` |
 | Онбординг / путь потребителя | `docs/getting-started.md` |
 | Runbook / инциденты | `docs/reference/runbook.md` |
@@ -150,6 +156,8 @@ Always-on (traefik / crowdsec / landing) поднимается на identity + 
 
 ### Делать всегда
 - Перед claim «готово» — `make check` (validate + doctor + plan-check + project-check); после деплоя — `make ps`.
+- После выкатки сайта — `make accept SVC=site`; строка `AI-BOTS` его handoff — `make bots-sources` и
+  `make allowlist` (порядок — `docs/reference/ecosystem.md § Handoff-блок релиза`).
 - Любая новая `${VAR}` в compose/configs — в `.env.example` сразу.
 - Бамп инфра-образа (литеральная версия в `compose/<svc>.yml`) — отдельным коммитом после явного OK;
   тег образа сервис-репо — `make bump`.

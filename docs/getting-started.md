@@ -24,8 +24,9 @@ fallback `ansible/inventory.ini`).
 - На VPS — Docker Engine ≥ 25 с плагином compose: новый VPS получает свежий движок на шаге 2; на VPS,
   поднятом раньше, версию называет `make doctor` (строка `docker engine`), обновление —
   `docs/reference/runbook.md § Docker Engine старше 25`.
-- Для каждого env опубликован домен с A-записью на IP соответствующего VPS (LE HTTP-01).
-  Convention — `<env>.<domain>` или `<env>-<domain>`, но это вне шаблона.
+- Для каждого env опубликован домен с A-записью на IP соответствующего VPS (LE HTTP-01); сайту на
+  корне нужна ещё запись `www.<домен>`. Convention — `<env>.<domain>` или `<env>-<domain>`, но это вне
+  шаблона.
 - Аккаунт в Gitea (`git.stit.tech`) с доступом к `<org>` и PAT для registry.
 - Локально: ansible 2.15+, git, ssh.
 
@@ -129,6 +130,12 @@ make ship          # commit + check + push + (на main) ssh-deploy
 
 Какой профиль какие переменные требует — `.claude/rules/multi-env.md § Profile-based opt-in`.
 
+**Сайт** (`<org>/site`, профиль `site`) выкатывается тегом из registry: секция `profile site` в `.env`
+(на не-прод среде — ещё замок `STAGING_BASIC_AUTH_USERS` и `make deploy`), затем `site` в
+`COMPOSE_PROFILES` и сразу `make bump SVC=site TAG=vX.Y.Z` — он ставит `SITE_TAG` и ждёт healthy; затем
+`make accept SVC=site` — код 0. Порядок и DNS — `docs/reference/ecosystem.md § Handoff-блок релиза`,
+«Первый релиз сайта на среде».
+
 ## 7. `/init-project` — спроектировать инфру под продукт
 
 Skill-оркестратор `/init-project` ведёт онбординг инфры: читает продуктовый контекст из соседнего
@@ -144,7 +151,8 @@ Skill-оркестратор `/init-project` ведёт онбординг ин�
 ## 8. `/de-template` — своя инфра
 
 `/de-template` читает stable-артефакты `docs/project/`, мутирует репо in-repo: прунит
-неиспользуемые `compose/*.yml` + секции `.env.example`, ставит
+неиспользуемые `compose/*.yml` + секции `.env.example` (при сайте на корне — и заглушку `landing` с
+`configs/landing/`), ставит
 `COMPOSE_PROFILES`, кастомит `CLAUDE.md`/README под идентичность проекта, срезает scaffolding.
 Cross-repo (форки backend/frontend, заполнение `.env` на VPS) — печатает next-steps, не выполняет.
 

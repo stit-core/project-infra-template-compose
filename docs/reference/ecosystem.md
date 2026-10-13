@@ -22,11 +22,11 @@ sibling-checkout'ами:
 
 | Шаблон → форк | Роль |
 |---|---|
-| `business-strategy-template` → `<org>/strategy` | design-time source of truth: бизнес, AJTBD, SWOT, карта гипотез, продукты (vision/surface, interface, screens, fsd, telegram-bot-flow, mobile, services + domains), ИТ-периметр |
+| `business-strategy-template` → `<org>/strategy` | design-time source of truth: бизнес, AJTBD, SWOT, карта гипотез, продукты (vision/surface, interface, screens, fsd, слой страницы сайта, дизайн, telegram-bot-flow, mobile, services + domains), ИТ-периметр |
 | `project-infra-template-compose` → `<org>/infra` | runtime проекта (docker-compose на VPS) и **операционный хаб**: общий план, рассылка агентов по сиблингам, выкатка тегов (`make bump`) |
 | `go-backend-template` → `<org>/backend` | Go-сервис |
 | `spa-frontend-template` → `<org>/frontend` | React SPA (кабинет, всё за логином) |
-| `ssr-frontend-template` → `<org>/site` | Astro SSR-сайт (индексируемый контент) |
+| `ssr-frontend-template` → `<org>/site` | Astro SSR-сайт (индексируемый контент); в стеке хаба — сервис `site` из коробки |
 | `telegram-bot-template` → `<org>/<bot>` | Telegram-бот (Python, aiogram) |
 | `mobile-template` → `<org>/mobile` | KMP-приложение Android + iOS; релиз — в магазины |
 
@@ -56,8 +56,7 @@ Git-хостинг и container registry — Gitea `git.stit.tech`.
 3. **Прямой заход в отдельный репо** (например, поработать только в backend) — нормальный режим:
    репо работает своей обвязкой, а последствия для хаба оформляются INFRA-HANDOFF-блоком — его
    печатает `/release` сервис-репо, а в backend, боте и mobile ещё и `/infra-handoff` по ходу работы.
-   В хабе блок применяется так: новый сервис — `/add-service`, новая переменная — `.env.example` и
-   `.env` на VPS, новый тег — `make bump`.
+   В хабе блок применяется построчно — «Handoff-блок релиза» ниже.
 
 ## Резолв сиблингов
 
@@ -77,17 +76,20 @@ Git-хостинг и container registry — Gitea `git.stit.tech`.
 ## Кто что читает из `<org>/strategy`
 
 Чтение read-only и одностороннее: продукт авторится только в strategy её скиллами, соседи его
-читают. Пути — внутри `docs/projects/<slug>/` strategy, где `<slug>` — папка продукта.
+читают. Пути — внутри `docs/projects/<slug>/` strategy, где `<slug>` — папка продукта. Контракт со
+стороны strategy — её `docs/README.md`, раздел «Что docs отдаёт соседям»: состав, закрытость и снимок
+описаны там, здесь — карта.
 
 | Репо | Кто читает | Что | Зачем |
 |---|---|---|---|
-| `<org>/infra` | `/init-project` | `vision.md`, `surface.md` | scope продукта: проблема и поверхности → карта сервисов |
+| `<org>/infra` | `/init-project` | `vision.md`, `surface.md` (тип и род `web-kind` поверхности) | scope продукта → карта сервисов: поверхность `web` рода `landing` или `site` — сервис `site` (код `<org>/site`), рода `app` — `<org>/frontend` |
 | | `/stack-deep-dive` | `surface.md` (+ `vision.md § Problem`) | какие поверхности public → сабдомены и edge-роуты |
 | | `/de-template` | `vision.md § Problem` (+ `surface.md`) | шапка `CLAUDE.md` / `README.md` под проект |
 | | `/smartdev` | наличие strategy, `vision.md`, `surface.md` | sanity на старте сессии |
+| | `/plan` | `services/{service,platform}.md`, ИТ-периметр `docs/projects/infrastructure/`, манифесты готовности `design/<surface>/ready.yaml` | контекст программ: что собирать и где, готова ли поверхность к сборке; машиной хаб манифест не читает |
 | `<org>/backend` | `/init-service`, `/scaffold` | `services/<svc>/domains/<ctx>/`, `services/_shared/`, паспорт `services/<svc>/README.md` | домены → Go-код сервиса |
-| `<org>/frontend` | `/init-service`, `/de-template`, `/scaffold` | `fsd/<surface>/` (+ `interface/`, `screens/` поверхности, `services/*/domains/`) | FSD-карта → слайсы SPA |
-| `<org>/site` | `/init-service`, `/de-template`, `/scaffold` | `fsd/<surface>/` (+ `interface/`, `screens/` поверхности) | карта → страницы и коллекции сайта |
+| `<org>/frontend` | `/init-service`, `/de-template`, `/scaffold` | `fsd/<surface>/` (+ `interface/`, `screens/` поверхности, `services/*/domains/`, пакет дизайна `design/`) | FSD-карта → слайсы SPA |
+| `<org>/site` | `/scaffold`, `/de-template` | слой страницы `site/<surface>/` (бриф, карта, планы, тексты по слотам), факты и голос (`facts.yaml`, `voice*.yaml`), пакет дизайна `design/` и `design/<surface>/` с манифестом готовности `ready.yaml`, получатели заявок `integration.md` — снимком с локом | страницы и коллекции сайта; собирается единица с `ready: true` манифеста |
 | `<org>/<bot>` | `/dialog-deep-dive` | `telegram-bot-flow/<surface>/` (+ `interface/<surface>/`, `services/*/domains/`) | флоу диалогов → StatesGroup, окна, фичи |
 | `<org>/mobile` | `/init-service`, `/de-template`, `/scaffold` | `mobile/<surface>/` (+ `interface/<surface>/`, `services/*/domains/`) | карта приложения → `shared/`, `androidApp/`, `iosApp/` |
 
@@ -107,10 +109,46 @@ Git-хостинг и container registry — Gitea `git.stit.tech`.
   `compose/backend.yml`), так что `PROJECT_NAME` в `.env` совпадает с org, куда `/release` пушит
   образ. VPS логинится в registry один раз — `docker login` с PAT из Gitea.
 - **Тег — строго в `.env`** на VPS: `<SVC>_TAG` (UPPER_SNAKE от `SVC`), не литерал в compose.
-- **Выкатка — только здесь:** `make bump SVC=<svc> TAG=<tag>` правит `<SVC>_TAG` в `.env` на VPS и
-  пересоздаёт сервис, compose сам пуллит отсутствующий образ. Rollback — тот же верб со старым тегом.
+- **Выкатка — только здесь:** `make bump SVC=<svc> TAG=<tag>` правит `<SVC>_TAG` в `.env` на VPS,
+  пересоздаёт сервис (compose сам пуллит отсутствующий образ) и ждёт healthy; тег без образа или образ, не
+  ставший healthy за 90 с, — отказ верба и возврат на прежний тег. Rollback — тот же верб со старым тегом.
 - **Из коробки** в стеке — `compose/backend.yml` и `compose/site.yml` (профили `backend` и `site`); frontend и
   бот добавляются `/add-service` по карте сервисов `docs/project/stack.md`.
+- **Сайт** — сервис `site` на корне `${DOMAIN}`, `www` — 301 на корень. Его контракт —
+  `docs/reference/infra-handoff.md` в `<org>/site`; хаб выполняет его стеком: `compose/site.yml`, middleware
+  edge, журнал доступа, CrowdSec с allowlist ботов, смок `-- site --` и приёмка `make accept SVC=site`.
+  По контракту strategy каждая поверхность рода `site` или `landing` — свой форк `<org>/site` и свой сервис
+  хаба с именем поверхности: в шаблоне это `site` (поле `infra-svc` форка сайта), следующую поверхность
+  добавляет `/add-service` (вариант «Node-сервис на корневом домене»).
 - **Mobile** в этот контракт не входит: образа и compose-сервиса у приложения нет, релиз в магазины —
   `/release` в `<org>/mobile`. Его инфра-поверхность (например, раздача `.well-known` для deep links,
   хосты API) приходит в хаб INFRA-HANDOFF-блоком.
+
+### Handoff-блок релиза
+
+`/release` сервис-репо печатает блок `=== INFRA HANDOFF · <org>/<svc> vX.Y.Z ===`; хаб применяет его по шагам:
+
+1. `WHAT` — сервиса в стеке нет: сначала `/add-service`.
+2. `ENV` — новый ключ: `${VAR}` в `compose/<svc>.yml` и декларация в `.env.example`; значение — в `.env` на VPS.
+3. `PROXY` — требование к edge (лимит, редирект, заголовок): labels `compose/<svc>.yml` или
+   `configs/traefik/dynamic/middlewares.yml.tpl` по rule `traefik-routing`.
+4. `AI-BOTS` (сайт) — версия реестра не та, что в первой строке `configs/crowdsec/ai-bots.sources`:
+   `make bots-sources` (сосед `<org>/site` на теге релиза).
+5. Правки шагов 2–4 — одним коммитом, `make ship`.
+6. `ACTION` — `make bump SVC=<svc> TAG=vX.Y.Z`; `RISK` читается до него, откат — `make bump` с прежним тегом.
+7. `AI-BOTS` (сайт) называет другую политику или версию реестра, чем прошлый релиз, — `make allowlist`:
+   allowlist пересобирается по `robots.txt` нового образа.
+8. Сайт — `make accept SVC=site` (код 0) после каждой выкатки; `make status` — блоки `-- edge --` и
+   `-- site --` без `ATTENTION`. Что значит каждый ✗ и `ATTENTION` — `docs/reference/runbook.md`.
+
+**Первый релиз сайта на среде** — `ACTION` длиннее:
+
+1. DNS: A-запись `www.<DOMAIN>` на VPS (роутер `site-www`; у среды на поддомене имени `www` обычно нет —
+   preflight предупреждает); Docker Engine ≥ 25 — строка `docker engine` в `make doctor`.
+2. `.env` на VPS — секция `profile site` по `.env.example` (канал формы). На не-прод среде (`ROBOTS_POLICY=noindex`
+   ставит `make new-env`) — ещё замок `STAGING_BASIC_AUTH_USERS` и `make deploy` до профиля: замок рендерится в
+   конфиг edge раньше, чем появится содержимое сайта.
+3. `site` в `COMPOSE_PROFILES` и сразу `make bump SVC=site TAG=vX.Y.Z` — он ставит `SITE_TAG`: профиль без тега
+   роняет `make deploy` (FAIL `image tags` в `make doctor`), а бамп без профиля поднимает сервис, которым
+   `make deploy` не управляет.
+4. `make accept SVC=site` — код 0 в профиле среды (прод или не-прод за замком).

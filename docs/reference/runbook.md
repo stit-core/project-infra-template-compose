@@ -1,6 +1,50 @@
 # Runbook
 
-Common failure modes на проектном VPS и что делать. Ordered by likelihood.
+Common failure modes на проектном VPS и что делать. Ordered by likelihood; вход — сигналы смока и приёмки ниже.
+
+## `ATTENTION` в `make status`
+
+Серверный смок (`== Server ==`) печатает проблему строкой `ATTENTION:`, smartdev ведёт её в `triage`.
+
+| блок | `ATTENTION:` | что делать |
+|---|---|---|
+| `-- host --` | `load1 … — хост перегружен`, `RAM available … — память на исходе` | `docker stats --no-stream` — кто ест CPU и память; всплеск запросов виден в журнале доступа (отчёт «бот × статус») |
+| | `disk … at N%` | `docker system df`, `du -sh /var/log/traefik` (копий журнала — до 14); restic-кеш — раздел «Restic backup не идёт» |
+| | `недавний OOM-kill на хосте` | `docker inspect -f '{{.State.OOMKilled}}' <контейнер>` — кого убили; потолок сайта — `mem_limit` в `compose/site.yml` |
+| `-- containers --` | `unhealthy: …`, `exited: …` | `make logs SVC=<svc>`; сайт — «Сайт не поднимается», `crowdsec` — «Edge отвечает 429 на всех адресах» |
+| | `restart-loop: …` — перезапуск сейчас или второй за 10 минут | `make logs SVC=<svc>`; `traefik` — «Traefik перезапускается, edge не отвечает» |
+| `-- edge --` | `журнала доступа нет`, `журнал доступа N МиБ`, `запись старше 26 ч` | ротация или запись журнала не идёт — «Журнал доступа Traefik» |
+| | `edge не отвечает на 443` | `make ps`; `traefik` — «Traefik перезапускается, edge не отвечает» |
+| | `CrowdSec не читает журнал доступа` | проба через edge не прочитана: «Edge отвечает 429 на всех адресах», последний пункт |
+| | `edge — allowlist ботов: N из M …` (нет, старше 8 дн, сетей вне предела, лишние) | `make allowlist`; его WARN — «Allowlist ботов в CrowdSec» |
+| | `edge — задание идёт … дольше своего срока`, `… не отвечает`, `нет списка источников`, `в образе нет ssl_client` | «Allowlist ботов в CrowdSec» |
+| | `edge — под баном боты: …` | адрес из allowlist или PTR поисковика без списка сетей под баном: снять — `docker exec crowdsec cscli decisions delete --ip <адрес>`; причина — «Бан адреса поисковика» |
+| `-- site --` | `site не отвечает на /healthz` | «Сайт не поднимается или на его адресах не сайт» |
+| | `не-прод без замка — сайт открыт без пароля` | `STAGING_BASIC_AUTH_USERS` в `.env`, `make deploy` — «Не-прод среда сайта» |
+| | `не-прод: / через edge — …`, `прод: / через edge — …` | 5xx или страница заглушки — «Сайт не поднимается или на его адресах не сайт»; 429 — «Edge отвечает 429 на всех адресах»; остальное назовёт `make accept SVC=site` |
+| | `не-прод: robots.txt сайта открывает индексацию`, `прод: robots.txt — не группа *…` | `robots.txt` отдаёт образ: `Sitemap` не на своём домене — штамповка origin (строка ниже), остальное — задача репо сайта |
+| | `sitemap.xml сайта пуст или не на <origin>` | штамповка origin: строка `[entrypoint] stamped …` в `make logs SVC=site`; домен — `make recreate SVC=site` |
+
+## Приёмка сайта: `make accept SVC=site`
+
+Список «Приёмки первого деплоя» контракта сайта (`docs/reference/infra-handoff.md § 1.7` в `<org>/site`) —
+машиной, в профиле среды: замок в цепочке роутера `site` — не-прод (проверяется видимое без пароля: 401 с
+`X-Robots-Tag`), без замка — прод. Код 0 — всё зелёное, 1 — есть ✗, 2 — принимать нечего (контейнер `site` не
+запущен). Дренаж не проверяется — он останавливает сайт, его держит приёмка образа (`pnpm accept:image` в
+`<org>/site`); TLS — строка без оценки: до выпуска сертификата LE цепочка не проверена.
+
+| раздел с ✗ | что делать |
+|---|---|
+| сервис (healthy, плейсхолдер origin, `"lvl":"error"` в логе, страница в `sitemap.xml`) | «Сайт не поднимается или на его адресах не сайт»; ошибки — `make logs SVC=site` |
+| смок edge и сайта | таблица `ATTENTION` выше |
+| адрес и среда | `http://` → `https://` — редирект entryPoint `web` (static-конфиг); `www` → корень и 403 на `/_image` — роутеры `site-www`, `site-image` в `compose/site.yml`; форму адреса, 404, `robots.txt`, `sitemap.xml`, `/healthz`, `/llms.txt` отдаёт образ — задача репо сайта |
+| записи `Host` | `www` с портом, заглавными или точкой — 301 роутера `site-www` (сервис `noop@internal`); чужой `Host` дошёл до сайта — роутер без `Host` в labels |
+| методы | `POST /` или `TRACE /` — 200: правило роутера `site` — только `GET` и `HEAD` |
+| заголовки | четыре заголовка edge — `secure-headers@file`, сжатие — `compress@file` в цепочке роутера `site`; лишние `X-Frame-Options`, `X-XSS-Protection` — состав `secure-headers` в `middlewares.yml.tpl` или образ; CSP — образ |
+| форма | серия `POST /api/contact` без 429 или с 403 и 303 — цепочка `site-form`: `form-rate-limit@file`, `form-body-limit@file`, отказ WAF — 429 |
+| UA-проба | бот из `ai-bots.sources` получил не тот ответ, что без UA: `docker exec crowdsec cscli decisions list` |
+| CrowdSec и журнал | постоверфлоу `rdns`, `seo-bots-whitelist` — коллекция `crowdsecurity/linux` в `compose/crowdsec.yml`; ключи записи журнала — `accessLog` в `configs/traefik/traefik.yml.tpl`; адрес под решением не 429 — bouncer в `middlewares.yml.tpl` |
+| edge | порт Traefik кроме 80 и 443, открытые dashboard или API — `compose/traefik.yml` и static-конфиг (`make validate`, `edge defaults`) |
 
 ## Сервис падает на пустых секретах
 
@@ -19,6 +63,14 @@ docker logs backend --tail=100
 
 - **PG_DSN ошибка:** проверь `POSTGRES_*` в `.env` на VPS (PG_DSN собирается интерполяцией в `compose/backend.yml`). Пустой пароль → заполни секцию profile postgres и `make deploy`.
 
+## Сайт не поднимается или на его адресах не сайт
+
+- **`make bump SVC=site` отказал** — тега нет в registry или образ не стал healthy за 90 с: верб вернул прежний тег в `.env` и поднял сайт на нём (у первого тега прежнего нет). `make logs SVC=site`: на env вне формата контейнер выходит с кодом 1, и строка лога называет ключ — `SITE_URL` (из `DOMAIN`), ключи формы; pull — «Образ сервиса не пуллится из registry».
+- **`make deploy` падает на `invalid reference format`** (FAIL `image tags` в `make doctor`) — профиль `site` включён, а `SITE_TAG` пуст: первый тег ставит `make bump SVC=site TAG=vX.Y.Z` (порядок первого релиза — `docs/reference/ecosystem.md`).
+- **На корне — страница заглушки** — роутеров сайта нет: контейнера `site` нет (`make ps`, профиль `site` в `COMPOSE_PROFILES`). Заглушка `landing` отвечает на корне, пока у сайта нет роутеров; при сайте на корне её прунит `/de-template`.
+- **Адреса сайта отвечают 5xx от edge** — контейнер есть, но не здоров (`starting`, `unhealthy`): роутеры остаются (`allowEmptyServices`), edge отвечает 500, затем 503. `make logs SVC=site`.
+- **Сменился домен** — `make recreate SVC=site`, не `restart`: origin проштампован в файлы на старте контейнера.
+
 ## Traefik не выдаёт LE-cert
 
 **Симптом:** `curl https://api.<DOMAIN>` отдаёт SELF_SIGNED или TIMEOUT, в логах traefik — `unable to obtain ACME certificate`.
@@ -29,6 +81,7 @@ docker logs traefik --tail=200 | grep -i 'acme\|challenge'
 
 Чек-лист:
 - A-record на `api.<DOMAIN>` указывает на IP VPS? `dig +short api.<DOMAIN>`.
+- Сайт: у `www.<DOMAIN>` своя A-запись (роутер `site-www`); у среды на поддомене имени `www` обычно нет — ошибка ACME на нём ожидаема, `make doctor` предупреждает (`dns`).
 - Порт 80 открыт извне? HTTP-01 challenge ходит на `:80/.well-known/acme-challenge/...`.
 - Rate limit LE: 50 cert/week per registered domain. Если хитанули — ждать неделю или использовать staging endpoint (отдельный `caServer` в traefik.yml).
 - `/letsencrypt/acme.json` существует и `chmod 0600`? Иногда после восстановления volume'а права слетают.
@@ -74,8 +127,8 @@ make allowlist                                        # обновить все 
 - **`уже идёт (<N> с) — пропуск`** — задание уже запущено расписанием, деплоем или вторым `make allowlist`: не ошибка, код 0.
 - **`в образе нет ssl_client`** — после бампа образа CrowdSec пропал помощник TLS, которым `wget` сверяет сертификат источника: задание отказывает (код 1), allowlist не меняется. Верни образ, в котором помощник есть (в Alpine — пакет `ssl_client`).
 - **`сервис site не отвечает — allowlist не меняется`** — задание читает политику с `http://site:3000/robots.txt`: `make ps`, `make logs SVC=site`.
-- **Сайт сменил политику ИИ-ботов** (строка `AI-BOTS` handoff релиза): после `make bump SVC=site` — `make allowlist`; allowlist бота, которого `robots.txt` закрыл именной группой, снимается.
-- **Сменилась версия реестра ботов** (та же строка, WARN `bots sources` в `make doctor`): в хабе `make bots-sources` (нужен сосед `<org>/site` на теге релиза), затем `make ship`.
+- **Строка `AI-BOTS` handoff релиза сайта** — шаги 4 и 7 `docs/reference/ecosystem.md § Handoff-блок релиза`: после `make bump SVC=site` — `make allowlist`, allowlist бота, которого `robots.txt` закрыл именной группой, снимается.
+- **WARN `bots sources` в `make doctor`** — версия реестра в `configs/crowdsec/ai-bots.sources` не та, что у соседа `<org>/site`: `make bots-sources` (сосед на теге релиза), коммит, `make ship`.
 - **Свой allowlist** называй не с `bot-`: имена `bot-…` — за заданием, список с таким именем, которого нет среди нужных, оно удаляет.
 - **Бот получил 429 от WAF**: `docker exec crowdsec cscli decisions list`; адреса из списка вендора там быть не должно — сверь `cscli allowlists check <адрес>` и дату обновления списка.
 
@@ -97,6 +150,24 @@ docker exec crowdsec cscli decisions delete --ip <адрес>  # снять ба
 
 - **Журнал растёт, копий нет:** `docker exec crowdsec crontab -l` — расписание на месте? `docker exec crowdsec pgrep crond` — crond жив? Нет — `make restart SVC=crowdsec`. Ротация руками — `docker exec crowdsec sh /opt/edge/rotate-access-log.sh`.
 - **Правка расписания** — `configs/crowdsec/crontab`, затем `make ship`: деплой рестартует `crowdsec`, crontab ставится на старте контейнера.
+
+## Отчёт «бот × статус»
+
+Кто из ботов приходил и что получил — по журналу доступа: активный файл и копии ротации за две недели. На VPS из
+`/opt/<p>-infra`, root'ом (каталог журнала — `700`); `jq` ставит роль `base`:
+
+```bash
+BOTS=$(awk 'NR > 1 { print $2 }' configs/crowdsec/ai-bots.sources | paste -sd'|')
+{ zcat -f /var/log/traefik/access.log.*.gz 2>/dev/null; cat /var/log/traefik/access.log; } |
+  jq -r --arg bots "$BOTS" '(."request_User-Agent" // "" | capture("(?<bot>" + $bots + ")").bot) as $bot
+    | [$bot, .DownstreamStatus] | @tsv' | sort | uniq -c | sort -rn
+```
+
+`429` сериями у поискового бота или загрузки по запросу человека — его держит лимит или бан CrowdSec:
+`docker exec crowdsec cscli decisions list` и раздел «Allowlist ботов в CrowdSec»; `403` — отказ WAF не 429;
+`5xx` сериями — сайт для бота недоступен. User-Agent подделывают: адрес сверяй с сетями вендора —
+`docker exec crowdsec cscli allowlists check <адрес>`. Как читать отчёт сайту — `docs/reference/observability.md`
+в `<org>/site`.
 
 ## Вербы отказывают с `ENV-ERR`
 
