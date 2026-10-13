@@ -114,7 +114,8 @@ ls -la .git/hooks/commit-msg .git/hooks/pre-commit 2>/dev/null
 - Прочитать `<org>/strategy/docs/projects/<slug>/{vision,surface}.md` (резолв
   пути — `docs/reference/ecosystem.md`; дефолт `../strategy`). Зафиксировать в
   state scope: проблема продукта, какие поверхности (surfaces) и части он
-  имеет — это вход для карты сервисов на этапе 2.
+  имеет — это вход для карты сервисов на этапе 2 (род `web-kind` веб-поверхности:
+  `landing` и `site` — сервис `site`, `app` — `<org>/frontend`).
 - Sibling-репо `<org>/strategy` нет или продукт в нём не спроектирован →
   **не блокировать**: записать next-step «склонируй `<org>/strategy` рядом /
   спроектируй продукт там (`/entrypoint`)» и вести стек по тому, что назовёт

@@ -185,7 +185,9 @@ stack согласуются с ним и с service-doc'ами:
   service-doc НЕ имеют (только контекст для cross-repo next-step).
 - **Service map ↔ продуктовые surfaces** (`<org>/strategy`, cross-repo):
   public-поверхность продукта (`surface.md` type `web`/`api`/`admin`)
-  обычно соответствует `frontend`/`backend`-строке карты. datastore/infra
+  обычно соответствует `frontend`/`backend`-строке карты: `web` рода
+  (`web-kind`) `landing` или `site` — строка `site` (`<org>/site`, корень
+  `${DOMAIN}`), рода `app` — `<org>/frontend`. datastore/infra
   surface не имеют. Рассинхрон (surface без сервиса или наоборот) — не
   ошибка, но повод уточнить через `AskUserQuestion`.
 - **Domains** ↔ public-сервисы (`Route` в service-doc упоминает

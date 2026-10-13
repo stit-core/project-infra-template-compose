@@ -103,7 +103,8 @@ make project-check
 Ссылки в репо:
 - Makefile (COMPOSE_ARGS) — wildcard $(wildcard compose/*.yml),
   само исключит. Править не надо.
-- scripts/deploy.sh — wildcard через docker compose, само исключит.
+- scripts/deploy.sh — ROLE_FILES[storage] называет оба файла (glob —
+  только у роли all): строку роли правлю тем же шагом.
 - docs/reference/architecture.md — упоминает storage как
   «опциональный профиль», не блокирует. Останется forward-only
   описание возможности.

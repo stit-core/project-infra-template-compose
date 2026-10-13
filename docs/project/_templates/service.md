@@ -12,12 +12,14 @@ status: draft
 ## Hosting
 <here — контейнер в этом репо (compose/<name>.yml, профиль); external — свой репо/CDN, здесь
 только роут/контекст. Для backend: source-репо внешний, НО контейнер хостится here
-(hosting: here, образ из git.stit.tech/<org>/backend). Какой профиль COMPOSE_PROFILES активирует.>
+(hosting: here, образ из git.stit.tech/<org>/backend). Индексируемый сайт `<org>/site` — тоже here:
+Node-сервис на корневом домене, профиль `site`, `compose/site.yml`. Какой профиль COMPOSE_PROFILES активирует.>
 
 ## Identity
 <Что это: образ сервис-репо (`${REGISTRY_HOST:-git.stit.tech}/${PROJECT_NAME}/<name>:${<NAME>_TAG}`,
 тег — в `.env`, выкатка `make bump`) или движок с закреплённой версией (postgres 17 / minio).
-container_name, healthcheck (path/команда), сети (proxy / backend-net).>
+container_name, healthcheck (path/команда), сети (proxy / backend-net). Сайт: порт 3000, healthcheck
+`/healthz` (контейнер и сервис Traefik), только `proxy`.>
 
 ## Secrets
 <Какие `${VAR}` нужны в .env: секция .env.example (postgres: POSTGRES_*;
@@ -25,7 +27,8 @@ storage: MINIO_*/...) или project-specific имена. `N/A` если сек�
 
 ## Route
 <Публичный ли: сабдомен (`<name>.${DOMAIN}`), traefik router + crowdsec@file middleware. Или
-internal (только backend-net) → `_internal_`. Порт.>
+internal (только backend-net) → `_internal_`. Порт. Сайт: корень `${DOMAIN}`, `www` — 301 на корень
+(роутер с сервисом `noop@internal`), форма и `/_image` — свои роутеры (rule `traefik-routing`).>
 
 ## Generates
 <Что de-template родит/изменит в инфре из этого артефакта:

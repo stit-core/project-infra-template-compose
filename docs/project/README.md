@@ -78,12 +78,14 @@ status: draft
 | `datastore` (postgres) | `postgres` | `compose/postgres.yml` |
 | `datastore` (minio) | `storage` | `compose/minio.yml` + `backup.yml` |
 | `backend` (`hosting: here`) | `backend` | `compose/backend.yml` |
-| `frontend` (`hosting: here`) | — (always-on `landing`) | `compose/landing.yml` |
+| `frontend` — индексируемый сайт (`hosting: here`, репо `<org>/site`) | `site` | `compose/site.yml` на корне `${DOMAIN}`; заглушка `compose/landing.yml` с `configs/landing/` прунится |
+| `frontend` — SPA за логином (`hosting: here`, репо `<org>/frontend`) | — | `compose/frontend.yml` на `app.${DOMAIN}` — `/add-service` |
 | `frontend`/`backend` (`hosting: external`) | — | cross-repo next-step |
 
-Always-on edge (`traefik`/`crowdsec`/`landing`) — фиксированный фундамент шаблона, не
-описывается service-doc'ами. `stack § Generates` несёт только cross-cutting: traefik
-dynamic routes, `DOMAIN`, ACME next-step (`ACME_EMAIL`/`ACME_CASERVER` в `.env` на VPS).
+Сайт от SPA строка карты отличает репо: `<org>/site` — поверхность strategy рода `landing` или `site`,
+`<org>/frontend` — рода `app`. Always-on edge (`traefik`/`crowdsec`; заглушка `landing` — пока корень не занят
+сайтом) — фиксированный фундамент шаблона, не описывается service-doc'ами. `stack § Generates` несёт только
+cross-cutting: traefik dynamic routes, `DOMAIN`, ACME next-step (`ACME_EMAIL`/`ACME_CASERVER` в `.env` на VPS).
 
 ## Cross-repo: продуктовый контекст
 
@@ -92,7 +94,8 @@ dynamic routes, `DOMAIN`, ACME next-step (`ACME_EMAIL`/`ACME_CASERVER` в `.env`
 склонированном **рядом** с `<org>/infra` (sibling-checkout). Скиллы читают его при старте,
 чтобы привязать инфру к продукту:
 
-- `stack-deep-dive` читает `<org>/strategy/.../surface.md` — какие поверхности public (нужны сабдомены).
+- `stack-deep-dive` читает `<org>/strategy/.../surface.md` — какие поверхности public (нужны сабдомены) и род
+  веб-поверхности `web-kind`: `landing` и `site` — сервис `site` на корне, `app` — `<org>/frontend`.
 - `de-template` читает `<org>/strategy/.../vision.md § Problem` — кастомизировать `CLAUDE.md` под проект.
 
 Авторская сторона продуктовых артефактов — **только** `<org>/strategy`; здесь их не редактируем.
@@ -126,3 +129,4 @@ dynamic routes, `DOMAIN`, ACME next-step (`ACME_EMAIL`/`ACME_CASERVER` в `.env`
 - ❌ Оставлять `Generates` пустым — движку `de-template` не из чего разворачивать.
 - ❌ Промоутить `status: stable` руками без зелёного валидатора.
 - ❌ Описывать always-on edge (traefik/crowdsec/landing) service-doc'ом — это фиксированный фундамент шаблона.
+  Сайт на корне — не фундамент: строка карты `hosting: here` и `services/site.md`.

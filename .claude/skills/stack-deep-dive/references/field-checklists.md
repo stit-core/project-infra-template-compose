@@ -20,7 +20,7 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
 **Что фиксируем** — авторитетный инвентарь частей продукта на стороне
 инфры (одна строка = одна часть):
 
-- `name` — слаг сервиса (`backend`, `db`, `storage`, `web`).
+- `name` — слаг сервиса (`backend`, `db`, `storage`, `site`, `web`).
 - `subtype` — `backend` / `frontend` / `datastore` / `infra`.
 - `hosting` — `here` (контейнер в этом репо) / `external` (свой репо/CDN).
 - `repo / source` — откуда (`<org>/backend`, «postgres в этом репо», CDN).
@@ -30,9 +30,11 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
   (дефолт) — поле опускается (всё на одном VPS). См. `references/multi-host.md`.
 
 Карта — **драйвер `COMPOSE_PROFILES`** (`/de-template` выводит профили из
-неё: datastore→postgres/storage, backend→backend). Сверяется с
-продуктовыми surfaces из `<org>/strategy` (cross-repo): public-surface обычно
-= `frontend`/`backend`-строка; datastore/infra surface не имеют.
+неё: datastore→postgres/storage, backend→backend, сайт `<org>/site`→site).
+Сверяется с продуктовыми surfaces из `<org>/strategy` (cross-repo):
+public-surface обычно = `frontend`/`backend`-строка — `web` рода `landing` или
+`site` даёт строку `site` (`<org>/site`, here), рода `app` — `<org>/frontend`;
+datastore/infra surface не имеют.
 
 **Опции опрашиваются как**:
 
@@ -43,7 +45,8 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
 **Что НЕ**:
 
 - Заводить строку для always-on фундамента (traefik/crowdsec/
-  landing) — это не «часть продукта».
+  landing) — это не «часть продукта». Сайт на корне — часть продукта:
+  строка `site`.
 - Авторить здесь продуктовые surfaces — они в `<org>/strategy`, читаются
   cross-repo (карта — про инфра-инвентарь, не про UX-поверхности).
 - `hosting: here` строка без последующего `services/<name>.md`.
@@ -51,9 +54,9 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
 **Тест-критерий**:
 
 - ✅ «`backend` (backend/here/`<org>/backend`/API), `db` (datastore/here/
-  postgres/Postgres 17), `storage` (datastore/here/minio/S3), `web`
-  (frontend/external/CDN/SPA) — из карты выводятся профили backend,
-  postgres, storage».
+  postgres/Postgres 17), `storage` (datastore/here/minio/S3), `site`
+  (frontend/here/`<org>/site`/сайт на корне), `web` (frontend/external/CDN/SPA)
+  — из карты выводятся профили backend, postgres, site, storage».
 - ❌ «traefik строкой в карте» — это фундамент, не часть продукта.
 - ❌ «`hosting: here` без service-doc» — нарушен инвариант зеркала.
 
@@ -73,7 +76,8 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
 
 - Корневой `DOMAIN` (например, `acme.dev`).
 - Список сабдоменов: какой сервис → какой сабдомен (`backend → api.`,
-  `minio → minio.`, `minio-s3 → s3.`, landing → корень).
+  `minio → minio.`, `minio-s3 → s3.`, сайт → корень и `www.` — 301 на корень;
+  без сайта корень держит заглушка `landing`).
 - LE-сертификаты: `ACME_EMAIL` / `ACME_CASERVER` — значения живут в `.env`
   на VPS; в stack — указание «ACME next-step».
 - Wildcard или per-host: обычно per-host через HTTP-01 challenge.
@@ -90,12 +94,12 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
 - Описывать сабдомены, которых нет в карте public-сервисов.
 - Хардкодить `ACME_EMAIL` в `stack.md` — это значение `.env` на VPS.
 - Класть два разных сервиса на один сабдомен.
-- Корневой `${DOMAIN}` не на landing.
+- Корневой `${DOMAIN}` не на сайте (а без сайта — не на заглушке `landing`).
 
 **Тест-критерий**:
 
 - ✅ «`DOMAIN=acme.dev`; `api.acme.dev` → backend, `minio.acme.dev` →
-  minio Console, `s3.acme.dev` → minio S3, корень → landing;
+  minio Console, `s3.acme.dev` → minio S3, корень и `www.acme.dev` → сайт;
   `ACME_CASERVER` — prod, `ACME_EMAIL` — next-step в `.env`».
 - ❌ «`DOMAIN` без указания сабдоменов» — public-сервисы есть, а
   схемы нет.
@@ -116,7 +120,11 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
 
 - Traefik middleware на public-роутах (набор — `configs/traefik/dynamic/middlewares.yml.tpl`):
   - `crowdsec@file` (дефолт шаблона) — обязательный bouncer;
-  - `secure-headers@file` — на HTTP-роутах сервисов (backend, landing);
+  - `secure-headers@file` — на HTTP-роутах сервисов (backend, landing, site);
+  - у сайта — свои цепочки: `compress`, форма с лимитом частоты и тела, `/_image`
+    — 403, `www` → корень (rule `traefik-routing`, «Корневой домен и www»);
+  - ИИ-боты: allowlist сетей вендоров по `robots.txt` сайта (`ai-bots.sources`);
+    поисковики — rDNS-постоверфлоу CrowdSec;
   - rate-limit (дефолт `rate-limit@file` или кастомный);
   - другие middleware (custom headers, redirect, etc.).
 - Особые роуты (sticky, retry, custom resolver).
@@ -137,7 +145,7 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
 **Тест-критерий**:
 
 - ✅ «`crowdsec@file` на всех public-роутах, `secure-headers@file` на
-  backend и landing; rate-limit дефолтный».
+  backend, landing и сайте; rate-limit дефолтный; цепочки сайта — шаблона».
 - ✅ «`crowdsec@file` на всех public; для `api.` кастомный rate-limit
   (отдельный middleware в `configs/traefik/dynamic/`)».
 - ❌ «Public-роут без middleware».
@@ -160,7 +168,7 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
   (`<project>-proxy` / `<project>-backend`).
 - Кто в какой сети — перечислить по subtype (`backend` → обе,
   `datastore postgres` → `backend-net`, `datastore minio` → обе для
-  Console, инфра → `proxy`).
+  Console, сайт → только `proxy`, инфра → `proxy`).
 - **Топология хостов** (single-host vs split): Postgres / MinIO co-located на
   одном VPS (дефолт) или вынесены на отдельные хосты (`HOST_ROLE` db/storage).
   При split docker service-name DNS между хостами не работает — backend
@@ -252,7 +260,8 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
 
 - Метрики: none по дефолту (шаблон метрики не собирает) или свой сервис
   метрик проекта (project-specific строка в карте).
-- Логи: local-only (`docker logs`) или свой стек проекта.
+- Логи: local-only (`docker logs`; журнал доступа Traefik — файл
+  `/var/log/traefik/access.log`, его читает CrowdSec) или свой стек проекта.
 
 **Опции опрашиваются как**:
 
@@ -265,7 +274,7 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
 
 **Тест-критерий**:
 
-- ✅ «метрик нет (дефолт); логи local-only».
+- ✅ «метрик нет (дефолт); логи local-only, журнал доступа — файл edge».
 - ✅ «свой сервис метрик (строка в карте) + его экспортёры; логи local-only».
 - ❌ «Просто \"есть мониторинг\"» — не сказано кто и что собирает.
 
@@ -285,14 +294,15 @@ Edge / Networks / Backup / Observability / Environments / Generates. По
 - Каждая среда = **отдельный VPS** с одним `ENV` и своим `.env`
   (канон — `.claude/rules/multi-env.md`).
 - Чем среды отличаются: домен (`dev.acme.dev` vs `acme.dev`), масштаб
-  (RAM/CPU VPS), какой набор профилей включён.
+  (RAM/CPU VPS), какой набор профилей включён; сайт не-прод среды — закрыт
+  (`ROBOTS_POLICY=noindex` и замок `STAGING_BASIC_AUTH_USERS`).
 - `N/A` — если среда одна (single-env проект).
 
 **Опции опрашиваются как**:
 
 - Список сред: Other (слаги проекта).
 - Домен на среду: Other (стратегия именования).
-- Профили на среду: multiSelect (`postgres`/`storage`/`backend`).
+- Профили на среду: multiSelect (`postgres`/`storage`/`backend`/`site`).
 
 **Что НЕ**:
 

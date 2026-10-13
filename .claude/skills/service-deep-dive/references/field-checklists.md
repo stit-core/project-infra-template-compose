@@ -23,7 +23,10 @@ Identity / Secrets / Route / Generates. По разделу на каждую с
   - `backend` → `backend`,
   - `datastore` postgres → `postgres`,
   - `datastore` minio → `storage`,
-  - `frontend` landing → `—` (always-on `landing`),
+  - `frontend` — сайт `<org>/site` (поверхность strategy рода `landing` или `site`) → профиль `site`:
+    Node-сервис на корне `${DOMAIN}`, заглушка `landing` при нём прунится,
+  - `frontend` — SPA `<org>/frontend` с `hosting: here` → свой профиль, его заводит `/add-service`
+    (`compose/frontend.yml`),
   - `infra` → обычно always-on, не профильное.
 - Источник: для `backend` — внешний source-репо `<org>/backend`, но
   контейнер `here`; для движков (postgres/minio) — official image; для
@@ -47,6 +50,7 @@ Identity / Secrets / Route / Generates. По разделу на каждую с
 
 - ✅ «Сервис `here`, профиль `postgres`, образ движок `postgres:17.X`».
 - ✅ «Сервис `here`, профиль `backend`, образ `git.stit.tech/<org>/backend:<sha>`».
+- ✅ «Сервис `here`, профиль `site`, образ `git.stit.tech/<org>/site:v1.2.0` — сайт на корне».
 - ❌ «Сервис `external` с service-doc» (это рассинхрон, такого быть не должно).
 - ❌ «Дублирован полный набор `COMPOSE_PROFILES=postgres,storage,backend`».
 
@@ -68,7 +72,8 @@ Identity / Secrets / Route / Generates. По разделу на каждую с
 - `container_name` (обычно `<name>`, иногда суффикс).
 - `healthcheck`: команда или path. Для postgres — `pg_isready`, для
   HTTP-API — `wget`/`curl` + `/health` (Go-сервисы на golibinfra: `/health`
-  liveness, `/ready` с probes), для minio — `mc ready`.
+  liveness, `/ready` с probes), для сайта — `/healthz` (у контейнера и у сервиса
+  Traefik), для minio — `mc ready`.
 - Сети: `proxy` (наружу — если public) и/или `backend-net` (internal).
 
 **Опции опрашиваются как**:
@@ -94,6 +99,8 @@ Identity / Secrets / Route / Generates. По разделу на каждую с
   `pg_isready -U postgres`, сеть `backend-net`».
 - ✅ «`image: git.stit.tech/acme/backend:abc1234`, healthcheck
   `wget -qO- http://127.0.0.1:8080/health`, сети `proxy + backend-net`».
+- ✅ «`image: …/site:${SITE_TAG}`, healthcheck `wget -qO- http://127.0.0.1:3000/healthz`,
+  сеть `proxy` — данных стека сайту не нужно».
 - ❌ «`image: minio/minio:latest`» — pinned обязательно.
 - ❌ «public сервис без сети `proxy`».
 
@@ -178,16 +185,19 @@ Identity / Secrets / Route / Generates. По разделу на каждую с
   публичной поверхности.
 - `_internal_`, но в сети `proxy` — лишняя поверхность.
 - Сабдомен, не упомянутый в `stack § Domains`, — рассинхрон (stub).
-- Сабдомен корневой `${DOMAIN}` для не-landing — конфликт с landing.
+- Корень `${DOMAIN}` не для сайта — конфликт с сайтом (профиль `site`; до его
+  первого деплоя корень держит заглушка `landing`).
 
 **Тест-критерий**:
 
 - ✅ «public, `api.${DOMAIN}`, traefik router + `crowdsec@file`, порт
   8080, LE через резолвер `letsencrypt` (ACME-значения — `.env`)».
 - ✅ «`_internal_` — backend-net only».
+- ✅ «public, корень `${DOMAIN}` и `www` (301 на корень, `noop@internal`), порт
+  3000, роутеры `site`, `site-form`, `site-image`, `site-www` — сайт».
 - ❌ «`api.example.com` без middleware» — публичная поверхность без
   щита.
-- ❌ «`${DOMAIN}` для backend» — landing занимает корень.
+- ❌ «`${DOMAIN}` для backend» — корень занимает сайт.
 
 **Порядок копания**:
 
@@ -203,7 +213,7 @@ Identity / Secrets / Route / Generates. По разделу на каждую с
 
 **Что фиксируем** — контракт для `/de-template`:
 
-- `COMPOSE_PROFILES += <profile>` (или «always-on» для landing/infra).
+- `COMPOSE_PROFILES += <profile>` (или «always-on» для infra).
 - `compose/<name>.yml` — keep (при `hosting: here`).
 - Секция переменных сервиса в `.env.example` — keep (если секреты).
 - traefik labels или dynamic route (если public).
@@ -226,8 +236,9 @@ Identity / Secrets / Route / Generates. По разделу на каждую с
 
 - ✅ «`COMPOSE_PROFILES += postgres`; `compose/postgres.yml` keep;
   секция `profile postgres` в `.env.example` keep».
-- ✅ «`COMPOSE_PROFILES` — нет (always-on landing); `compose/landing.yml`
-  keep; traefik labels для `${DOMAIN}`».
+- ✅ «`COMPOSE_PROFILES += site`; `compose/site.yml` keep, `compose/landing.yml`
+  с `configs/landing/` — pruned; секция `profile site` в `.env.example` keep;
+  DNS `www.<DOMAIN>`».
 - ✅ «external; cross-repo next-step: форкни `<org>/frontend`,
   деплой на CDN».
 - ❌ «`Generates` пуст».

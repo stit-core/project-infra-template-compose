@@ -28,10 +28,11 @@ make status
 - `== Critical ==` — `ATTENTION:`-строки git/deploy-drift (upstream behind) или `none`. Это
   pure-local (`status.sh`): docker тут не дёргается.
 - `== Server ==` — серверный смок VPS (host-витали load/RAM/swap/disk/OOM + здоровье
-  контейнеров unhealthy/exited/restart-loop). Собирает таргет `make status` через смок
-  (`smoke-run.sh` на VPS / `ssh.sh smoke` с workstation). Свои `ATTENTION:`-строки — чейнить как
-  Critical (→ triage). `SKIP` — нет `.env.local` (connection не задан) или VPS недоступен; это
-  норма, не падение.
+  контейнеров unhealthy/exited/restart-loop + edge: журнал доступа, его чтение CrowdSec, allowlist и
+  баны ботов + сайт: liveness, `/` по среде, `robots.txt`, `sitemap.xml`). Собирает таргет `make status`
+  через смок (`smoke-run.sh` на VPS / `ssh.sh smoke` с workstation). Свои `ATTENTION:`-строки — чейнить
+  как Critical (→ triage); что значит каждая — `docs/reference/runbook.md`. `SKIP` — нет `.env.local`
+  (connection не задан) или VPS недоступен; это норма, не падение.
 - `== Plan ==` — активные планы (статус, прогресс, следующий шаг) и число пунктов бэклога, или `none`.
 - `== Branch ==` / `== Working tree ==` / `== Compose ==` / `== Recent commits ==` — фон.
 
@@ -63,11 +64,11 @@ make status
 | Сигнал из `make status` / задачи | Действие — чейн |
 |---|---|
 | `== Critical ==` ≠ none (upstream behind-drift) | → skill `triage` |
-| `== Server ==` ATTENTION (host-pressure: disk/RAM/load/OOM, или unhealthy/exited/restart на VPS) | → skill `triage` |
+| `== Server ==` ATTENTION (host-pressure: disk/RAM/load/OOM, unhealthy/exited/restart на VPS, edge, сайт) | → skill `triage` |
 | Багфикс / «сломалось» / «не поднимается» / трейс | → skill `triage` (не `plan`) |
 | Проект не инициализирован (origin ещё template ИЛИ нет stable `docs/project/stack.md`) | → skill `init-project` (первым делом) |
 | `== Plan ==` активный `in-progress` | продолжи со следующего открытого шага («Где мы сейчас») |
-| Задача целиком про один сиблинг: фича бэка / фронта / сайта / бота, задача мобильному приложению, правка дизайна продукта | → агент в `../<repo>` работает его обвязкой (`CLAUDE.md § Оркестрация`); выкатка тега — вернись сюда, `make bump` (у mobile и strategy выкатки отсюда нет) |
+| Задача целиком про один сиблинг: фича бэка / фронта / сайта / бота, задача мобильному приложению, правка дизайна продукта | → агент в `../<repo>` работает его обвязкой (`CLAUDE.md § Оркестрация`); выкатка тега — вернись сюда, шаги handoff-блока релиза (`docs/reference/ecosystem.md`): `make bump`, у сайта — ещё `make accept SVC=site` (у mobile и strategy выкатки отсюда нет) |
 | Задача сквозная (несколько репо) | → skill `plan`: фаза на репо → агенты в сиблингах → выкатка здесь |
 | Задача = новый сервис в стек | → skill `add-service` |
 | Задача = restore / потеря данных / host crashed | → skill `dr-restore` |
@@ -112,12 +113,16 @@ make ship MSG="feat(foo): bar"
 Перечисление внутренностей сервер-side скрипта — explanatory, не команды для ручного запуска
 (канон — `make deploy`; raw-docker исключения — rule `make-first`).
 
-1. `git pull --ff-only origin main` — fail если remote разошлась.
-2. `scripts/render-configs.sh` — envsubst для `.tpl`.
-3. preflight DNS — только warnings.
-4. **crowdsec early** — bouncer auto-register если `CROWDSEC_BOUNCER_API_KEY=` пуст.
-5. `docker compose up -d --remove-orphans --wait --wait-timeout 180` (смена .env-значений → compose пересоздаёт сам).
-6. Diff `prev_sha..new_sha`: `configs/{traefik,crowdsec,postgres}/**` → restart их.
+1. Форма строк `.env` и identity — до первого чтения ключа (`ENV-ERR` — отказ до compose).
+2. `git pull --ff-only origin main` (его отказ деплой не останавливает); `deploy.sh`, обновлённый этим pull,
+   продолжает новой версией.
+3. `scripts/render-configs.sh` — preflight `.env` и envsubst для `.tpl`.
+4. preflight DNS — только warnings.
+5. **crowdsec early** (ждёт healthy) — bouncer auto-register если `CROWDSEC_BOUNCER_API_KEY=` пуст.
+6. `docker compose up -d --remove-orphans --wait --wait-timeout 180` (смена .env-значений → compose пересоздаёт сам).
+7. Diff от `refs/deploy/ok` (ревизия, конфиги которой сервисы уже подхватили): `configs/{traefik,crowdsec,postgres}/**`
+   (кроме заданий `configs/crowdsec/*.sh` и `ai-bots.sources`) → restart их и ожидание healthy.
+8. При профиле `site` — allowlist ботов: недостающие и не обновлявшиеся шесть дней списки.
 
 ### Hot-fix прямо на VPS
 

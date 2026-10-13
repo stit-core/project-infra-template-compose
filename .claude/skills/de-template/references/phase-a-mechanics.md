@@ -15,7 +15,8 @@ A — Phase B (печать cross-repo next-steps).
 | postgres | `datastore` | `here` | `postgres` |
 | minio | `datastore` | `here` | `storage` |
 | backend | `backend` | `here` | `backend` |
-| landing | `frontend` | `here` | — (always-on) |
+| site (репо `<org>/site`) | `frontend` | `here` | `site` |
+| frontend (репо `<org>/frontend`) | `frontend` | `here` | — (`/add-service`, `compose/frontend.yml`) |
 | frontend | `frontend` | `external` | — (cross-repo next-step) |
 | backend-external | `backend` | `external` | — (cross-repo next-step) |
 | `infra` | `infra` | `here` | обычно always-on (см. service-doc) |
@@ -25,7 +26,7 @@ A — Phase B (печать cross-repo next-steps).
 1. Прочитать `stack.md § Service map`.
 2. Для каждой строки с `hosting: here` → определить профиль по таблице.
 3. Собрать множество профилей в детерминированном порядке (алфавит:
-   `backend,postgres,storage`).
+   `backend,postgres,site,storage`).
 4. Найти в `.env.example` строку `COMPOSE_PROFILES=...`:
    - если есть и значение совпадает — пропустить (идемпотентность);
    - если есть с другим значением — Edit на новое значение;
@@ -51,7 +52,7 @@ A — Phase B (печать cross-repo next-steps).
 
 - `traefik.yml`
 - `crowdsec.yml`
-- `landing.yml`
+- `landing.yml` — пока в карте нет сайта на корне (ниже)
 
 ### Profiled — таблица прунинга
 
@@ -61,6 +62,8 @@ A — Phase B (печать cross-repo next-steps).
 | `minio.yml` | в карте есть `datastore` minio |
 | `backup.yml` | в карте есть `datastore` minio (storage профиль) |
 | `backend.yml` | в карте есть `backend` с `hosting: here` |
+| `site.yml` | в карте есть сайт `<org>/site` с `hosting: here` |
+| `landing.yml` + `configs/landing/` | в карте **нет** сайта на корне; при сайте прунится и строка `configs/landing/index.html` в `.gitignore` |
 
 ### Шаги
 
@@ -72,8 +75,10 @@ A — Phase B (печать cross-repo next-steps).
    Удалю:
    - compose/minio.yml
    - compose/backup.yml
-   В репо нет других ссылок на эти файлы:
+   В репо ссылки на эти файлы:
      - Makefile глобит compose/*.yml через wildcard — само исключит;
+     - scripts/deploy.sh: ROLE_FILES[storage] называет оба — строку
+       роли правлю тем же шагом;
      - scripts/render-configs.sh не упоминает по имени;
      - docs/ — упоминают как «опциональный профиль storage», не
        блокируют.
@@ -84,7 +89,8 @@ A — Phase B (печать cross-repo next-steps).
 
 ### Anti-patterns
 
-- Удалить always-on (`compose/traefik.yml` etc.).
+- Удалить always-on (`compose/traefik.yml` etc.); `landing.yml` при
+  карте без сайта на корне — тоже always-on.
 - Удалить файл без проверки ссылок (вдруг в `Makefile` хардкод на
   старый набор).
 - Удалить файлы без каскада.
@@ -103,6 +109,7 @@ Identity (`PROJECT_NAME`/`ENV`/`DOMAIN`), `ACME_*`,
 | `profile postgres` (`POSTGRES_*`) | профиль `postgres` |
 | `profile storage` (`MINIO_*`, `*_S3_*`, `RESTIC_*`, `BACKUP_AWS_*`) | профиль `storage` |
 | `profile backend` (`OIDC_*`, `JWT_SECRET`, `BACKEND_TAG`) | профиль `backend` |
+| `profile site` (`SITE_*`, `ROBOTS_POLICY`) | профиль `site`; `STAGING_BASIC_AUTH_USERS` остаётся — его читает `middlewares.yml.tpl` (цепочка `staging`) |
 
 ### Шаги
 
@@ -226,14 +233,18 @@ Identity (`PROJECT_NAME`/`ENV`/`DOMAIN`), `ACME_*`,
 - [ ] `MINIO_*` / `*_S3_*` / `RESTIC_*` / `BACKUP_AWS_*` — для
       storage профиля.
 - [ ] `OIDC_*` / `JWT_SECRET` — для backend профиля.
+- [ ] Секция `profile site` (канал формы; на не-прод — замок) — для site
+      профиля; первый релиз сайта — `docs/reference/ecosystem.md`.
 
 ### 3. DNS
 - [ ] LE-HTTP-01 A-записи для сабдоменов:
-      api.<DOMAIN>, minio.<DOMAIN>, s3.<DOMAIN>.
+      api.<DOMAIN>, minio.<DOMAIN>, s3.<DOMAIN>, www.<DOMAIN> (сайт).
 
 ### 4. Выставить tag backend в .env
 - [ ] После `/release` backend: `make bump SVC=backend TAG=<vX.Y.Z>`
       (правит `BACKEND_TAG` в `.env` на VPS + force-recreate).
+- [ ] После `/release` сайта: профиль `site` и сразу
+      `make bump SVC=site TAG=<vX.Y.Z>`, затем `make accept SVC=site`.
 ```
 
 ### После печати

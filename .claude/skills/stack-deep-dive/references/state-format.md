@@ -39,7 +39,7 @@ ref: docs/project/stack.md
 
 ## Host layout
 - Режим: split (single-host — секцию опускаем).
-- vps-app (HOST_ROLE=edge): traefik, backend, landing.
+- vps-app (HOST_ROLE=edge): traefik, crowdsec, backend, site.
 - vps-db (HOST_ROLE=db): postgres; backend достаёт PG через PG_HOST/PG_PORT из `.env`.
 - vps-storage (HOST_ROLE=storage): minio, backup; RESTIC_REPOSITORY → этот хост.
 ```
@@ -94,7 +94,7 @@ stack'а, но важны для будущих сессий.
 секцию **не заводим**. Появляется, когда оператор выбрал split в `§ Networks`.
 
 - Одна строка на хост: `<имя-хоста> (HOST_ROLE=<роль>): <сервисы>`.
-- Роли: `edge` (traefik/backend/landing) / `db`
+- Роли: `edge` (traefik/crowdsec/landing/backend/site) / `db`
   (postgres) / `storage` (minio/backup).
 - Эндпоинты не дублируем: PG — `PG_HOST`/`PG_PORT`, restic —
   `RESTIC_REPOSITORY` в `.env` каждого хоста.

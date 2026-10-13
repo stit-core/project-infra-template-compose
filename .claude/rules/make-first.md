@@ -21,9 +21,10 @@ paths:
 | LOOP | `validate` / `doctor` / `check` | compose syntax+tpl+.env / live preflight / `validate`+`doctor`+`plan-check`+`project-check` |
 | SHIP | `ship MSG="…"` / `deploy` / `render` | commit+check+push+(main)ssh-deploy / server-side / envsubst для `.tpl` |
 | OPS | `ps` / `logs SVC=` / `restart SVC=` / `recreate SVC=` / `build SVC=` | статус / логи / рестарт / пересоздать (подхват нового значения `.env` или тега) / сборка образа сервиса (на VPS) |
-| | `bump SVC= TAG=` | бамп image-тега: `<SVC>_TAG` в `.env` на VPS + force-recreate, ждёт healthy. Теги — строго через `.env` |
+| | `bump SVC= TAG=` | бамп image-тега: `<SVC>_TAG` в `.env` на VPS + force-recreate, ждёт healthy; отказ — возврат на прежний тег. Теги — строго через `.env` |
 | | `backup` / `restore-pg SNAPSHOT=` | one-shot backup / restore postgres из restic |
 | | `allowlist` | allowlist ботов в CrowdSec: сети вендоров по `configs/crowdsec/ai-bots.sources` и `robots.txt` сайта |
+| | `accept SVC=site` | приёмка сайта после деплоя машиной (список контракта сайта § 1.7, профиль среды — у контейнера); код 0 — зелёная |
 | INTEL | `status` / `search Q= [P=]` | cockpit-сводка (локальный `status.sh` + серверный смок `== Server ==` по SSH при `.env.local`) / поиск по compose+configs+scripts+docs |
 | PROVISION | `new-env` | bootstrap `.env` на чистом VPS |
 | SETUP | `setup` | симлинк git-хуков (commit-msg, pre-commit) в `.git/hooks/` + PyYAML для frontmatter-проверки |
@@ -38,7 +39,8 @@ paths:
 сама за себя. Каждый такой вызов в доке/скиле помечай как explanatory (зачем именно raw):
 
 - **`docker exec <c> <tool> …`** для инструмента внутри контейнера, у которого нет make-обёртки:
-  `restic` (в `backup`), `cscli` (в `crowdsec`), `mc` (в `minio`).
+  `restic` (в `backup`), `cscli` (в `crowdsec`), `mc` (в `minio`), `wget` к сайту изнутри (`docker exec site
+  wget -qO- http://127.0.0.1:3000/robots.txt` — на не-прод edge без пароля отвечает 401).
   Пример: `docker exec backup restic snapshots --compact`.
 - **`docker compose config`** — разбор отрендеренного compose при триаже (`make validate` его гоняет,
   но при отладке полезен напрямую).
@@ -51,8 +53,8 @@ paths:
 ## Local vs remote
 
 Репо живёт на **рабочей станции оператора**: authoring / `validate` / `plan` / `ship` —
-локально, живого стека тут нет. Ops-вербы (`ps`/`logs`/`restart`/`backup`/`restore-pg`)
-выполняются **на проектном VPS** и **сами проксируют туда**: sentinel — наличие `.env` (живёт
+локально, живого стека тут нет. Ops-вербы (`ps`/`logs`/`restart`/`recreate`/`build`/`bump`/`backup`/`restore-pg`/
+`allowlist`/`accept`) выполняются **на проектном VPS** и **сами проксируют туда**: sentinel — наличие `.env` (живёт
 только на сервере). Нет `.env` (workstation) → верб уходит через `scripts/tools/ssh.sh exec make
 <verb>` на VPS; есть `.env` (на VPS) → локальный `docker`. Произвольная команда на VPS —
 `bash scripts/tools/ssh.sh exec '…'` (см. ниже).

@@ -25,9 +25,10 @@ paths:
 | ACME | `.env` | `ACME_EMAIL`, `ACME_CASERVER` |
 | Локально-сгенерированные | `.env` (auto после первого deploy) | `CROWDSEC_BOUNCER_API_KEY` |
 | Оператор-управление | `.env` | `COMPOSE_PROFILES`, `HOST_ROLE` |
-| Image-теги | `.env` (**строго**; бамп — `make bump SVC= TAG=`) | `BACKEND_TAG` (конвенция `<SVC>_TAG`) |
+| Image-теги | `.env` (**строго**; бамп — `make bump SVC= TAG=`) | `BACKEND_TAG`, `SITE_TAG` (конвенция `<SVC>_TAG`) |
+| Среда сайта | `.env` (`ROBOTS_POLICY` ставит `make new-env` по `ENV`, замок — оператор) | `ROBOTS_POLICY` (`index` — прод, `noindex` — любая другая), замок `STAGING_BASIC_AUTH_USERS` |
 | Registry образов | `.env` (дефолт `git.stit.tech` в compose; другой registry — override) | `REGISTRY_HOST=git.stit.tech` |
-| Секреты профилей | `.env` (секции в `.env.example`) | `POSTGRES_*`, `OIDC_*`, `JWT_SECRET`, `MINIO_*`, `RESTIC_*` |
+| Секреты профилей | `.env` (секции в `.env.example`) | `POSTGRES_*`, `OIDC_*`, `JWT_SECRET`, `MINIO_*`, `RESTIC_*`, `SITE_SMTP_URL` |
 
 Полный контракт переменных с комментариями как сгенерировать — `.env.example`. Env'ы физически изолированы: разные VPS, разные `.env`, утечка значения одной среды не задевает другую.
 
@@ -57,6 +58,10 @@ make ship      # compose поднимет новые сервисы
 ```
 
 Project-specific переменные (например `STRIPE_KEY`) — тот же флоу + декларация в `.env.example` и `${VAR}` в compose (см. `secrets-and-env.md` § Новый секрет).
+
+Сайт (`site`) включается не `make ship`, а тегом: секция `profile site`, на не-прод — замок и `make deploy`, затем
+профиль и сразу `make bump SVC=site TAG=…`, затем `make accept SVC=site` — `docs/reference/ecosystem.md`
+(«Первый релиз сайта на среде»).
 
 ## Ротация
 

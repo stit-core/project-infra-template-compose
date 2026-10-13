@@ -25,8 +25,9 @@ kind: init-project-journey
 секция Generates); `services/db.md` (не заведён).
 
 ## Открытые вопросы
-- frontend будет hosting=external (форк `<org>/frontend`) или here
-  (landing-bundle)? (**blocker** — определяет, нужен ли service-doc)
+- кабинет (`web` рода `app`, форк `<org>/frontend`) — hosting=external (CDN)
+  или here (`/add-service`, `app.${DOMAIN}`)? (**blocker** — определяет, нужен
+  ли service-doc)
 
 ## Доменные решения
 - В карте отказались от minio (объектное хранилище не нужно), бэкап

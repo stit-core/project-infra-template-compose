@@ -102,7 +102,7 @@ snapshot `<id>`? Это остановит backend и пересоздаст Б�
 5. `make ship` — стек поднимается на секретах из `.env`.
 6. Сценарий A выше — для postgres.
 7. Volume'ы (minio-data, app-uploads) — не покрыты backup'ом; восстанавливаются из external source / re-uploads / off-site mirror если настроен.
-8. Verify все healthchecks + LE-сертификаты выпустились.
+8. Verify все healthchecks + LE-сертификаты выпустились; сайт — `make accept SVC=site` (код 0).
 
 ### 3. Verify
 

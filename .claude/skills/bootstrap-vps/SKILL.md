@@ -55,12 +55,12 @@ make ship  # render-configs перерендерит traefik.yml, traefik под
 
 1. **VPS provisioned**, у тебя есть IP и root-доступ по SSH ключу (минимум один ключ в `/root/.ssh/authorized_keys`).
 
-2. **DNS** для `${DOMAIN}` (а также `api.${DOMAIN}` etc. — по сабдоменам, которые будут активированы позже) указывает на IP VPS — нужно для HTTP-01 ACME challenge.
+2. **DNS** для `${DOMAIN}` (а также `api.${DOMAIN}`, `www.${DOMAIN}` у сайта etc. — по сабдоменам, которые будут активированы позже) указывает на IP VPS — нужно для HTTP-01 ACME challenge.
 
 3. **Gitea-репо** `<client-org>/infra` существует и склонирован из шаблона `project-infra-template-compose`.
 
 4. **Доступ к registry** `REGISTRY_HOST` (дефолт `git.stit.tech`) — Gitea-аккаунт с PAT, которым
-   VPS будет пуллить образы сервис-репо (нужен к активации профиля `backend`, шаг 7).
+   VPS будет пуллить образы сервис-репо (нужен к активации профилей `backend` и `site`, шаг 7).
 
 Без любого из этих пунктов — стопори, проси подготовить.
 
@@ -124,7 +124,7 @@ PROJECT_NAME=<p> ENV=<env> DOMAIN=<d> ACME_EMAIL=<email> \
 make new-env
 ```
 
-Создаёт `.env` (chmod 600) — identity + ACME. Секреты профилей допишешь по мере активации (шаг 7); image-теги — тоже в `.env` (`make bump`).
+Создаёт `.env` (chmod 600) — identity + ACME, `ROBOTS_POLICY` по `ENV` (`prod` — `index`, любая другая среда — `noindex`) и `HOST_ROLE=all`. Секреты профилей допишешь по мере активации (шаг 7); image-теги — тоже в `.env` (`make bump`).
 
 `.env` содержит **закомментированную** строку `# COMPOSE_PROFILES=` — будешь раскомментировать по мере активации сервисов (см. шаг 7).
 
@@ -152,7 +152,8 @@ make deploy
 1. `render-configs.sh` — envsubst для traefik.yml/middlewares/landing из `.env`.
 2. CrowdSec early для bouncer auto-register.
 3. Остальные always-on: traefik / landing.
-4. Traefik запрашивает LE-cert на `${DOMAIN}` (landing).
+4. Traefik запрашивает LE-cert на `${DOMAIN}` (landing). Форк с сайтом на корне заглушки не несёт (её прунит
+   `/de-template`): корень без роутеров до первого `make bump SVC=site`, сертификат корня — с ним.
 
 **Если что-то не поднимается:**
 - traefik не healthy / пустой traefik.yml → `.env` не заполнен (`ACME_EMAIL`) или render не отработал; `make doctor` (секция «configs render») покажет.
@@ -176,6 +177,12 @@ make ship
 ```
 
 **Storage обязательно с postgres** (backup делает pg_dumpall, без postgres сразу падает — deploy.sh валидирует, ругнётся явно).
+
+**Site** (сайт на корне, `<org>/site`) включается не `make ship`, а тегом: секция `profile site` в `.env`; на не-прод
+среде — ещё замок `STAGING_BASIC_AUTH_USERS` и `make deploy`; затем `site` в `COMPOSE_PROFILES` и сразу
+`make bump SVC=site TAG=<tag>` — он ставит `SITE_TAG`: профиль без тега роняет `make deploy`; затем
+`make accept SVC=site` — код 0. Нужны Docker Engine ≥ 25 (`make doctor`, строка `docker engine`) и запись
+`www.${DOMAIN}`; порядок — `docs/reference/ecosystem.md` («Первый релиз сайта на среде»).
 
 **Backend** (и любой образ сервис-репо) тянется из `REGISTRY_HOST`, поэтому до его профиля VPS
 логинится в registry: оператор сам выполняет на VPS `docker login <REGISTRY_HOST>` с PAT из Gitea
@@ -202,7 +209,7 @@ make ship MSG="feat(foo): bar"   # add -A + commit + check + push + (на main) 
 ### Verify
 
 - `make ps` — always-on сервисы healthy.
-- `https://${DOMAIN}/` — landing отдаётся через traefik + LE.
+- `https://${DOMAIN}/` — заглушка отдаётся через traefik + LE; сайт на корне — `make accept SVC=site` (код 0).
 - `configs/traefik/traefik.yml` на VPS непустой (render отработал).
 
 ### Backup smoke-test (после активации storage профиля)

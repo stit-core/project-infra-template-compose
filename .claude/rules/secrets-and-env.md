@@ -23,9 +23,10 @@ envsubst'ом (`scripts/render-configs.sh`).
 | Identity | `PROJECT_NAME`, `ENV`, `DOMAIN` | `scripts/new-env.sh` |
 | ACME | `ACME_EMAIL`, `ACME_CASERVER` | `scripts/new-env.sh` / оператор |
 | Local-managed | `CROWDSEC_BOUNCER_API_KEY`, `COMPOSE_PROFILES`, `HOST_ROLE` | auto-register / оператор |
-| Image-теги | `BACKEND_TAG` (конвенция `<SVC>_TAG`) | оператор (`make bump SVC= TAG=`) |
+| Image-теги | `BACKEND_TAG`, `SITE_TAG` (конвенция `<SVC>_TAG`) | оператор (`make bump SVC= TAG=`) |
+| Среда сайта | `ROBOTS_POLICY`, замок `STAGING_BASIC_AUTH_USERS` | `scripts/new-env.sh` (по `ENV`) / оператор |
 | Registry | `REGISTRY_HOST` (дефолт `git.stit.tech` в compose) | оператор, если registry другой |
-| Секреты профилей | `POSTGRES_*`, `OIDC_*`, `JWT_SECRET`, `MINIO_*`, `APP_S3_*`, `BACKUP_S3_*`, `RESTIC_*`, `BACKUP_AWS_*` | оператор (по `.env.example`) |
+| Секреты профилей | `POSTGRES_*`, `OIDC_*`, `JWT_SECRET`, `MINIO_*`, `APP_S3_*`, `BACKUP_S3_*`, `RESTIC_*`, `BACKUP_AWS_*`, `SITE_SMTP_URL` | оператор (по `.env.example`) |
 
 ## Multi-env
 
@@ -39,8 +40,9 @@ envsubst'ом (`scripts/render-configs.sh`).
 |---|---|---|
 | `.env.example` | да | Полный контракт переменных: активные — заполняются на bootstrap, профильные — закомментированы с комментарием как сгенерировать |
 | `.env` | **нет** (gitignored) | Реальные значения на VPS |
-| `configs/<svc>/*.tpl` | да | envsubst-шаблоны с .env-vars (`traefik.yml.tpl` с `${ACME_EMAIL}`, `middlewares.yml.tpl` с `${CROWDSEC_BOUNCER_API_KEY}`) |
-| rendered `configs/<svc>/<file>` | **нет** (gitignored) | Выход render-configs.sh, пересобирается каждый deploy |
+| `configs/<svc>/*.tpl` | да | envsubst-шаблоны с .env-vars (`traefik.yml.tpl` с `${ACME_EMAIL}`, `middlewares.yml.tpl` с `${CROWDSEC_BOUNCER_API_KEY}` и `${STAGING_BASIC_AUTH_USERS}`) |
+| rendered `configs/<svc>/<file>` | **нет** (gitignored) | Выход render-configs.sh, пересобирается каждый deploy. Права — по минимуму читателей: конфиги Traefik (ключ bouncer, хеш замка) — `600`, их читает Traefik root'ом; страница заглушки — `644`, её читает nginx не root'ом |
+| `/var/log/traefik/` (каталог хоста) | **нет** | Журнал доступа: адреса и User-Agent клиентов — `700`, только root (ставит контейнер `crowdsec` на старте) |
 
 ## Правила
 
@@ -129,7 +131,8 @@ identity + ACME из `.env`, других секретов не требует.
 - Inline-секретов в `compose/*.yml` (значения вида `password: actual_secret` —
   должно быть `${VAR}` с декларацией в `.env.example`)
 - Rendered-файлов из `.tpl` (gitignored: `configs/traefik/traefik.yml`,
-  `configs/traefik/dynamic/middlewares.yml` — в нём ключ bouncer и хеш замка не-прод среды)
+  `configs/traefik/dynamic/middlewares.yml` — в нём ключ bouncer и хеш замка не-прод среды,
+  `configs/landing/index.html`)
 
 `.gitignore` страхует от типовых имён; `git diff --cached` ловит остальное.
 

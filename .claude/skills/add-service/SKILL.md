@@ -1,6 +1,6 @@
 ---
 name: add-service
-description: Добавить новый сервис в проектную инфру — compose-фрагмент с pinned image / healthcheck / networks, опционально секреты через .env и traefik labels. Вызывай, когда в стек нужен новый контейнер — сервис из сиблинг-репо (frontend, site, бот), движок (cache, search, очередь) или воркер, в том числе по INFRA-HANDOFF из сервис-репо.
+description: Добавить новый сервис в проектную инфру — compose-фрагмент с pinned image / healthcheck / networks, опционально секреты через .env и traefik labels. Вызывай, когда в стек нужен новый контейнер — сервис из сиблинг-репо (frontend, бот, следующая поверхность сайта — Node-сервис на корневом домене), движок (cache, search, очередь) или воркер, в том числе по INFRA-HANDOFF из сервис-репо.
 ---
 
 # Skill: add-service
@@ -10,7 +10,8 @@ description: Добавить новый сервис в проектную ин
 ## Когда применять
 
 - "Добавь worker / cache / search-index"
-- Сервис из сиблинг-репо выходит в стек (frontend, site, бот) — в том числе по INFRA-HANDOFF-блоку его `/release`
+- Сервис из сиблинг-репо выходит в стек (frontend, бот, следующая поверхность сайта) — в том числе по
+  INFRA-HANDOFF-блоку его `/release`; сайт первой поверхности (`compose/site.yml`) в стеке из коробки
 - "/add-service"
 
 ## Когда не применять
@@ -24,7 +25,7 @@ description: Добавить новый сервис в проектную ин
 
 - **Имя** (kebab-case): `worker`, `redis`, `search`.
 - **Image + закреплённая версия**: `redis:7.4-alpine`. Никаких `:latest`.
-  Образ сервис-репо (frontend, site, бот) — как `compose/backend.yml`:
+  Образ сервис-репо (frontend, бот, поверхность сайта) — как `compose/backend.yml` или `compose/site.yml`:
   `image: ${REGISTRY_HOST:-git.stit.tech}/${PROJECT_NAME}/<svc>:${<SVC>_TAG}`, тег — `# <SVC>_TAG=`
   в `.env.example`, выкатка — `make bump SVC=<svc> TAG=<tag>` (контракт — `docs/reference/ecosystem.md`).
 - **Сабдомен** (если public): `<sub>.${DOMAIN}`. Проверить: `grep -r 'Host(\`<sub>' compose/`.
@@ -79,6 +80,31 @@ services:
 
 Используй `compose/backend.yml` как образец для public-сервиса с секретами; `compose/postgres.yml` — для internal с persistence.
 
+### 1a. Вариант: Node-сервис на корневом домене
+
+Следующая поверхность strategy рода `site` или `landing` — свой форк `<org>/site` и свой сервис с именем поверхности —
+или другой Node-сервис с рендером на своём домене. Образец — `compose/site.yml` целиком; нормы — rules
+`compose-and-services` («Node-сервисы с рендером») и `traefik-routing` («Корневой домен и www»):
+
+- имя сервиса, `container_name`, профиль, `<SVC>_TAG` и роутеры — по имени поверхности; домен — свой (переменная
+  `.env` с комментарием в `.env.example`), а не `${DOMAIN}` сайта первой поверхности;
+- два роутера на домен: корень и `www`; `www` только редиректит — сервис `noop@internal` и свой `redirectRegex` на
+  этот домен в `configs/traefik/dynamic/` (общий `www-to-apex@file` ведёт на `${DOMAIN}`);
+- обязательный env образа — origin (`SITE_URL: https://<домен>`) из `.env`; ключи профиля — с умолчанием `${…:-}`;
+- `init: true`; без `read_only`, тома на выходе сборки и `user:` — их ломает штамповка origin; `stop_grace_period`
+  больше дренажа образа; `mem_limit` и `--max-old-space-size` ≈ 75 %;
+- healthcheck `/healthz` — у контейнера (`start_interval`) и у сервиса Traefik (`loadbalancer.healthcheck`);
+- публичный POST — свой роутер с лимитом частоты и тела (`form-rate-limit@file`, `form-body-limit@file`), без
+  `retry` и `compress`; `/_image` — `deny-all@file`;
+- сервису, которому нужны камера, микрофон или геолокация (видеосвязь, карта «рядом со мной»), — свой
+  headers-middleware вместо `secure-headers@file`: тот же состав и свой `permissionsPolicy`, а не послабление общего,
+  иначе браузер молча отвечает `NotAllowedError`, в логах ничего;
+- фрагмент — в `ROLE_FILES[edge]` (`scripts/deploy.sh`), запись `www` — в `scripts/preflight-dns.sh`.
+
+Что знает только сервис `site`: allowlist ботов читает `robots.txt` сервиса `site`, смок edge и `make accept` —
+тоже его. Вторую поверхность принимают списком «Приёмки первого деплоя» контракта сайта (`infra-handoff.md § 1.7`)
+руками, а политику её ИИ-ботов сверяют с политикой `site` (allowlist у CrowdSec общий).
+
 ### 2. Секреты через .env (если нужны)
 
 Если сервис читает секреты:
@@ -127,15 +153,18 @@ services:
 
 1. `scripts/tools/smoke.d/90-<svc>.sh` — бежит **на хосте**, read-only, self exit 0; печатает
    блок `-- <svc> --` + строки; на проблеме — `ATTENTION: <msg>` в колонке 0 (его ловит
-   smartdev → triage). Контракт — в шапке `scripts/tools/smoke-run.sh`; образец — `10-host.sh`.
+   smartdev → triage). Контракт — в шапке `scripts/tools/smoke-run.sh`; образец — `10-host.sh`, HTTP-сервис —
+   `90-site.sh`.
 2. Префикс `90-` — после базовых `10-host`/`20-containers` (порядок лексикографический).
 
 Так смок «растёт по мере развития инфры»: каждый новый сервис со своим сигналом докладывает файл.
 
 ### 7. Validate + ship
 
-1. Локально: `make validate` — compose-syntax, yamllint, .tpl, .env coverage.
+1. Локально: `make validate` — compose-syntax, yamllint, .tpl, .env coverage, умолчания edge.
 2. `make ship MSG="feat(<svc>): add <Service>"` — commit + `make check` (красный → пуш отменён) + push + (на main) ssh-deploy. Канон, не ручной push+deploy.
+   Образ сервис-репо: профиль в `COMPOSE_PROFILES` и сразу `make bump SVC=<svc> TAG=<tag>` — профиль без тега роняет
+   `make deploy` (FAIL `image tags` в `make doctor`).
 3. Verify: `make ps`, healthcheck зелёный, `https://<sub>.${DOMAIN}` доступен (если public); `make status` → `== Server ==` видит сервис.
 
 ## Чек-лист
@@ -150,6 +179,7 @@ services:
 - [ ] Если образ сервис-репо — `${REGISTRY_HOST:-git.stit.tech}/${PROJECT_NAME}/<svc>:${<SVC>_TAG}` + `# <SVC>_TAG=` в `.env.example`
 - [ ] `make validate` зелёный
 - [ ] (Если bespoke-сигнал вне `docker ps`) — `scripts/tools/smoke.d/90-<svc>.sh` для `== Server ==`
+- [ ] (Node-сервис на корне) — роутеры корня и `www` (`noop@internal`), `/healthz` у контейнера и Traefik, без `read_only`, origin из `.env`
 
 ## Anti-patterns
 

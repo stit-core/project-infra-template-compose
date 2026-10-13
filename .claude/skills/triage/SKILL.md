@@ -10,7 +10,7 @@ description: Red-арм cockpit'а — структурированный раз
 
 **Red-арм cockpit'а:** `smartdev` переключает сюда, когда `make status` дал
 `== Critical ==` ≠ none (upstream-drift) или ATTENTION в `== Server ==` (unhealthy / exited /
-restart-loop / host-pressure), либо задача = «сломалось». Багфикс ведётся здесь, а не через
+restart-loop / host-pressure / edge / сайт), либо задача = «сломалось». Багфикс ведётся здесь, а не через
 `plan`: у фикса своя короткая RED→GREEN петля, план её только замедляет. Исключение —
 research-spike, когда причина неясна после ≥2 попыток.
 
@@ -18,7 +18,7 @@ research-spike, когда причина неясна после ≥2 попы�
 
 - `make status` / `make ps` → unhealthy / restarting / exited
 - `make ship`/`make deploy` упал
-- сервис стартует с пустыми секретами; cert не выписывается; landing/сайт не открывается
+- сервис стартует с пустыми секретами; cert не выписывается; landing/сайт не открывается; `make accept SVC=site` красный
 - Юзер кидает лог / трейс / «почему X не работает»
 
 ## Когда не применять
@@ -37,6 +37,7 @@ research-spike, когда причина неясна после ≥2 попы�
 | **render fail** | `make render`/deploy падает на envsubst | `scripts/render-configs.sh` — отсутствующий `${VAR}` в `.env`, .tpl-синтаксис, профиль |
 | **deploy.sh fail** | `make ship`/`make deploy` non-zero | где упал: `git pull --ff-only` (drift) / render-configs / compose `--wait` timeout |
 | **pull образа** | `compose up` / `make bump` падает на pull (`manifest unknown`, `unauthorized`) | тег есть в registry? VPS залогинен в `REGISTRY_HOST`? путь `${REGISTRY_HOST}/${PROJECT_NAME}/<svc>` совпадает с тем, куда пушит `/release` сервис-репо? |
+| **edge / сайт** | `ATTENTION` блоков `-- edge --`, `-- site --`; ✗ `make accept SVC=site`; боты получают 429 | `docs/reference/runbook.md`: таблицы `ATTENTION` и приёмки ведут в раздел сбоя |
 | **on-server drift** | оператор правил на хосте, следующий deploy затрёт | backport в git **в тот же день** |
 
 ## Шаги
@@ -44,7 +45,8 @@ research-spike, когда причина неясна после ≥2 попы�
 ### 1. Воспроизвести минимально
 
 - Что именно красное? `make ps`, `make doctor`, `make logs SVC=<svc>`.
-- Когда последний раз работало? `git log --oneline -10` — что изменил последний deploy (`prev_sha..HEAD`)?
+- Когда последний раз работало? `git log --oneline -10` — что изменил последний deploy; `git log refs/deploy/ok..HEAD`
+  на VPS — коммиты, конфиги которых сервисы ещё не подхватили (деплой отказал после pull).
 - Локально или только на VPS? (cert/healthcheck/.env — обычно VPS-only.)
 
 Не гоняй весь стек — точечно тот сервис, что упал.

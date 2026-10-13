@@ -111,12 +111,13 @@ blocked-by: —
   `SITE_REPO_PATH=<R> make bots-sources` → `git diff --exit-code configs/crowdsec/ai-bots.sources`, первая строка
   содержит `1ca0e662f76d`; байт в `crawlers.yaml` worktree соседа → `make doctor` → WARN
   - Подтверждено: `M/p7/stage-b/s6-sources.log` — печать без изменений, версия `1ca0e662f76d`, байт у соседа — WARN
-- [ ] **AC10** — Канон и обвязка хаба — про сайт правдой: `docs/reference/ecosystem.md` (сайт — в стеке из коробки;
+- [x] **AC10** — Канон и обвязка хаба — про сайт правдой: `docs/reference/ecosystem.md` (сайт — в стеке из коробки;
   `<org>/site` читает слой страницы, факты и голос, пакет дизайна и `ready.yaml`, как в контракте strategy 0.2.0;
   что хаб делает со строками `AI-BOTS` и `PROXY` handoff), `CLAUDE.md`, `README.md`,
   `docs/reference/{architecture,runbook}.md`, `docs/getting-started.md`, правила, `docs/project/`, скиллы — без
   утверждений «корень — только заглушка», «`site` добавляет `/add-service`», «сайт читает `fsd/`». Проверка:
   grep-список § 5 файла покрытия → «должно быть» найдено, «не должно быть» пусто; чтение валидатором по § 1.6 покрытия
+  - Подтверждено: grep-список § 5 — ✓ 61, ✗ 0 (S8 `b2bf1eb`, S9); чтение по § 1.6 — за валидатором этапа C
 - [ ] **AC11** — Гейт зелёный, умолчания безопасности edge на месте: `sanitizePath` не выключен, `crowdsec@file` — на
   каждом публичном роутере, docker-сокет — только у `traefik`, catch-all роутеров и опубликованных портов сервисов
   нет, dashboard закрыт. Проверка: `make check` на чистом дереве → `✓ check clean`, с поломкой умолчания — красный;
@@ -186,12 +187,13 @@ blocked-by: —
     Зависит от: S7
   - Сделано: ecosystem — чтение strategy по её контракту, «Handoff-блок релиза» и первый релиз сайта; runbook —
     `ATTENTION` смока, ✗ приёмки, сбои сайта, отчёт «бот × статус»; § 5 по файлам S8 — ✗ 0, `make check` — зелёный
-- [ ] **S9** — Правила и скиллы хаба знают сайт: `multi-env`, `secrets-and-env`, `traefik-routing`,
+- [x] **S9** — Правила и скиллы хаба знают сайт: `multi-env`, `secrets-and-env`, `traefik-routing`,
   `compose-and-services`, `make-first`; `docs/project/` (README, шаблоны); `add-service` (вариант «Node-сервис на
   корневом домене»), `de-template` (сайт → профиль `site`, заглушка прунится), справочники `service-deep-dive`,
   `stack-deep-dive`, `init-project`, `bootstrap-vps`
   - Проверка: grep-список § 5 покрытия по `.claude/` и `docs/project/` → чисто; `make validate` →
     `frontmatter PASS`; `make check` → зелёный · Закрывает: AC10 · Зависит от: S8
+  - Сделано: правила, `docs/project/`, скиллы (`add-service` — вариант 1a); § 5 — ✗ 0, `frontmatter PASS (18)`
 
 ### Этап D — приёмка
 - [ ] **S10** — Приёмка отдельным агентом, не автором: контракт сайта пункт за пунктом по файлу покрытия на свежем
@@ -205,13 +207,11 @@ blocked-by: —
 - Обоснования этапов A и B — в правилах `traefik-routing`, `secrets-and-env`, `compose-and-services`, runbook и § 3.
 - Роутер `site-www` не проксирует (`noop@internal`, regexp `www-to-apex` без хоста): несработавший редирект отдавал
   запрос сайту мимо замка, лимитов формы и запрета `/_image`. Контур не-прод — цепочка `staging@file`
-  (`staging-noindex`, затем `staging-auth`: иначе 401 без `X-Robots-Tag`); включает её сам пароль — хвост цепочек
-  `${STAGING_BASIC_AUTH_USERS:+,staging@file}`, пользователь — `users` в dynamic-конфиге (смена пароля — без рестарта
-  Traefik).
-- `make bump` при отказе возвращает прежний тег в `.env` и поднимает сервис на нём; первый разворот — профиль `site`,
-  затем `make bump` (ставит `SITE_TAG`). `make new-env` пишет `ROBOTS_POLICY` по `ENV` и `HOST_ROLE=all`.
-  Healthcheck `site` — `start_interval: 1s`: роутеры контейнера в `starting` Traefik не строит (Engine ≥ 25 —
-  `make doctor`).
+  (`staging-noindex`, затем `staging-auth`: иначе 401 без `X-Robots-Tag`); её включает сам пароль (хвост
+  `${STAGING_BASIC_AUTH_USERS:+,staging@file}`), пользователь — `users` dynamic-конфига: пароль меняется без рестарта.
+- `make bump` при отказе возвращает прежний тег в `.env` и поднимает сервис на нём; первый разворот — профиль `site` и
+  сразу `make bump` (ставит `SITE_TAG`). `make new-env` пишет `ROBOTS_POLICY` по `ENV` и `HOST_ROLE=all`. Healthcheck
+  `site` — `start_interval: 1s`: роутеры контейнера в `starting` Traefik не строит (Engine ≥ 25).
 - `scripts/preflight-env.sh` отказывает до рендера и compose (`render`, `deploy`, `doctor`; форма строк — ещё
   `validate` и ops-вербы): замок — не `'user:hash'` с логином из `A-Za-z0-9._@-` и bcrypt целиком (Р23); `DOMAIN` — не
   запись хоста при профиле `site` (Р24); строка `.env` — не `KEY=значение`, где значение с пробелом, `$`, кавычкой или
@@ -279,21 +279,22 @@ blocked-by: —
   шлюз сети — адрес всех запросов с хоста (Р32). Страница — из `sitemap.xml` сайта, UA — токены `ai-bots.sources`.
 - `make doctor`: пустой `<SVC>_TAG` включённого сервиса — FAIL (`make deploy` упадёт на ссылке образа). Приёмка
   фазы — на стенде шаблона (решение владельца); сертификаты и настоящие адреса ботов — первый деплой проекта.
-- Handoff-блок релиза — одна норма, шаги в `ecosystem.md` (`CLAUDE.md`, runbook — ссылкой); на не-прод замок и
+- Handoff-блок релиза — одна норма: шаги в `ecosystem.md`, `CLAUDE.md` и runbook ссылаются; на не-прод замок и
   `make deploy` — до профиля `site`: `make bump` конфиги не рендерит (Р36); `make accept SVC=site` — после каждой
-  выкатки (заявки и чужих решений не оставляет); отчёт «бот × статус» — с копиями ротации (Р28); R-сторона — Р35.
+  выкатки: заявки и решений не оставляет; отчёт «бот × статус» — с копиями ротации (Р28); R-сторона — Р35. Сайт в
+  карте — `frontend` с репо `<org>/site`, без нового subtype; `/de-template` прунит заглушку с `configs/landing/` и
+  строкой `ROLE_FILES[edge]`, ключ замка — нет: его читает `middlewares.yml.tpl`.
 
 ## Handoff
 - Репо сайта (через дирижёра): расхождения и уточнения контракта — § 3 файла покрытия (этап B — Р23–Р31, C — Р32–Р36).
-- Оператору форка: первый релиз сайта на среде — `ecosystem.md` («Handoff-блок релиза»: DNS `www`, Docker Engine ≥ 25,
-  секция `profile site`, `make bump`, `make accept SVC=site`). Обновление действующего VPS (runbook): строки `.env` не
-  той формы — `ENV-ERR` первого `make deploy` до compose; прежний `deploy.sh` allowlist не создаст — `make deploy`
-  второй раз; пересоздание Traefik и CrowdSec — 10–11 с без ответа; свой аудит может получить 429 от CrowdSec.
+- Оператору форка: первый релиз сайта — `ecosystem.md` («Handoff-блок релиза»); обновление действующего VPS — runbook:
+  `ENV-ERR` первого `make deploy` до compose; прежний `deploy.sh` allowlist не создаст — `make deploy` второй раз;
+  пересоздание Traefik и CrowdSec — 10–11 с без ответа; свой аудит может получить 429 от CrowdSec.
 - Бэклог `I` (не тема фазы): `make validate` без `.env` не разбирает compose и не ловит `:latest`; `auth.log` у
   CrowdSec пуст на Debian 12 без rsyslog; `deploy.sh` глотает отказ `git pull --ff-only`; роутеры file-провайдера
   `edge defaults` не читает; API Traefik из контейнера — 404; плагин bouncer качается при каждом старте Traefik
   (версию закрепляет `hash`); заглушка после пересоздания отвечает через 30 с.
 
 ## Где мы сейчас
-Этапы A, B приняты; этап C: S7 и замечания B — `743dbf0`…`c78e311` (гейт `M/p7/stage-c.sh`: ✓ 286, ✗ 0), S8 — канон
-и документы хаба. Дальше — S9 (правила, `docs/project/`, скиллы; § 5 покрытия), затем валидатор этапа C и приёмка S10.
+Этапы A, B приняты; этап C исполнен: S7 и замечания B — `743dbf0`…`c78e311` (гейт `M/p7/stage-c.sh`: ✓ 286, ✗ 0),
+S8 — `b2bf1eb`, S9 — правила и скиллы. Дальше — независимый валидатор этапа C (гейт и § 1.6, § 5 покрытия), затем S10.

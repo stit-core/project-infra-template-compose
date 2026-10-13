@@ -37,8 +37,9 @@ VPS (несколько серверов на одну среду). **Шабло
 | `storage` | docker-compose + minio + backup | MinIO + restic-backup |
 
 `COMPOSE_PROFILES` гейтит postgres/storage/backend/site и при split — на split-хосте
-ставится профиль его роли (`db` → `COMPOSE_PROFILES=postgres`, `storage` →
-`storage`). Дефолт `HOST_ROLE=all` поднимает `docker-compose.yml` + все `compose/*.yml`.
+ставится профиль его роли (`edge` → `backend`, `site`; `db` → `COMPOSE_PROFILES=postgres`,
+`storage` → `storage`). Сайт живёт с edge: CrowdSec читает журнал Traefik и `robots.txt`
+сайта по сети `proxy`. Дефолт `HOST_ROLE=all` поднимает `docker-compose.yml` + все `compose/*.yml`.
 
 ## Шов 3: per-host backup
 
