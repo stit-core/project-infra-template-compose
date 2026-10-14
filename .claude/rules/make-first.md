@@ -21,10 +21,10 @@ paths:
 | LOOP | `validate` / `doctor` / `check` | compose syntax+tpl+.env / live preflight / `validate`+`doctor`+`plan-check`+`project-check` |
 | SHIP | `ship MSG="…"` / `deploy` / `render` | commit+check+push+(main)ssh-deploy / server-side / envsubst для `.tpl` |
 | OPS | `ps` / `logs SVC=` / `restart SVC=` / `recreate SVC=` / `build SVC=` | статус / логи / рестарт / пересоздать (подхват нового значения `.env` или тега) / сборка образа сервиса (на VPS) |
-| | `bump SVC= TAG=` | бамп image-тега: `<SVC>_TAG` в `.env` на VPS + force-recreate, ждёт healthy; отказ — возврат на прежний тег; `site` — и allowlist ботов (недостающие списки). Теги — строго через `.env` |
+| | `bump SVC= TAG=` | бамп image-тега: `<SVC>_TAG` в `.env` на VPS + force-recreate, ждёт healthy; отказ — возврат на прежний тег; `site` — и allowlist ботов (недостающие списки и те, что старше шести дней). Теги — строго через `.env` |
 | | `backup` / `restore-pg SNAPSHOT=` | one-shot backup / restore postgres из restic |
 | | `allowlist` | allowlist ботов в CrowdSec: сети вендоров по `configs/crowdsec/ai-bots.sources` и `robots.txt` сайта |
-| | `accept SVC=site` | приёмка сайта после деплоя машиной (список контракта сайта § 1.7, профиль среды — у контейнера); код 0 — зелёная |
+| | `accept SVC=site` | приёмка сайта после деплоя машиной (требования контракта сайта `infra-handoff.md` § Edge и § Боты, профиль среды — у контейнера); код 0 — зелёная |
 | INTEL | `status` / `search Q= [P=]` | cockpit-сводка (локальный `status.sh` + серверный смок `== Server ==` по SSH при `.env.local`) / поиск по compose+configs+scripts+docs |
 | PROVISION | `new-env` | bootstrap `.env` на чистом VPS |
 | SETUP | `setup` | симлинк git-хуков (commit-msg, pre-commit) в `.git/hooks/` + PyYAML для frontmatter-проверки |

@@ -54,7 +54,7 @@ Single-VPS docker-compose стек одного проекта (дефолт). �
   реестра ботов сайта, `make bots-sources`) против именных групп `robots.txt` сервиса `site`.
 - **Расписание edge** — crond в контейнере `crowdsec` (`configs/crowdsec/crontab`): ротация журнала (раз в
   сутки и при 256 МиБ) и allowlist раз в неделю; allowlist обновляют ещё `make deploy` и `make bump SVC=site`
-  (недостающие списки) и `make allowlist`.
+  (недостающие списки и те, что старше шести дней) и `make allowlist`.
 - **Не-прод контур** — `ROBOTS_POLICY=noindex` у сайта и цепочка `staging@file` (`X-Robots-Tag` и basicAuth)
   хвостом его роутеров, пока задан `STAGING_BASIC_AUTH_USERS`.
 
