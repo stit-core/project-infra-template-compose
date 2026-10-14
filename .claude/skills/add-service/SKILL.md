@@ -103,8 +103,9 @@ services:
 - фрагмент — в `ROLE_FILES[edge]` (`scripts/deploy.sh`), запись `www` — в `scripts/preflight-dns.sh`.
 
 Что знает только сервис `site`: allowlist ботов читает `robots.txt` сервиса `site`, смок edge и `make accept` —
-тоже его. Вторую поверхность принимают списком «Приёмки первого деплоя» контракта сайта (`infra-handoff.md § 1.7`)
-руками, а политику её ИИ-ботов сверяют с политикой `site` (allowlist у CrowdSec общий).
+тоже его. Вторую поверхность принимают руками по контракту сайта (`infra-handoff.md`, § Edge и § Боты) —
+пробами, как в `scripts/tools/accept.sh`, — а политику её ИИ-ботов сверяют с политикой `site` (allowlist у
+CrowdSec общий).
 
 ### 2. Секреты через .env (если нужны)
 

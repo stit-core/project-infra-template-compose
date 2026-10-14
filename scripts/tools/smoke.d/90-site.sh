@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# smoke.d/90-site.sh — сервис site (профиль site), контракт сайта: infra-handoff.md § 1.6 в <org>/site.
+# smoke.d/90-site.sh — сервис site (профиль site), контракт сайта: infra-handoff.md в <org>/site.
 # Часть drop-in смока (см. smoke-run.sh): бежит НА хосте, read-only, self exit 0; `ATTENTION:` в
 # колонке 0. Проверяет:
 #   - liveness — /healthz у контейнера;

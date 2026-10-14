@@ -127,10 +127,10 @@ allowlist: ## allowlist ботов в CrowdSec: сети вендоров по a
 	@if [ -f .env ]; then docker exec crowdsec sh /opt/edge/bots-allowlist.sh; \
 	else bash scripts/tools/ssh.sh exec make allowlist; fi
 
-# Приёмка после деплоя — «Приёмка первого деплоя» контракта сервиса машиной, в профиле среды
-# (прод или не-прод за замком): смок edge и сайта, адрес, записи Host, методы, заголовки, лимит
-# формы, UA-проба по ai-bots.sources, журнал, отказ WAF. .env не читает: домен и среду берёт у
-# запущенного контейнера.
+# Приёмка после деплоя — проверки по контракту сайта (infra-handoff.md в <org>/site) машиной, в
+# профиле среды (прод или не-прод за замком): смок edge и сайта, адрес, записи Host, методы,
+# заголовки, лимит формы, UA-проба по ai-bots.sources, журнал, отказ WAF. .env не читает: домен и
+# среду берёт у запущенного контейнера.
 accept: ## приёмка сервиса после деплоя (на VPS; с workstation — через ssh): make accept SVC=site
 	@if [ -z "$(SVC)" ]; then echo "usage: make accept SVC=site"; exit 2; fi
 	@if [ -f .env ]; then bash scripts/tools/accept.sh $(SVC); \
