@@ -9,12 +9,14 @@ Postgres, MinIO, backend, индексируемый сайт, backup — дек
 секреты в `.env` на VPS. Форк → `<org>/infra`, разворот за день.
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-2563eb)](LICENSE)
-[![Часть stit](https://img.shields.io/badge/stit-открытые_шаблоны-6366f1)](https://git.stit.tech/stit-core/stit-public)
+[![Часть stit](https://img.shields.io/badge/stit-открытые_шаблоны-6366f1)](https://github.com/stit-core)
 [![Stack](https://img.shields.io/badge/stack-Docker_Compose-0ea5e9)](#что-внутри)
 [![Edge](https://img.shields.io/badge/edge-Traefik_v3_%2B_CrowdSec-22c55e)](#что-внутри)
 [![Secrets](https://img.shields.io/badge/secrets-plain_.env-000000)](#принципы)
 
 </div>
+
+> Разработка идёт в приватном Gitea (`git.stit.tech/stit-core/project-infra-template-compose`), публичное зеркало — [github.com/stit-core/project-infra-template-compose](https://github.com/stit-core/project-infra-template-compose). Как с ним работать вне инфраструктуры stit — в [профиле stit-core](https://github.com/stit-core).
 
 ---
 
@@ -33,7 +35,7 @@ Postgres, MinIO, backend, индексируемый сайт, backup — дек
 
 Форки одной орги лежат рядом sibling-checkout'ами; продукт проектируется первым — в
 `<org>/strategy` (форк
-[`business-strategy-template`](https://git.stit.tech/stit-core/business-strategy-template)).
+[`business-strategy-template`](https://github.com/stit-core/business-strategy-template)).
 Карта всех репо, операционный флоу и контракты —
 [`docs/reference/ecosystem.md`](docs/reference/ecosystem.md).
 
@@ -112,7 +114,7 @@ make ship        # check + push + (на main) ssh-deploy. На чистом де
 
 Это один из открытых шаблонов stit (Apache-2.0) — фундамент «-1 уровня»,
 берите бесплатно и владейте. Карта всех шаблонов и точка входа —
-**[витрина stit](https://git.stit.tech/stit-core/stit-public)**. Нужна
+**[витрина stit](https://github.com/stit-core)**. Нужна
 команда, стандарт или поддержка — **[наш подход и контакты (vision)](https://git.stit.tech/stit/vision)**.
 
 ## Лицензия
