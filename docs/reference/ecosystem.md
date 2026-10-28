@@ -15,7 +15,7 @@ sibling-checkout'ами:
 ├─ infra/      ← project-infra-template-compose (этот репо)
 ├─ backend/    ← go-backend-template
 ├─ frontend/   ← spa-frontend-template
-├─ site/       ← ssr-frontend-template
+├─ site/       ← seo-frontend-template
 ├─ <bot>/      ← telegram-bot-template
 └─ mobile/     ← mobile-template
 ```
@@ -26,7 +26,7 @@ sibling-checkout'ами:
 | `project-infra-template-compose` → `<org>/infra` | runtime проекта (docker-compose на VPS) и **операционный хаб**: общий план, рассылка агентов по сиблингам, выкатка тегов (`make bump`) |
 | `go-backend-template` → `<org>/backend` | Go-сервис |
 | `spa-frontend-template` → `<org>/frontend` | React SPA (кабинет, всё за логином) |
-| `ssr-frontend-template` → `<org>/site` | Astro SSR-сайт (индексируемый контент); в стеке хаба — сервис `site` из коробки |
+| `seo-frontend-template` → `<org>/site` | Astro SEO-сайт (индексируемый контент); в стеке хаба — сервис `site` из коробки |
 | `telegram-bot-template` → `<org>/<bot>` | Telegram-бот (Python, aiogram) |
 | `mobile-template` → `<org>/mobile` | KMP-приложение Android + iOS; релиз — в магазины |
 

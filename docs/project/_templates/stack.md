@@ -23,7 +23,7 @@ cross-repo.
 | backend | backend | here | `<org>/backend` (форк go-backend-template) | API |
 | db | datastore | here | — (postgres в этом репо) | Postgres 17 |
 | storage | datastore | here | — (minio в этом репо) | S3 + Console |
-| site | frontend | here | `<org>/site` (форк ssr-frontend-template) | индексируемый сайт на корне |
+| site | frontend | here | `<org>/site` (форк seo-frontend-template) | индексируемый сайт на корне |
 | web | frontend | external | `<org>/frontend` (CDN) | SPA |
 
 ## Domains

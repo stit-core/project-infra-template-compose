@@ -63,7 +63,7 @@ surfaces), read-only; резолв пути — `docs/reference/ecosystem.md`.
 | `../strategy` | design SoT: продукт, домены, UX, FSD-карта, ИТ-периметр | правка дизайна скиллами strategy |
 | `../backend` | Go-сервис | `/release` → образ в registry; здесь `make bump SVC=backend` |
 | `../frontend` | React SPA (кабинет) | `/release` → образ; здесь `make bump SVC=frontend` |
-| `../site` | Astro SSR-сайт | `/release` → образ; здесь `make bump SVC=site` |
+| `../site` | Astro SEO-сайт | `/release` → образ; здесь `make bump SVC=site` |
 | `../<bot>` | Telegram-бот | `/release` → образ; здесь `make bump SVC=bot` |
 | `../mobile` | KMP-приложение | только задачи: релиз в магазины — его `/release`, деплой отсюда не касается |
 
