@@ -16,6 +16,8 @@
   deploy-флоу, что НЕ в шаблоне.
 - [reference/ecosystem.md](reference/ecosystem.md) — канон экосистемы: карта репо, операционный флоу,
   резолв сиблингов, кто что читает из `<org>/strategy`, контракт сервис-репо ↔ хаб.
+- [reference/project-root.md](reference/project-root.md) — корень проекта `~/git/<org>/`: карта проекта
+  `CLAUDE.md`, общие настройки сессии, `local/`, как сессия корня видит репо; образцы файлов корня.
 - [reference/runbook.md](reference/runbook.md) — failure modes на проектном VPS, recovery, DR-drill.
 
 ## Infra design source-of-truth

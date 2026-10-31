@@ -23,18 +23,18 @@ Postgres, MinIO, backend, индексируемый сайт, backup — дек
 ## Место в экосистеме
 
 ```
-<org>/strategy                      design-time SoT: бизнес, продукт, домены, UX
-      │  читается cross-repo (vision, surface)
-      ▼
-<org>/infra   ← вы здесь            операционный хаб: общий план, агенты в сиблингах,
-      │                             выкатка тегов (make bump); один VPS на среду
-      ▼
-<org>/{backend,frontend,site,<bot>} образ в registry своим /release → выкатка отсюда
-<org>/mobile                        задачи отсюда; релиз — в магазины
+~/git/<org>/                        корень проекта: CLAUDE.md — карта проекта, отсюда ведётся работа
+├─ strategy/                        design-time SoT: бизнес, продукт, домены, UX — проектируется первым
+├─ infra/   ← вы здесь              хаб: программы сквозных задач, выкатка тегов (make bump);
+│                                   один VPS на среду
+├─ backend/ frontend/ site/ <bot>/  образ в registry своим /release → выкатка через infra
+└─ mobile/                          релиз — в магазины
 ```
 
-Форки одной орги лежат рядом sibling-checkout'ами; продукт проектируется первым — в
-`<org>/strategy` (форк
+Форки одной орги лежат в корне проекта `~/git/<org>/`, и работа ведётся из корня: одна сессия
+Claude Code работает в каждом репо его скиллами, карта проекта — корневой `CLAUDE.md`
+([`docs/reference/project-root.md`](docs/reference/project-root.md)). Продукт проектируется
+первым — в `<org>/strategy` (форк
 [`business-strategy-template`](https://github.com/stit-core/business-strategy-template)).
 Карта всех репо, операционный флоу и контракты —
 [`docs/reference/ecosystem.md`](docs/reference/ecosystem.md).
@@ -62,7 +62,8 @@ Postgres / MinIO можно вынести на отдельные хосты (s
 **[`docs/getting-started.md`](docs/getting-started.md)**. Коротко, три шага:
 
 **1. Форк и доступ к registry** (один раз на проект): `Use this template` → `<org>/infra`,
-клон; Gitea-аккаунт с PAT, которым VPS будет пуллить образы сервисов.
+клон в корень проекта (`~/git/<org>/infra`); Gitea-аккаунт с PAT, которым VPS будет пуллить образы
+сервисов.
 
 **2. Bootstrap VPS** (один VPS на среду): поднять чистый VPS и завести identity:
 ```bash
@@ -106,7 +107,7 @@ make ship        # check + push + (на main) ssh-deploy. На чистом де
 | Куда | Зачем |
 |---|---|
 | [`docs/getting-started.md`](docs/getting-started.md) | путь от форка до работающей VPS |
-| [`docs/reference/`](docs/reference/) | архитектура · экосистема · runbook/DR |
+| [`docs/reference/`](docs/reference/) | архитектура · экосистема · корень проекта · runbook/DR |
 | [`CLAUDE.md`](CLAUDE.md) | точка входа для агента (ядро + роутер); дневной флоу — `/smartdev` |
 | `make help` | полный словарь команд |
 

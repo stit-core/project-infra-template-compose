@@ -30,17 +30,19 @@
 
 ## Где это запускается
 
-Репо живёт на **рабочей станции оператора** — authoring / validate / plan / ship. Живого
-стека локально нет: приложения и контейнеры — на удалённом VPS (один VPS = одна среда).
-`make ship` пушит и триггерит remote `deploy.sh` по SSH. Ops на VPS (`ps`/`logs`/`deploy`/
-`restart`) — через `scripts/tools/ssh.sh` (connection из `.env.local`, fallback
+Репо живёт на **рабочей станции оператора** в корне проекта (`~/git/<org>/infra`) — authoring /
+validate / plan / ship. Живого стека локально нет: приложения и контейнеры — на удалённом VPS
+(один VPS = одна среда). `make ship` пушит и триггерит remote `deploy.sh` по SSH. Ops на VPS
+(`ps`/`logs`/`deploy`/`restart`) — через `scripts/tools/ssh.sh` (connection из `.env.local`, fallback
 `ansible/inventory.ini`). Локальный SKIP authoring-проверок без `.env`/docker — норма, не падение.
 
 ## Где это в экосистеме
 
-**Роль:** runtime проекта и его **операционный хаб**. Один форк (`<org>/infra`) — один проект,
-один VPS на среду (dev/staging/prod); отсюда ведутся программы сквозных задач и выкатка тегов, сервис-репо
-лежат рядом sibling-checkout'ами. Карта репо, флоу и контракты — канон `docs/reference/ecosystem.md`.
+**Роль:** runtime проекта и его **хаб**: здесь живут программы сквозных задач и отсюда идёт выкатка
+тегов. Один форк (`<org>/infra`) — один проект, один VPS на среду (dev/staging/prod). Работа ведётся из
+корня проекта `~/git/<org>/`: все репо проекта — его папки (этот — `infra/`, соседи — sibling-checkout'ы
+`../<name>`), карта проекта — корневой `CLAUDE.md` (`docs/reference/project-root.md`). Карта репо, флоу и
+контракты — канон `docs/reference/ecosystem.md`.
 **Образы сервисов** — из registry `REGISTRY_HOST` (дефолт `git.stit.tech`); теги — строго в `.env`
 (`<SVC>_TAG`), выкатка — `make bump SVC=<svc> TAG=<tag>`. Из коробки в стеке — `compose/backend.yml` и
 `compose/site.yml` (сайт на корне `${DOMAIN}`); frontend и бот добавляются `/add-service`. Handoff-блок
@@ -53,10 +55,11 @@ surfaces), read-only; резолв пути — `docs/reference/ecosystem.md`.
 
 1. **Сначала strategy.** Бизнес и продукт проектируются в `<org>/strategy` её скиллами
    (`/entrypoint`, клиент — `/entrypoint-for-business`) до инфры; здесь продукт не авторится.
-2. **Дальше — отсюда.** `/init-project` читает strategy и проектирует инфру. Сквозная задача —
-   программа здесь (`/plan`, фаза на репо) → агенты в сиблингах со своими планами фаз → выкатка здесь.
-3. **Агент в сиблинге работает обвязкой того репо** — сначала его CLAUDE.md, дальше его вербы,
-   скиллы и гейты: контракты сиблинга живут там, поэтому его код отсюда в обход них не правим.
+2. **Реализация — из корня проекта, через хаб.** `/init-project` читает strategy и проектирует инфру.
+   Сквозная задача — программа здесь (`/plan`, фаза на репо) → фазы в репо проекта, у каждой свой план
+   (их ведёт сессия корня — сама или фоновыми агентами) → выкатка здесь.
+3. **В соседнем репо работа идёт обвязкой того репо** — сначала его CLAUDE.md, дальше его вербы,
+   скиллы и гейты: контракты соседа живут там, поэтому его код в обход них не правим.
 
 | Сосед | Что там | Итог работы агента |
 |---|---|---|
@@ -121,6 +124,7 @@ identity + ACME из `.env`. `postgres` / `storage` (minio + backup) / `backend`
 | Архитектура, сети, профили, non-goals | `docs/reference/architecture.md` |
 | Инфра-слой проекта (stack + карта сервисов + service-doc'и) | `docs/project/README.md` (вход для `/init-project` + `/de-template`) |
 | Экосистема: карта репо, флоу, резолв сиблингов, контракт сервис-репо ↔ хаб, handoff-блок релиза | `docs/reference/ecosystem.md` |
+| Корень проекта: карта проекта `CLAUDE.md`, общие настройки сессии, `local/`; как сессия корня видит репо | `docs/reference/project-root.md` |
 | Продуктовый контекст (vision/surfaces) | соседний `<org>/strategy` (форк `business-strategy-template`), читается cross-repo |
 | Per-env `.env`-контракт, multi-env, профили | `.claude/rules/multi-env.md` |
 | Compose-инварианты сервиса | `.claude/rules/compose-and-services.md` |

@@ -7,9 +7,11 @@
 руками.** Multi-env: один проект имеет N сред (`dev`, `prod`, ...) — **N отдельных VPS**, по
 одному на `ENV`. Шаги 2–6 проходите на каждый VPS отдельно; 0, 1, 7 и 8 — один раз на проект.
 
-**Место в экосистеме.** Этот форк — операционный хаб проекта: продукт проектируется раньше, в
-соседнем `<org>/strategy` (`/entrypoint`), а отсюда ведутся общий план, работа агентов в
-сервис-репо и выкатка их образов (`make bump`). Карта и флоу — `docs/reference/ecosystem.md`.
+**Место в экосистеме.** Этот форк — хаб проекта: здесь живут программы сквозных задач, отсюда идёт
+выкатка образов сервис-репо (`make bump`). Продукт проектируется раньше, в соседнем `<org>/strategy`
+(`/entrypoint`). Все форки лежат в корне проекта `~/git/<org>/`, и работа ведётся из корня — карта
+проекта там же, в корневом `CLAUDE.md` (`docs/reference/project-root.md`). Карта и флоу —
+`docs/reference/ecosystem.md`.
 
 **Где вы работаете.** Репо живёт на **рабочей станции оператора** — здесь authoring / validate /
 plan / ship. Живого стека локально нет: приложения и контейнеры крутятся на удалённом VPS (один
@@ -34,7 +36,8 @@ fallback `ansible/inventory.ini`).
 
 1. Gitea (`https://git.stit.tech`) → `stit-core/project-infra-template-compose` →
    **Use this template** → `<org>/infra`.
-2. `git clone git@git.stit.tech:<org>/infra.git && cd infra`.
+2. В корне проекта (заведён по `docs/reference/project-root.md`):
+   `cd ~/git/<org> && git clone git@git.stit.tech:<org>/infra.git && cd infra`.
 3. `make setup` — ставит git-хуки (commit-msg, pre-commit на `.claude/plans/` + `docs/project/`)
    и PyYAML для frontmatter-проверки.
 
@@ -159,6 +162,6 @@ Cross-repo (форки backend/frontend, заполнение `.env` на VPS) �
 ## Готово
 
 Проект больше ничего не помнит про шаблон: свой домен, свой набор профилей, свой `CLAUDE.md`.
-Дальше — обычный дневной флоу через `/smartdev` (устройство `.claude`-слоя — `docs/contributing.md`):
-работа в сервис-репо ведётся отсюда общим планом, агентами в сиблингах и выкаткой `make bump`
-(`CLAUDE.md § Оркестрация`). Когда что-то сломалось — `docs/reference/runbook.md`.
+Дальше работа ведётся из корня проекта: инфра — дневной флоу через `/smartdev` (устройство
+`.claude`-слоя — `docs/contributing.md`), сквозные задачи — программами этого репо, выкатка —
+`make bump` (`CLAUDE.md § Оркестрация`). Когда что-то сломалось — `docs/reference/runbook.md`.
