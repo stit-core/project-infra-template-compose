@@ -37,7 +37,7 @@ Subagent'ы: `explorer` (read-many), `reviewer` (severity-graded review) — о�
 ```
 prompt → /smartdev (cockpit: make status, читает активные планы, чейнит режим)
        → plan (planning-first: изменение идёт через план в .claude/plans/; сквозная задача — программа)
-       → act (RED→GREEN: make validate/doctor; работа в сервис-репо — агентами в сиблингах, CLAUDE.md § Оркестрация)
+       → act (RED→GREEN: make validate/doctor; работа в сервис-репо — сессией корня проекта в их папках, CLAUDE.md § Оркестрация)
        → verify (claim «готово» → make check = validate + doctor + plan-check + project-check)
        → ship (make ship MSG="…": commit + check + push + на main ssh-deploy)
 ```
