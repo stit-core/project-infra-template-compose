@@ -277,7 +277,7 @@ make ship
    make restore-pg SNAPSHOT=latest
    ```
 6. Сверь новый IP во внешних системах, которые на него завязаны (webhook'и, allowlist'ы).
-7. App-uploads (minio-data) — не покрыто backup'ом. Если настроен external mirror (`mc mirror`) — оттуда; если нет — данные потеряны.
+7. App-uploads (minio-data) — не покрыто backup'ом. Если настроен external mirror (`mcli mirror`) — оттуда; если нет — данные потеряны.
 
 ## Quarterly DR drill
 

@@ -29,9 +29,10 @@ Identity / Secrets / Route / Generates. По разделу на каждую с
     (`compose/frontend.yml`),
   - `infra` → обычно always-on, не профильное.
 - Источник: для `backend` — внешний source-репо `<org>/backend`, но
-  контейнер `here`; для движков (postgres/minio) — official image; для
-  образа сервис-репо — `${REGISTRY_HOST:-git.stit.tech}/${PROJECT_NAME}/<name>`
-  с тегом `${<NAME>_TAG}` из `.env`.
+  контейнер `here`; для движков — публичный образ (postgres — official,
+  minio — `pgsty/silo`); для образа сервис-репо —
+  `${REGISTRY_HOST:-git.stit.tech}/${PROJECT_NAME}/<name>` с тегом
+  `${<NAME>_TAG}` из `.env`.
 
 **Опции опрашиваются как**:
 
@@ -73,7 +74,7 @@ Identity / Secrets / Route / Generates. По разделу на каждую с
 - `healthcheck`: команда или path. Для postgres — `pg_isready`, для
   HTTP-API — `wget`/`curl` + `/health` (Go-сервисы на golibinfra: `/health`
   liveness, `/ready` с probes), для сайта — `/healthz` (у контейнера и у сервиса
-  Traefik), для minio — `mc ready`.
+  Traefik), для minio — `curl` по `/minio/health/ready`.
 - Сети: `proxy` (наружу — если public) и/или `backend-net` (internal).
 
 **Опции опрашиваются как**:
@@ -101,7 +102,7 @@ Identity / Secrets / Route / Generates. По разделу на каждую с
   `wget -qO- http://127.0.0.1:8080/health`, сети `proxy + backend-net`».
 - ✅ «`image: …/site:${SITE_TAG}`, healthcheck `wget -qO- http://127.0.0.1:3000/healthz`,
   сеть `proxy` — данных стека сайту не нужно».
-- ❌ «`image: minio/minio:latest`» — pinned обязательно.
+- ❌ «`image: pgsty/silo:latest`» — pinned обязательно.
 - ❌ «public сервис без сети `proxy`».
 
 **Порядок копания**:

@@ -220,9 +220,9 @@ Daily backup гоняется внутри backup-контейнера (busybox 
 make backup
 ```
 
-Должно завершиться успехом. Проверь в проектном Minio (или external endpoint) — `mc` внутри minio-контейнера (make-first исключение):
+Должно завершиться успехом. Проверь в проектном Minio (или external endpoint) — `mcli` внутри minio-контейнера (make-first исключение). У алиаса `local` в контейнере сервера ключей нет: адрес с ключами корня — переменная `MC_HOST_local` из окружения контейнера:
 ```bash
-docker exec minio mc ls local/backups/
+docker exec minio sh -c 'MC_HOST_local="http://$MINIO_ROOT_USER:$MINIO_ROOT_PASSWORD@127.0.0.1:9000" mcli ls local/backups/'
 ```
 
 ## Guard'рейлы

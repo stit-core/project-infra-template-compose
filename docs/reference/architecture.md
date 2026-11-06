@@ -31,7 +31,7 @@ Single-VPS docker-compose стек одного проекта (дефолт). �
   `/_image` — 403 на edge. Пока сайта нет, корень держит заглушка `landing` — с ней выпускается сертификат
   корня; при сайте на корне её прунит `/de-template`.
 - **Backup** (restic, in-container crond): сидит сбоку, ежедневно делает `pg_dumpall | gzip | restic backup --stdin` (один файл-снапшот, не volume tree). `RESTIC_REPOSITORY` задаётся в `.env` без local-default'а — чтобы исключить случайный указатель на проектный minio (host failure уносит и postgres-data, и репо).
-- **Minio**: S3-storage на `s3.${DOMAIN}` / console `minio.${DOMAIN}`; bucket `app-uploads` для backend, `backups` для restic; service-accounts создаёт `minio-init`.
+- **Minio** (образ Silo — форк MinIO, клиент `mcli`): S3-storage на `s3.${DOMAIN}` / console `minio.${DOMAIN}`; bucket `app-uploads` для backend, `backups` для restic; service-accounts создаёт `minio-init`.
 
 ## Сети
 
@@ -81,7 +81,7 @@ Single-VPS docker-compose стек одного проекта (дефолт). �
 
 Образы сервис-репо compose тянет как `${REGISTRY_HOST:-git.stit.tech}/${PROJECT_NAME}/<svc>:${<SVC>_TAG}`; выкатка тега — `make bump SVC= TAG=`.
 
-Backup может писать в любой restic-совместимый endpoint (`RESTIC_REPOSITORY` в `.env`). Local-default отсутствует by design — на single-VPS он не даёт DR, host failure уносит и репо. Рекомендация: external managed S3 / bare-IP S3 на другом хосте. App-uploads bucket (`minio-data`) — **не** покрыт backup'ом; если нужен — настрой `mc mirror` job в external storage отдельно.
+Backup может писать в любой restic-совместимый endpoint (`RESTIC_REPOSITORY` в `.env`). Local-default отсутствует by design — на single-VPS он не даёт DR, host failure уносит и репо. Рекомендация: external managed S3 / bare-IP S3 на другом хосте. App-uploads bucket (`minio-data`) — **не** покрыт backup'ом; если нужен — настрой `mcli mirror` job в external storage отдельно.
 
 Один VPS = одна среда. Подробно — `.claude/rules/multi-env.md`. Карта репо экосистемы, флоу и контракт с сервис-репо — `docs/reference/ecosystem.md`.
 

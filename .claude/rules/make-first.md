@@ -1,6 +1,6 @@
 ---
 name: make-first
-description: make-first дисциплина — все операции через `make <verb>` (единый словарь из Makefile), скрипты за таргетами напрямую не дёргаем. Список легитимных raw-docker исключений (restic/cscli/mc/ls через `docker exec`, `docker compose config`, throwaway `docker run` в DR) и local-vs-remote split (authoring локально, ops на VPS). Грузится при правке Makefile, scripts/, скилов.
+description: make-first дисциплина — все операции через `make <verb>` (единый словарь из Makefile), скрипты за таргетами напрямую не дёргаем. Список легитимных raw-docker исключений (restic/cscli/mcli/ls через `docker exec`, `docker compose config`, throwaway `docker run` в DR) и local-vs-remote split (authoring локально, ops на VPS). Грузится при правке Makefile, scripts/, скилов.
 paths:
   - "Makefile"
   - "scripts/**"
@@ -39,7 +39,7 @@ paths:
 сама за себя. Каждый такой вызов в доке/скиле помечай как explanatory (зачем именно raw):
 
 - **`docker exec <c> <tool> …`** для инструмента внутри контейнера, у которого нет make-обёртки:
-  `restic` (в `backup`), `cscli` (в `crowdsec`), `mc` (в `minio`), `wget` к сайту изнутри (`docker exec site
+  `restic` (в `backup`), `cscli` (в `crowdsec`), `mcli` (в `minio`), `wget` к сайту изнутри (`docker exec site
   wget -qO- http://127.0.0.1:3000/robots.txt` — на не-прод edge без пароля отвечает 401).
   Пример: `docker exec backup restic snapshots --compact`.
 - **`docker compose config`** — разбор отрендеренного compose при триаже (`make validate` его гоняет,

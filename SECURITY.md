@@ -16,7 +16,7 @@
 и ошибки в security-sensitive конфигах (Traefik static + dynamic,
 `configs/crowdsec/**`).
 
-Вне скоупа: уязвимости в самих upstream-образах (Traefik, Postgres, Minio,
+Вне скоупа: уязвимости в самих upstream-образах (Traefik, Postgres, Silo,
 restic и т.д.) — их репортить их мейнтейнерам; здесь — только если наш
 дефолт-конфиг делает их эксплуатируемыми.
 

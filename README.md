@@ -46,7 +46,7 @@ Claude Code работает в каждом репо его скиллами, �
 | **Edge** | Traefik v3 + CrowdSec — HTTP-01 LE, WAF, IP-bans, журнал доступа, allowlist поисковых и ИИ-ботов | always-on |
 | **Landing** | заглушка корня `${DOMAIN}` под LE-cert до первого деплоя сайта | always-on |
 | **DB** | Postgres 17 | profile `postgres` |
-| **Storage** | MinIO (S3 + Console) | profile `storage` |
+| **Storage** | Silo — форк MinIO (S3 + Console) | profile `storage` |
 | **Backup** | restic + pg_dumpall + crond (alpine), daily → restic-репо | profile `storage` |
 | **App** | backend, образ из registry (`REGISTRY_HOST`, дефолт `git.stit.tech`) | profile `backend` |
 | **Site** | индексируемый сайт `<org>/site` на корне `${DOMAIN}` (`www` → корень) — `compose/site.yml`; приёмка — `make accept SVC=site` | profile `site` |

@@ -82,7 +82,7 @@ surfaces), read-only; резолв пути — `docs/reference/ecosystem.md`.
 | DB | Postgres 17 | `compose/postgres.yml` |
 | App | Backend (`${REGISTRY_HOST}/${PROJECT_NAME}/backend`) | `compose/backend.yml` |
 | Site | Индексируемый сайт (`${REGISTRY_HOST}/${PROJECT_NAME}/site`) на корне `${DOMAIN}`, `www` → корень | `compose/site.yml` |
-| Storage | Minio (S3 + Console) на `s3.${DOMAIN}` / `minio.${DOMAIN}` | `compose/minio.yml` |
+| Storage | Silo — форк MinIO (S3 + Console) на `s3.${DOMAIN}` / `minio.${DOMAIN}` | `compose/minio.yml` |
 | Backup | restic + pg_dumpall + crond в alpine, пишет в `$RESTIC_REPOSITORY` | `compose/backup.yml`, `containers/backup/` |
 
 Always-on (traefik / crowdsec / landing — заглушка корня до первого деплоя сайта) поднимается на
@@ -136,7 +136,7 @@ identity + ACME из `.env`. `postgres` / `storage` (minio + backup) / `backend`
 ## Стиль
 
 - **make-first.** Все операции — через `make <verb>` (`make help`); скрипты за таргетами напрямую
-  не дёргаем. Raw-`docker` — только legit-исключения (restic/cscli/mc/ls через `docker exec`,
+  не дёргаем. Raw-`docker` — только legit-исключения (restic/cscli/mcli/ls через `docker exec`,
   throwaway в DR, explanatory deploy.sh-внутренности). Канон и список исключений — rule `.claude/rules/make-first.md`.
 - **YAML 2-space indent**, без табов.
 - **Image закреплён конкретной версией.** `:latest` запрещён — конвенция, ловится `make validate`.
